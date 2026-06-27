@@ -7,6 +7,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
@@ -38,6 +39,7 @@ data class PlayerUiState(
  * Media3's [Player] interface so it can be attached directly to a [PlayerView] for video
  * rendering while also driving playback that keeps running when the app is backgrounded.
  */
+@OptIn(UnstableApi::class)
 class PlayerController(private val appContext: Context) {
 
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

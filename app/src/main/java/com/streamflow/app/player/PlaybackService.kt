@@ -1,5 +1,6 @@
 package com.streamflow.app.player
 
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -9,6 +10,7 @@ import androidx.media3.session.MediaSessionService
  * play/pause/skip controls) survives the app being backgrounded - the main "Premium" perk we can
  * replicate locally, since ad-free playback comes for free by not using YouTube's official player.
  */
+@OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null

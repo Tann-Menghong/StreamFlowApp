@@ -1,6 +1,5 @@
 package com.streamflow.app.extractor
 
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -40,7 +39,7 @@ class OkHttpDownloader(private val client: OkHttpClient) : Downloader() {
             }
         }
 
-        val body = dataToSend?.toRequestBody(null.toMediaTypeOrNull())
+        val body = dataToSend?.toRequestBody(null)
         requestBuilder.method(httpMethod, body)
 
         client.newCall(requestBuilder.build()).execute().use { response ->
