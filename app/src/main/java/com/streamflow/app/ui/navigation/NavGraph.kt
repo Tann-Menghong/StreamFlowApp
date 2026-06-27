@@ -28,7 +28,11 @@ fun NavHostController.navigateToVideo(url: String) {
 }
 
 @Composable
-fun StreamFlowNavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
+fun StreamFlowNavGraph(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+    onCheckForUpdates: () -> Unit = {}
+) {
     NavHost(navController = navController, startDestination = Destinations.HOME, modifier = modifier) {
         composable(Destinations.HOME) {
             HomeScreen(onVideoClick = { video -> navController.navigateToVideo(video.url) })
@@ -37,7 +41,10 @@ fun StreamFlowNavGraph(navController: NavHostController, modifier: Modifier = Mo
             SearchScreen(onVideoClick = { video -> navController.navigateToVideo(video.url) })
         }
         composable(Destinations.LIBRARY) {
-            LibraryScreen(onVideoClick = { video -> navController.navigateToVideo(video.url) })
+            LibraryScreen(
+                onVideoClick = { video -> navController.navigateToVideo(video.url) },
+                onCheckForUpdates = onCheckForUpdates
+            )
         }
         composable(
             route = Destinations.VIDEO_DETAIL,

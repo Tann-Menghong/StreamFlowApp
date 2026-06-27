@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -33,7 +37,7 @@ import com.streamflow.app.ui.components.VideoListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(onVideoClick: (VideoItem) -> Unit) {
+fun LibraryScreen(onVideoClick: (VideoItem) -> Unit, onCheckForUpdates: () -> Unit = {}) {
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory { initializer { LibraryViewModel(ServiceLocator.database) } }
     )
@@ -42,7 +46,16 @@ fun LibraryScreen(onVideoClick: (VideoItem) -> Unit) {
     val history by viewModel.history.collectAsState()
 
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text(stringResource(R.string.tab_library)) }) }
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text(stringResource(R.string.tab_library)) },
+                actions = {
+                    IconButton(onClick = onCheckForUpdates) {
+                        Icon(Icons.Default.SystemUpdate, contentDescription = stringResource(R.string.check_for_updates))
+                    }
+                }
+            )
+        }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
