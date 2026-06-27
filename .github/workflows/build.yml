@@ -7,6 +7,11 @@ on:
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag to publish a release for (e.g. v0.1.0). Leave empty to just build."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -51,13 +56,24 @@ jobs:
           path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
 
+      - name: Determine release tag
+        id: release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prepare release APK
-        if: startsWith(github.ref, 'refs/tags/')
-        run: cp app/build/outputs/apk/debug/*.apk streamflow-${{ github.ref_name }}-debug.apk
+        if: steps.release.outputs.tag != ''
+        run: cp app/build/outputs/apk/debug/*.apk streamflow-${{ steps.release.outputs.tag }}-debug.apk
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.release.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          files: streamflow-${{ github.ref_name }}-debug.apk
+          tag_name: ${{ steps.release.outputs.tag }}
+          files: streamflow-${{ steps.release.outputs.tag }}-debug.apk
           generate_release_notes: true
