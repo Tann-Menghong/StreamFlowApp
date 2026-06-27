@@ -36,11 +36,30 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Determine release tag
+        id: release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Lint
         run: ./gradlew lint --no-daemon
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          if [ -n "${{ steps.release.outputs.tag }}" ]; then
+            VERSION_NAME="${{ steps.release.outputs.tag }}"
+            VERSION_NAME="${VERSION_NAME#v}"
+            ./gradlew assembleDebug --no-daemon \
+              -PreleaseVersionName="$VERSION_NAME" \
+              -PreleaseVersionCode=${{ github.run_number }}
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -55,16 +74,6 @@ jobs:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
-
-      - name: Determine release tag
-        id: release
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Prepare release APK
         if: steps.release.outputs.tag != ''

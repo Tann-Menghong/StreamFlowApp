@@ -13,8 +13,11 @@ android {
         applicationId = "com.streamflow.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI overrides these via -PreleaseVersionName/-PreleaseVersionCode so the APK
+        // attached to a GitHub release actually reports the tagged version; the literals
+        // below are only the fallback for local/dev builds.
+        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 2
+        versionName = (project.findProperty("releaseVersionName") as String?) ?: "0.1.1"
 
         vectorDrawables.useSupportLibrary = true
     }
