@@ -51,9 +51,12 @@ class VideoDetailViewModel(
     }
 
     fun selectPlaybackSource(source: PlaybackSource, title: String) {
+        val current = (state.value as? UiState.Success)?.data ?: return
         when (source) {
-            is PlaybackSource.Muxed -> playerController.play(source.url, title, source.label)
-            is PlaybackSource.AudioOnly -> playerController.play(source.url, title, source.label)
+            is PlaybackSource.Muxed ->
+                playerController.play(source.url, title, source.label, current.url, current.thumbnailUrl)
+            is PlaybackSource.AudioOnly ->
+                playerController.play(source.url, title, source.label, current.url, current.thumbnailUrl)
         }
     }
 

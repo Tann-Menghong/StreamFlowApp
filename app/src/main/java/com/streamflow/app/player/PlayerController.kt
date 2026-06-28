@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 
 data class PlayerUiState(
     val title: String = "",
+    val videoPageUrl: String = "",
+    val thumbnailUrl: String? = null,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0L,
@@ -72,10 +74,18 @@ class PlayerController(private val appContext: Context) {
         }
     }
 
-    fun play(url: String, title: String, qualityLabel: String) {
+    fun play(url: String, title: String, qualityLabel: String, videoPageUrl: String, thumbnailUrl: String?) {
         withController { player ->
             val speed = _state.value.playbackSpeed
-            _state.update { PlayerUiState(title = title, qualityLabel = qualityLabel, playbackSpeed = speed) }
+            _state.update {
+                PlayerUiState(
+                    title = title,
+                    videoPageUrl = videoPageUrl,
+                    thumbnailUrl = thumbnailUrl,
+                    qualityLabel = qualityLabel,
+                    playbackSpeed = speed
+                )
+            }
             val mediaItem = MediaItem.Builder()
                 .setUri(url)
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
@@ -96,6 +106,18 @@ class PlayerController(private val appContext: Context) {
             val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
             player.seekTo((player.currentPosition + deltaMs).coerceIn(0, duration))
         }
+    }
+
+    fun togglePlayPause() {
+        withController { player -> player.playWhenReady = !player.playWhenReady }
+    }
+
+    fun stop() {
+        controller?.let { player ->
+            player.stop()
+            player.clearMediaItems()
+        }
+        _state.update { PlayerUiState() }
     }
 
     fun attachTo(playerView: PlayerView) {
