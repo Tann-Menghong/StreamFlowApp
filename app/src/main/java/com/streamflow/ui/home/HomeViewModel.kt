@@ -1,0 +1,60 @@
+package com.streamflow.ui.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.model.VideoItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import org.schabi.newpipe.extractor.Page
+
+sealed class HomeUiState {
+    object Loading : HomeUiState()
+    data class Success(
+        val videos: List<VideoItem>,
+        val isLoadingMore: Boolean = false,
+        val hasMore: Boolean = false
+    ) : HomeUiState()
+    data class Error(val message: String) : HomeUiState()
+}
+
+class HomeViewModel : ViewModel() {
+
+    private val repo = YouTubeRepository()
+    private var nextPage: Page? = null
+
+    private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
+    val uiState: StateFlow<HomeUiState> = _uiState
+
+    init { loadTrending() }
+
+    fun loadTrending() {
+        viewModelScope.launch {
+            _uiState.value = HomeUiState.Loading
+            nextPage = null
+            val result = repo.getTrending()
+            nextPage = result.nextPage
+            _uiState.value = if (result.videos.isEmpty())
+                HomeUiState.Error("Could not load trending videos.")
+            else
+                HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+        }
+    }
+
+    fun loadMore() {
+        val current = _uiState.value as? HomeUiState.Success ?: return
+        val page = nextPage ?: return
+        if (current.isLoadingMore) return
+        viewModelScope.launch {
+            _uiState.value = current.copy(isLoadingMore = true)
+            val result = repo.getTrendingNextPage(page)
+            nextPage = result.nextPage
+            _uiState.value = current.copy(
+                videos = current.videos + result.videos,
+                isLoadingMore = false,
+                hasMore = result.nextPage != null
+            )
+        }
+    }
+}

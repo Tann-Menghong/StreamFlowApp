@@ -1,0 +1,9 @@
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+-keep class com.fasterxml.jackson.** { *; }
+-dontwarn com.fasterxml.jackson.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class kotlin.** { *; }
+-keepattributes *Annotation*
+-keepattributes Signature
