@@ -23,18 +23,48 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 private const val SITE_URL = "https://donghuafun.com/"
 
+// ── Ad-blocking: known ad/tracker domains ────────────────────────────────────
+private val AD_DOMAINS = setOf(
+    "doubleclick.net", "googlesyndication.com", "googletagmanager.com",
+    "googletagservices.com", "google-analytics.com", "googleadservices.com",
+    "adservice.google.com", "analytics.google.com", "pagead2.googlesyndication.com",
+    "adnxs.com", "adsrvr.org", "adform.net", "rubiconproject.com",
+    "pubmatic.com", "openx.net", "moatads.com", "scorecardresearch.com",
+    "amazon-adsystem.com", "media.net", "criteo.com", "taboola.com",
+    "outbrain.com", "revcontent.com", "mgid.com", "ads.yahoo.com",
+    "advertising.com", "casalemedia.com", "turn.com", "adsystem.com",
+    "smartadserver.com", "bidswitch.net", "contextweb.com", "spotxchange.com",
+    "lijit.com", "appnexus.com", "trafficjunky.net", "exoclick.com",
+    "propellerads.com", "popcash.net", "clksite.com", "popads.net",
+    "adsterra.com", "hilltopads.net", "clickadu.com", "yllix.com"
+)
+
+private val AD_URL_PATTERNS = listOf(
+    "/ads/", "/ad/", "/advert", "banner_ad", "pop-ad", "popup_ad",
+    "/pagead/", "/adframe", "ad_slot", "adsense"
+)
+
+private fun isAdRequest(url: String): Boolean {
+    val lower = url.lowercase()
+    if (AD_DOMAINS.any { lower.contains(it) }) return true
+    if (AD_URL_PATTERNS.any { lower.contains(it) }) return true
+    return false
+}
+
+private val EMPTY_RESPONSE = WebResourceResponse("text/plain", "utf-8", null)
+
+// ── Stream detection ─────────────────────────────────────────────────────────
 private fun isVideoStream(url: String): Boolean {
     val lower = url.lowercase()
     if (!lower.startsWith("http")) return false
-    // Exclude common non-video resources
-    val excluded = listOf(".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",
-        ".woff", ".woff2", ".ttf", ".ico", ".json", "analytics", "doubleclick",
-        "googlesyndication", "google-analytics", "pagead", "adsbygoogle")
+    val excluded = listOf(".js", ".css", ".png", ".jpg", ".jpeg", ".gif",
+        ".svg", ".woff", ".woff2", ".ttf", ".ico", "analytics", "doubleclick",
+        "googlesyndication", "pagead", "adsbygoogle")
     if (excluded.any { lower.contains(it) }) return false
-    // Match HLS / progressive video
     return lower.contains(".m3u8") || lower.contains(".mp4") ||
            lower.contains(".webm") || lower.contains("/hls/") ||
-           lower.contains("/stream/") || lower.contains("playlist") && lower.contains("m3u")
+           lower.contains("/stream/") ||
+           (lower.contains("playlist") && lower.contains("m3u"))
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -89,10 +119,9 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                             setSupportZoom(true)
                             builtInZoomControls = true
                             displayZoomControls = false
-                            // Desktop UA helps with some players
                             userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
                                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                                "Chrome/121.0.0.0 Mobile Safari/537.36"
+                                "Chrome/124.0.0.0 Mobile Safari/537.36"
                         }
                         CookieManager.getInstance().apply {
                             setAcceptCookie(true)
@@ -112,25 +141,33 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                                     isLoading = false
                                     canGoBack = view.canGoBack()
                                 }
+                                // Inject CSS to hide ad containers
+                                view.evaluateJavascript("""
+                                    (function(){
+                                      var style = document.createElement('style');
+                                      style.textContent = '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"],.ads,.advertisement,.adsbygoogle,iframe[src*="ad"]{display:none!important}';
+                                      document.head.appendChild(style);
+                                    })()
+                                """.trimIndent(), null)
                             }
-                            // Intercept every network request — detect video streams
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): WebResourceResponse? {
                                 val url = request.url.toString()
+                                // Block ads
+                                if (isAdRequest(url)) return EMPTY_RESPONSE
+                                // Detect video stream
                                 if (isVideoStream(url)) {
                                     mainHandler.post { vm.onStreamDetected(url) }
                                 }
-                                return null // let WebView handle it normally
+                                return null
                             }
                             override fun onReceivedSslError(
                                 view: WebView,
                                 handler: SslErrorHandler,
                                 error: android.net.http.SslError
-                            ) {
-                                handler.proceed() // accept SSL for video CDNs
-                            }
+                            ) { handler.proceed() }
                         }
 
                         wv.webChromeClient = object : WebChromeClient() {
@@ -145,7 +182,6 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Loading bar at top
             if (isLoading) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
@@ -154,25 +190,25 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                 )
             }
 
-            // Stream detected banner at bottom
             AnimatedVisibility(
                 visible = detectedUrl != null,
                 enter = slideInVertically { it },
-                exit = slideOutVertically { it },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp)
+                exit  = slideOutVertically { it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
                 detectedUrl?.let { url ->
                     Card(
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Default.PlayCircle,
-                                contentDescription = null,
+                                Icons.Default.PlayCircle, null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -190,9 +226,9 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                                 onClick = { vm.clearDetectedStream() },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Dismiss",
+                                Icon(Icons.Default.Close, null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                             }
                         }
                     }

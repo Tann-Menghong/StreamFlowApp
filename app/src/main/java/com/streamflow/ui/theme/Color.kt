@@ -2,19 +2,23 @@ package com.streamflow.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Dark theme
-val Red80 = Color(0xFFFF6B6B)
-val Red40 = Color(0xFFCC0000)
-val Dark = Color(0xFF0F0F0F)
-val DarkSurface = Color(0xFF1C1C1C)
-val LightGray = Color(0xFFAAAAAA)
+// Dark
+val BackgroundDark    = Color(0xFF0E0E16)
+val SurfaceDark       = Color(0xFF16161F)
+val SurfaceVariantDark= Color(0xFF1F1F2E)
+val PrimaryRed        = Color(0xFFFF3D3D)
+val PrimaryRedDim     = Color(0xFFBB1E1E)
+val OnSurfaceDark     = Color(0xFFEEEEF5)
+val SubtextDark       = Color(0xFF8888A0)
 
-// AMOLED theme
-val AmoledBg = Color(0xFF000000)
-val AmoledSurface = Color(0xFF0A0A0A)
+// AMOLED
+val BackgroundAmoled  = Color(0xFF000000)
+val SurfaceAmoled     = Color(0xFF0D0D12)
 
-// Light theme
-val LightBg = Color(0xFFF9F9F9)
-val LightSurface = Color(0xFFFFFFFF)
-val LightOnBg = Color(0xFF111111)
-val RedLight = Color(0xFFD32F2F)
+// Light
+val BackgroundLight   = Color(0xFFF5F5FA)
+val SurfaceLight      = Color(0xFFFFFFFF)
+val SurfaceVariantLight= Color(0xFFEEEEF5)
+val PrimaryRedLight   = Color(0xFFCC1111)
+val OnSurfaceLight    = Color(0xFF111118)
+val SubtextLight      = Color(0xFF666680)
