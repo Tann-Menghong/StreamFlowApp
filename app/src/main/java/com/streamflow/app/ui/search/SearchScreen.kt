@@ -25,7 +25,7 @@ import com.streamflow.app.ui.components.VideoListContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(onVideoClick: (VideoItem) -> Unit) {
+fun SearchScreen(onVideoClick: (VideoItem) -> Unit, onChannelClick: (String) -> Unit = {}) {
     val viewModel: SearchViewModel = viewModel(
         factory = viewModelFactory { initializer { SearchViewModel(ServiceLocator.repository) } }
     )
@@ -50,6 +50,7 @@ fun SearchScreen(onVideoClick: (VideoItem) -> Unit) {
             state = state,
             onVideoClick = onVideoClick,
             onRetry = viewModel::retry,
+            onChannelClick = onChannelClick,
             modifier = Modifier.padding(padding)
         )
     }

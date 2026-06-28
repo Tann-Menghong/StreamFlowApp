@@ -5,6 +5,7 @@ package com.streamflow.app.ui.video
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,7 @@ fun VideoDetailScreen(
     videoUrl: String,
     onBack: () -> Unit,
     onVideoClick: (VideoItem) -> Unit,
+    onChannelClick: (String) -> Unit = {},
     isInPictureInPictureMode: Boolean = false
 ) {
     val viewModel: VideoDetailViewModel = viewModel(
@@ -122,7 +124,8 @@ fun VideoDetailScreen(
                     onSelectSource = { source -> viewModel.selectPlaybackSource(source, current.data.title) },
                     onSelectSpeed = viewModel::setPlaybackSpeed,
                     onSeek = viewModel::seekBy,
-                    onVideoClick = onVideoClick
+                    onVideoClick = onVideoClick,
+                    onChannelClick = onChannelClick
                 )
             }
         }
@@ -138,7 +141,8 @@ private fun VideoDetailBody(
     onSelectSource: (PlaybackSource) -> Unit,
     onSelectSpeed: (Float) -> Unit,
     onSeek: (Long) -> Unit,
-    onVideoClick: (VideoItem) -> Unit
+    onVideoClick: (VideoItem) -> Unit,
+    onChannelClick: (String) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -159,7 +163,11 @@ private fun VideoDetailBody(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(
+                        modifier = details.uploaderUrl?.let { url ->
+                            Modifier.clickable { onChannelClick(url) }
+                        } ?: Modifier
+                    ) {
                         Text(details.uploaderName, style = MaterialTheme.typography.bodyMedium)
                         val meta = listOfNotNull(
                             formatViewCount(details.viewCount).takeIf { it.isNotBlank() },
@@ -227,6 +235,7 @@ private fun VideoDetailBody(
                 VideoListItem(
                     video = video,
                     onClick = { onVideoClick(video) },
+                    onUploaderClick = onChannelClick,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }

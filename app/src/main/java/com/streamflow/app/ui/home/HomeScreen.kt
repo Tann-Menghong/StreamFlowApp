@@ -18,7 +18,7 @@ import com.streamflow.app.ui.components.VideoListContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onVideoClick: (VideoItem) -> Unit) {
+fun HomeScreen(onVideoClick: (VideoItem) -> Unit, onChannelClick: (String) -> Unit = {}) {
     val viewModel: HomeViewModel = viewModel(
         factory = viewModelFactory { initializer { HomeViewModel(ServiceLocator.repository) } }
     )
@@ -31,6 +31,7 @@ fun HomeScreen(onVideoClick: (VideoItem) -> Unit) {
             state = state,
             onVideoClick = onVideoClick,
             onRetry = viewModel::load,
+            onChannelClick = onChannelClick,
             modifier = Modifier.padding(padding)
         )
     }

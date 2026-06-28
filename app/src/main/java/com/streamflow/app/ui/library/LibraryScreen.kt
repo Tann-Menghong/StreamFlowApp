@@ -37,7 +37,11 @@ import com.streamflow.app.ui.components.VideoListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(onVideoClick: (VideoItem) -> Unit, onCheckForUpdates: () -> Unit = {}) {
+fun LibraryScreen(
+    onVideoClick: (VideoItem) -> Unit,
+    onChannelClick: (String) -> Unit = {},
+    onCheckForUpdates: () -> Unit = {}
+) {
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory { initializer { LibraryViewModel(ServiceLocator.database) } }
     )
@@ -86,7 +90,11 @@ fun LibraryScreen(onVideoClick: (VideoItem) -> Unit, onCheckForUpdates: () -> Un
                 } else {
                     LazyColumn(contentPadding = PaddingValues(12.dp)) {
                         items(videoItems, key = { it.url }) { video ->
-                            VideoListItem(video = video, onClick = { onVideoClick(video) })
+                            VideoListItem(
+                                video = video,
+                                onClick = { onVideoClick(video) },
+                                onUploaderClick = onChannelClick
+                            )
                         }
                     }
                 }

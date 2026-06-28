@@ -23,7 +23,12 @@ import coil.compose.AsyncImage
 import com.streamflow.app.data.model.VideoItem
 
 @Composable
-fun VideoListItem(video: VideoItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun VideoListItem(
+    video: VideoItem,
+    onClick: () -> Unit,
+    onUploaderClick: ((String) -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -62,10 +67,16 @@ fun VideoListItem(video: VideoItem, onClick: () -> Unit, modifier: Modifier = Mo
                 overflow = TextOverflow.Ellipsis
             )
             Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 4.dp)) {
+                val uploaderUrl = video.uploaderUrl
                 Text(
                     text = video.uploaderName,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = if (onUploaderClick != null && uploaderUrl != null) {
+                        Modifier.clickable { onUploaderClick(uploaderUrl) }
+                    } else {
+                        Modifier
+                    }
                 )
                 val meta = listOfNotNull(
                     formatViewCount(video.viewCount).takeIf { it.isNotBlank() },

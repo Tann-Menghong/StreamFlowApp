@@ -25,6 +25,7 @@ fun VideoListContent(
     state: UiState<List<VideoItem>>,
     onVideoClick: (VideoItem) -> Unit,
     onRetry: () -> Unit,
+    onChannelClick: (String) -> Unit = {},
     emptyMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -54,7 +55,11 @@ fun VideoListContent(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(state.data, key = { it.url }) { video ->
-                        VideoListItem(video = video, onClick = { onVideoClick(video) })
+                        VideoListItem(
+                            video = video,
+                            onClick = { onVideoClick(video) },
+                            onUploaderClick = onChannelClick
+                        )
                     }
                 }
             }

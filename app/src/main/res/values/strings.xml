@@ -8,6 +8,7 @@
     <string name="background_play">Background play</string>
     <string name="audio_only">Audio only</string>
     <string name="related_videos">Related videos</string>
+    <string name="channel_videos">Videos</string>
     <string name="watch_history">Watch history</string>
     <string name="bookmarks">Bookmarks</string>
     <string name="empty_bookmarks">No bookmarks yet. Tap the bookmark icon on a video to save it here.</string>

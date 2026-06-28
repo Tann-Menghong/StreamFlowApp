@@ -1,5 +1,6 @@
 package com.streamflow.app.data.repository
 
+import com.streamflow.app.data.model.ChannelDetails
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.model.VideoItem
@@ -8,6 +9,9 @@ import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
@@ -73,6 +77,29 @@ class YoutubeRepository {
         }
     }
 
+    suspend fun getChannelDetails(url: String): Result<ChannelDetails> = withContext(Dispatchers.IO) {
+        runCatching {
+            val info = ChannelInfo.getInfo(service, url)
+
+            val videosTab = info.tabs.firstOrNull { ChannelTabs.VIDEOS in it.contentFilters }
+            val videos = videosTab?.let { tab ->
+                ChannelTabInfo.getInfo(service, tab).relatedItems
+                    .filterIsInstance<StreamInfoItem>()
+                    .map { it.toVideoItem() }
+            }.orEmpty()
+
+            ChannelDetails(
+                url = info.url,
+                name = info.name,
+                avatarUrl = bestThumbnail(info.avatars),
+                bannerUrl = bestThumbnail(info.banners),
+                subscriberCount = info.subscriberCount,
+                description = info.description.orEmpty(),
+                videos = videos
+            )
+        }
+    }
+
     private fun buildPlaybackOptions(
         muxed: List<VideoStream>,
         audio: List<AudioStream>
@@ -101,6 +128,7 @@ class YoutubeRepository {
         title = name,
         thumbnailUrl = bestThumbnail(thumbnails),
         uploaderName = uploaderName ?: "",
+        uploaderUrl = uploaderUrl,
         durationSeconds = duration,
         viewCount = viewCount,
         textualUploadDate = textualUploadDate,

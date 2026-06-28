@@ -23,3 +23,13 @@ fun formatViewCount(count: Long): String {
         else -> "$count views"
     }
 }
+
+fun formatSubscriberCount(count: Long): String {
+    if (count < 0) return ""
+    return when {
+        count >= 1_000_000_000 -> String.format(Locale.US, "%.1fB subscribers", count / 1_000_000_000.0)
+        count >= 1_000_000 -> String.format(Locale.US, "%.1fM subscribers", count / 1_000_000.0)
+        count >= 1_000 -> String.format(Locale.US, "%.1fK subscribers", count / 1_000.0)
+        else -> "$count subscribers"
+    }
+}

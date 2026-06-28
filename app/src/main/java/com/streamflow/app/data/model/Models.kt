@@ -6,6 +6,7 @@ data class VideoItem(
     val title: String,
     val thumbnailUrl: String?,
     val uploaderName: String,
+    val uploaderUrl: String?,
     val durationSeconds: Long,
     val viewCount: Long,
     val textualUploadDate: String?,
@@ -31,4 +32,15 @@ data class VideoDetails(
     val relatedVideos: List<VideoItem>,
     val playbackOptions: List<PlaybackSource>,
     val bestAudioUrl: String?
+)
+
+/** A YouTube channel's profile info plus its uploaded videos, mapped from NewPipeExtractor's ChannelInfo. */
+data class ChannelDetails(
+    val url: String,
+    val name: String,
+    val avatarUrl: String?,
+    val bannerUrl: String?,
+    val subscriberCount: Long,
+    val description: String,
+    val videos: List<VideoItem>
 )
