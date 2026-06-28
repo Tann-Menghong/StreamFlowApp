@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.app.data.db.AppDatabase
 import com.streamflow.app.data.db.BookmarkEntity
 import com.streamflow.app.data.db.HistoryEntity
+import com.streamflow.app.data.db.SubscriptionEntity
 import com.streamflow.app.data.model.VideoItem
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,12 +23,19 @@ class LibraryViewModel(private val database: AppDatabase) : ViewModel() {
         .map { entities -> entities.map { it.toVideoItem() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val subscriptions: StateFlow<List<SubscriptionEntity>> = database.subscriptionDao().observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun clearHistory() {
         viewModelScope.launch { database.historyDao().clear() }
     }
 
     fun removeBookmark(url: String) {
         viewModelScope.launch { database.bookmarkDao().deleteByUrl(url) }
+    }
+
+    fun unsubscribe(channelUrl: String) {
+        viewModelScope.launch { database.subscriptionDao().deleteByUrl(channelUrl) }
     }
 
     private fun HistoryEntity.toVideoItem() = VideoItem(

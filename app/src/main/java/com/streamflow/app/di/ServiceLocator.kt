@@ -49,7 +49,7 @@ object ServiceLocator {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "streamflow.db"
-            ).build()
+            ).fallbackToDestructiveMigration().build()
 
             repository = YoutubeRepository()
             playerController = PlayerController(context.applicationContext)

@@ -1,5 +1,6 @@
 package com.streamflow.app.ui.channel
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +17,11 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -52,10 +55,11 @@ fun ChannelDetailScreen(
 ) {
     val viewModel: ChannelDetailViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { ChannelDetailViewModel(ServiceLocator.repository, channelUrl) }
+            initializer { ChannelDetailViewModel(ServiceLocator.repository, ServiceLocator.database, channelUrl) }
         }
     )
     val state by viewModel.state.collectAsState()
+    val isSubscribed by viewModel.isSubscribed.collectAsState()
 
     Scaffold(
         topBar = {
@@ -81,14 +85,24 @@ fun ChannelDetailScreen(
                         Text(stringResource(R.string.retry))
                     }
                 }
-                is UiState.Success -> ChannelBody(channel = current.data, onVideoClick = onVideoClick)
+                is UiState.Success -> ChannelBody(
+                    channel = current.data,
+                    isSubscribed = isSubscribed,
+                    onToggleSubscription = { viewModel.toggleSubscription(current.data) },
+                    onVideoClick = onVideoClick
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ChannelBody(channel: ChannelDetails, onVideoClick: (VideoItem) -> Unit) {
+private fun ChannelBody(
+    channel: ChannelDetails,
+    isSubscribed: Boolean,
+    onToggleSubscription: () -> Unit,
+    onVideoClick: (VideoItem) -> Unit
+) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         if (channel.bannerUrl != null) {
             item {
@@ -103,22 +117,38 @@ private fun ChannelBody(channel: ChannelDetails, onVideoClick: (VideoItem) -> Un
 
         item {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = channel.avatarUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(64.dp).clip(CircleShape)
-                    )
-                    Column(modifier = Modifier.padding(start = 12.dp)) {
-                        Text(channel.name, style = MaterialTheme.typography.titleMedium)
-                        val subscribers = formatSubscriberCount(channel.subscriberCount)
-                        if (subscribers.isNotBlank()) {
-                            Text(
-                                text = subscribers,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(
+                            model = channel.avatarUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(64.dp).clip(CircleShape)
+                        )
+                        Column(modifier = Modifier.padding(start = 12.dp)) {
+                            Text(channel.name, style = MaterialTheme.typography.titleMedium)
+                            val subscribers = formatSubscriberCount(channel.subscriberCount)
+                            if (subscribers.isNotBlank()) {
+                                Text(
+                                    text = subscribers,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (isSubscribed) {
+                        OutlinedButton(onClick = onToggleSubscription) {
+                            Text(stringResource(R.string.subscribed))
+                        }
+                    } else {
+                        FilledTonalButton(onClick = onToggleSubscription) {
+                            Text(stringResource(R.string.subscribe))
                         }
                     }
                 }

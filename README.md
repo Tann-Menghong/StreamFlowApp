@@ -11,6 +11,8 @@ sign-in, or YouTube/Google API key is required.
 - Browse trending videos, search YouTube, and watch videos with no ads
 - Channel pages: tap any uploader's name to view their avatar, banner,
   subscriber count, description, and full video list — just like YouTube
+- Subscriptions: subscribe to channels from their page and find them all in
+  a dedicated Library tab, stored entirely on-device
 - Background/audio-only playback that keeps running when the app is minimized,
   with media notification controls (play/pause/seek) — a Premium-like experience
 - Local watch history and bookmarks ("Library" tab), stored entirely on-device
@@ -72,6 +74,7 @@ as NewPipe. Use it at your own risk, for personal use only.
 
 - Merge separate video-only + audio-only DASH streams to support 1080p and
   above (today's progressive formats top out around 720p)
-- Subscriptions (a followed-channels feed; channel pages themselves are done)
+- A combined feed of new uploads across subscribed channels (subscriptions
+  themselves are done)
 - Playlists
 - SponsorBlock-style segment skipping

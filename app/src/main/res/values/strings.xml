@@ -11,8 +11,13 @@
     <string name="channel_videos">Videos</string>
     <string name="watch_history">Watch history</string>
     <string name="bookmarks">Bookmarks</string>
+    <string name="subscriptions">Subscriptions</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="subscribed">Subscribed</string>
+    <string name="unsubscribe">Unsubscribe</string>
     <string name="empty_bookmarks">No bookmarks yet. Tap the bookmark icon on a video to save it here.</string>
     <string name="empty_history">No watch history yet.</string>
+    <string name="empty_subscriptions">No subscriptions yet. Visit a channel page and tap Subscribe.</string>
     <string name="quality">Quality</string>
     <string name="error_loading">Something went wrong loading this content.</string>
     <string name="retry">Retry</string>

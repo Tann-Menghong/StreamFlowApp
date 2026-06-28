@@ -33,3 +33,18 @@ interface BookmarkDao {
     @Query("DELETE FROM bookmarks WHERE url = :url")
     suspend fun deleteByUrl(url: String)
 }
+
+@Dao
+interface SubscriptionDao {
+    @Query("SELECT * FROM subscriptions ORDER BY subscribedAt DESC")
+    fun observeAll(): Flow<List<SubscriptionEntity>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM subscriptions WHERE channelUrl = :channelUrl)")
+    fun observeIsSubscribed(channelUrl: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: SubscriptionEntity)
+
+    @Query("DELETE FROM subscriptions WHERE channelUrl = :channelUrl")
+    suspend fun deleteByUrl(channelUrl: String)
+}
