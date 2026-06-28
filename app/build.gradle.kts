@@ -91,7 +91,7 @@ dependencies {
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
     // JavaScript engine required by NewPipeExtractor to decipher YouTube's obfuscated stream URLs.
     // Without this, every video load fails at the JS-evaluation step.
-    implementation("net.sourceforge.htmlunit:rhino:1.7.15")
+    implementation("org.mozilla:rhino:1.7.15")
 
     // Playback
     implementation("androidx.media3:media3-exoplayer:1.4.1")
