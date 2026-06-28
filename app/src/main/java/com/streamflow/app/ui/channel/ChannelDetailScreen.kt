@@ -42,6 +42,7 @@ import com.streamflow.app.R
 import com.streamflow.app.data.model.ChannelDetails
 import com.streamflow.app.data.model.VideoItem
 import com.streamflow.app.di.ServiceLocator
+import com.streamflow.app.ui.components.PlaylistListItem
 import com.streamflow.app.ui.components.UiState
 import com.streamflow.app.ui.components.VideoListItem
 import com.streamflow.app.ui.components.formatSubscriberCount
@@ -51,7 +52,8 @@ import com.streamflow.app.ui.components.formatSubscriberCount
 fun ChannelDetailScreen(
     channelUrl: String,
     onBack: () -> Unit,
-    onVideoClick: (VideoItem) -> Unit
+    onVideoClick: (VideoItem) -> Unit,
+    onPlaylistClick: (String) -> Unit = {}
 ) {
     val viewModel: ChannelDetailViewModel = viewModel(
         factory = viewModelFactory {
@@ -89,7 +91,8 @@ fun ChannelDetailScreen(
                     channel = current.data,
                     isSubscribed = isSubscribed,
                     onToggleSubscription = { viewModel.toggleSubscription(current.data) },
-                    onVideoClick = onVideoClick
+                    onVideoClick = onVideoClick,
+                    onPlaylistClick = onPlaylistClick
                 )
             }
         }
@@ -101,7 +104,8 @@ private fun ChannelBody(
     channel: ChannelDetails,
     isSubscribed: Boolean,
     onToggleSubscription: () -> Unit,
-    onVideoClick: (VideoItem) -> Unit
+    onVideoClick: (VideoItem) -> Unit,
+    onPlaylistClick: (String) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         if (channel.bannerUrl != null) {
@@ -160,6 +164,23 @@ private fun ChannelBody(
                         modifier = Modifier.padding(top = 16.dp)
                     )
                 }
+            }
+        }
+
+        if (channel.playlists.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.playlists),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            items(channel.playlists, key = { it.url }) { playlist ->
+                PlaylistListItem(
+                    playlist = playlist,
+                    onClick = { onPlaylistClick(playlist.url) },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
         }
 

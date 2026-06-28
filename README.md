@@ -15,6 +15,8 @@ sign-in, or YouTube/Google API key is required.
   a dedicated Library tab, stored entirely on-device
 - Subscriptions feed: a combined, merged feed of new uploads across all
   subscribed channels, right in the Library tab
+- Playlists: browse a channel's playlists and open one to see its full
+  video list
 - Background/audio-only playback that keeps running when the app is minimized,
   with media notification controls (play/pause/seek) — a Premium-like experience
 - Local watch history and bookmarks ("Library" tab), stored entirely on-device
@@ -76,5 +78,4 @@ as NewPipe. Use it at your own risk, for personal use only.
 
 - Merge separate video-only + audio-only DASH streams to support 1080p and
   above (today's progressive formats top out around 720p)
-- Playlists
 - SponsorBlock-style segment skipping

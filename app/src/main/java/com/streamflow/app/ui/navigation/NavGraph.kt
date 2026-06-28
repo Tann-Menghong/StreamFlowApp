@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import com.streamflow.app.ui.channel.ChannelDetailScreen
 import com.streamflow.app.ui.home.HomeScreen
 import com.streamflow.app.ui.library.LibraryScreen
+import com.streamflow.app.ui.playlist.PlaylistDetailScreen
 import com.streamflow.app.ui.search.SearchScreen
 import com.streamflow.app.ui.video.VideoDetailScreen
 import java.net.URLDecoder
@@ -22,6 +23,7 @@ object Destinations {
     const val LIBRARY = "library"
     const val VIDEO_DETAIL = "video/{videoUrl}"
     const val CHANNEL = "channel/{channelUrl}"
+    const val PLAYLIST = "playlist/{playlistUrl}"
 }
 
 fun NavHostController.navigateToVideo(url: String) {
@@ -32,6 +34,11 @@ fun NavHostController.navigateToVideo(url: String) {
 fun NavHostController.navigateToChannel(url: String) {
     val encoded = URLEncoder.encode(url, StandardCharsets.UTF_8.name())
     navigate("channel/$encoded")
+}
+
+fun NavHostController.navigateToPlaylist(url: String) {
+    val encoded = URLEncoder.encode(url, StandardCharsets.UTF_8.name())
+    navigate("playlist/$encoded")
 }
 
 @Composable
@@ -84,7 +91,21 @@ fun StreamFlowNavGraph(
             ChannelDetailScreen(
                 channelUrl = channelUrl,
                 onBack = { navController.popBackStack() },
-                onVideoClick = { video -> navController.navigateToVideo(video.url) }
+                onVideoClick = { video -> navController.navigateToVideo(video.url) },
+                onPlaylistClick = { url -> navController.navigateToPlaylist(url) }
+            )
+        }
+        composable(
+            route = Destinations.PLAYLIST,
+            arguments = listOf(navArgument("playlistUrl") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val encodedUrl = backStackEntry.arguments?.getString("playlistUrl").orEmpty()
+            val playlistUrl = URLDecoder.decode(encodedUrl, StandardCharsets.UTF_8.name())
+            PlaylistDetailScreen(
+                playlistUrl = playlistUrl,
+                onBack = { navController.popBackStack() },
+                onVideoClick = { video -> navController.navigateToVideo(video.url) },
+                onChannelClick = { url -> navController.navigateToChannel(url) }
             )
         }
     }

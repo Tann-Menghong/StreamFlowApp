@@ -2,6 +2,8 @@ package com.streamflow.app.data.repository
 
 import com.streamflow.app.data.model.ChannelDetails
 import com.streamflow.app.data.model.PlaybackSource
+import com.streamflow.app.data.model.PlaylistDetails
+import com.streamflow.app.data.model.PlaylistItem
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.model.VideoItem
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +14,8 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo
+import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
@@ -88,6 +92,13 @@ class YoutubeRepository {
                     .map { it.toVideoItem() }
             }.orEmpty()
 
+            val playlistsTab = info.tabs.firstOrNull { ChannelTabs.PLAYLISTS in it.contentFilters }
+            val playlists = playlistsTab?.let { tab ->
+                ChannelTabInfo.getInfo(service, tab).relatedItems
+                    .filterIsInstance<PlaylistInfoItem>()
+                    .map { it.toPlaylistItem() }
+            }.orEmpty()
+
             ChannelDetails(
                 url = info.url,
                 name = info.name,
@@ -95,7 +106,25 @@ class YoutubeRepository {
                 bannerUrl = bestThumbnail(info.banners),
                 subscriberCount = info.subscriberCount,
                 description = info.description.orEmpty(),
-                videos = videos
+                videos = videos,
+                playlists = playlists
+            )
+        }
+    }
+
+    suspend fun getPlaylistDetails(url: String): Result<PlaylistDetails> = withContext(Dispatchers.IO) {
+        runCatching {
+            val info = PlaylistInfo.getInfo(service, url)
+
+            PlaylistDetails(
+                url = info.url,
+                name = info.name,
+                uploaderName = info.uploaderName ?: "",
+                thumbnailUrl = bestThumbnail(info.thumbnails),
+                streamCount = info.streamCount,
+                videos = info.relatedItems
+                    .filterIsInstance<StreamInfoItem>()
+                    .map { it.toVideoItem() }
             )
         }
     }
@@ -133,5 +162,13 @@ class YoutubeRepository {
         viewCount = viewCount,
         textualUploadDate = textualUploadDate,
         isShort = isShortFormContent
+    )
+
+    private fun PlaylistInfoItem.toPlaylistItem(): PlaylistItem = PlaylistItem(
+        url = url,
+        name = name,
+        thumbnailUrl = bestThumbnail(thumbnails),
+        uploaderName = uploaderName ?: "",
+        streamCount = streamCount
     )
 }

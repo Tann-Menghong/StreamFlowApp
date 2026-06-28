@@ -42,5 +42,25 @@ data class ChannelDetails(
     val bannerUrl: String?,
     val subscriberCount: Long,
     val description: String,
+    val videos: List<VideoItem>,
+    val playlists: List<PlaylistItem>
+)
+
+/** A playlist's summary as shown in a list (e.g. a channel's Playlists tab), mapped from PlaylistInfoItem. */
+data class PlaylistItem(
+    val url: String,
+    val name: String,
+    val thumbnailUrl: String?,
+    val uploaderName: String,
+    val streamCount: Long
+)
+
+/** A playlist's full details plus its videos, mapped from NewPipeExtractor's PlaylistInfo. */
+data class PlaylistDetails(
+    val url: String,
+    val name: String,
+    val uploaderName: String,
+    val thumbnailUrl: String?,
+    val streamCount: Long,
     val videos: List<VideoItem>
 )

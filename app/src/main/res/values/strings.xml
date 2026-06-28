@@ -9,6 +9,8 @@
     <string name="audio_only">Audio only</string>
     <string name="related_videos">Related videos</string>
     <string name="channel_videos">Videos</string>
+    <string name="playlists">Playlists</string>
+    <string name="playlist_video_count">%1$d videos</string>
     <string name="watch_history">Watch history</string>
     <string name="bookmarks">Bookmarks</string>
     <string name="subscriptions">Subscriptions</string>
