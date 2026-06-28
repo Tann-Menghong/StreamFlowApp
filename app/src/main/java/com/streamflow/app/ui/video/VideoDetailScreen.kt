@@ -57,7 +57,8 @@ import com.streamflow.app.ui.components.formatViewCount
 fun VideoDetailScreen(
     videoUrl: String,
     onBack: () -> Unit,
-    onVideoClick: (VideoItem) -> Unit
+    onVideoClick: (VideoItem) -> Unit,
+    isInPictureInPictureMode: Boolean = false
 ) {
     val viewModel: VideoDetailViewModel = viewModel(
         factory = viewModelFactory {
@@ -74,6 +75,16 @@ fun VideoDetailScreen(
     val state by viewModel.state.collectAsState()
     val isBookmarked by viewModel.isBookmarked.collectAsState()
     val playerState by viewModel.playerState.collectAsState()
+
+    if (isInPictureInPictureMode) {
+        PlayerSurface(
+            playbackSpeed = playerState.playbackSpeed,
+            onSelectSpeed = viewModel::setPlaybackSpeed,
+            showSpeedControl = false,
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -219,7 +230,8 @@ private fun formatSpeedLabel(speed: Float): String {
 private fun PlayerSurface(
     playbackSpeed: Float,
     onSelectSpeed: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showSpeedControl: Boolean = true
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var speedMenuExpanded by remember { mutableStateOf(false) }
@@ -241,19 +253,21 @@ private fun PlayerSurface(
             modifier = Modifier.fillMaxSize()
         )
 
-        Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-            FilledTonalButton(onClick = { speedMenuExpanded = true }) {
-                Text(formatSpeedLabel(playbackSpeed))
-            }
-            DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
-                PLAYBACK_SPEEDS.forEach { speed ->
-                    DropdownMenuItem(
-                        text = { Text(formatSpeedLabel(speed)) },
-                        onClick = {
-                            onSelectSpeed(speed)
-                            speedMenuExpanded = false
-                        }
-                    )
+        if (showSpeedControl) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                FilledTonalButton(onClick = { speedMenuExpanded = true }) {
+                    Text(formatSpeedLabel(playbackSpeed))
+                }
+                DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
+                    PLAYBACK_SPEEDS.forEach { speed ->
+                        DropdownMenuItem(
+                            text = { Text(formatSpeedLabel(speed)) },
+                            onClick = {
+                                onSelectSpeed(speed)
+                                speedMenuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
         }

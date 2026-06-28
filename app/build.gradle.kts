@@ -16,8 +16,8 @@ android {
         // CI overrides these via -PreleaseVersionName/-PreleaseVersionCode so the APK
         // attached to a GitHub release actually reports the tagged version; the literals
         // below are only the fallback for local/dev builds.
-        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 4
-        versionName = (project.findProperty("releaseVersionName") as String?) ?: "0.3.0"
+        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 5
+        versionName = (project.findProperty("releaseVersionName") as String?) ?: "0.4.0"
 
         vectorDrawables.useSupportLibrary = true
     }

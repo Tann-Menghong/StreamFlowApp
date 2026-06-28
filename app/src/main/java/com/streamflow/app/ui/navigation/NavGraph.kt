@@ -31,7 +31,8 @@ fun NavHostController.navigateToVideo(url: String) {
 fun StreamFlowNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    onCheckForUpdates: () -> Unit = {}
+    onCheckForUpdates: () -> Unit = {},
+    isInPictureInPictureMode: Boolean = false
 ) {
     NavHost(navController = navController, startDestination = Destinations.HOME, modifier = modifier) {
         composable(Destinations.HOME) {
@@ -55,7 +56,8 @@ fun StreamFlowNavGraph(
             VideoDetailScreen(
                 videoUrl = videoUrl,
                 onBack = { navController.popBackStack() },
-                onVideoClick = { video -> navController.navigateToVideo(video.url) }
+                onVideoClick = { video -> navController.navigateToVideo(video.url) },
+                isInPictureInPictureMode = isInPictureInPictureMode
             )
         }
     }

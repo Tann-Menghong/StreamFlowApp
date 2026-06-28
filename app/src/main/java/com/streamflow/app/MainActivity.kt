@@ -1,6 +1,10 @@
 package com.streamflow.app
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
@@ -20,7 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -38,15 +44,36 @@ import com.streamflow.app.ui.theme.StreamFlowTheme
 import com.streamflow.app.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
+    private var canEnterPip = false
+    private var inPictureInPictureMode by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             StreamFlowTheme {
                 Surface {
-                    StreamFlowApp()
+                    StreamFlowApp(
+                        isInPictureInPictureMode = inPictureInPictureMode,
+                        onPipEligibilityChanged = { canEnterPip = it }
+                    )
                 }
             }
         }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (canEnterPip && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPictureInPictureMode = isInPictureInPictureMode
     }
 }
 
@@ -59,7 +86,10 @@ private val bottomTabs = listOf(
 )
 
 @Composable
-private fun StreamFlowApp() {
+private fun StreamFlowApp(
+    isInPictureInPictureMode: Boolean = false,
+    onPipEligibilityChanged: (Boolean) -> Unit = {}
+) {
     val context = LocalContext.current
     val currentVersionName = remember {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
@@ -76,7 +106,12 @@ private fun StreamFlowApp() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute != Destinations.VIDEO_DETAIL
+    val showBottomBar = currentRoute != Destinations.VIDEO_DETAIL && !isInPictureInPictureMode
+
+    val playerState by ServiceLocator.playerController.state.collectAsState()
+    LaunchedEffect(currentRoute, playerState.isPlaying) {
+        onPipEligibilityChanged(currentRoute == Destinations.VIDEO_DETAIL && playerState.isPlaying)
+    }
 
     val availableUpdate = updateState.available
     if (availableUpdate != null) {
@@ -171,7 +206,8 @@ private fun StreamFlowApp() {
         StreamFlowNavGraph(
             navController = navController,
             modifier = Modifier.padding(padding),
-            onCheckForUpdates = { updateViewModel.checkForUpdate(announceUpToDate = true) }
+            onCheckForUpdates = { updateViewModel.checkForUpdate(announceUpToDate = true) },
+            isInPictureInPictureMode = isInPictureInPictureMode
         )
     }
 }
