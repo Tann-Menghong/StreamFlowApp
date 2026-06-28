@@ -2,7 +2,7 @@ package com.streamflow.app.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.streamflow.app.data.model.VideoItem
+import com.streamflow.app.data.model.SearchResultItem
 import com.streamflow.app.data.repository.YoutubeRepository
 import com.streamflow.app.ui.components.UiState
 import kotlinx.coroutines.Job
@@ -17,8 +17,8 @@ class SearchViewModel(private val repository: YoutubeRepository) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    private val _state = MutableStateFlow<UiState<List<VideoItem>>>(UiState.Success(emptyList()))
-    val state: StateFlow<UiState<List<VideoItem>>> = _state.asStateFlow()
+    private val _state = MutableStateFlow<UiState<List<SearchResultItem>>>(UiState.Success(emptyList()))
+    val state: StateFlow<UiState<List<SearchResultItem>>> = _state.asStateFlow()
 
     private var searchJob: Job? = null
 

@@ -64,3 +64,18 @@ data class PlaylistDetails(
     val streamCount: Long,
     val videos: List<VideoItem>
 )
+
+/** A channel's summary as shown in a list (e.g. search results), mapped from ChannelInfoItem. */
+data class ChannelItem(
+    val url: String,
+    val name: String,
+    val thumbnailUrl: String?,
+    val subscriberCount: Long,
+    val description: String
+)
+
+/** A single search result, which YouTube mixes between matching videos and channels. */
+sealed class SearchResultItem {
+    data class Video(val video: VideoItem) : SearchResultItem()
+    data class Channel(val channel: ChannelItem) : SearchResultItem()
+}

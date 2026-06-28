@@ -21,7 +21,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.streamflow.app.R
 import com.streamflow.app.data.model.VideoItem
 import com.streamflow.app.di.ServiceLocator
-import com.streamflow.app.ui.components.VideoListContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,11 +45,11 @@ fun SearchScreen(onVideoClick: (VideoItem) -> Unit, onChannelClick: (String) -> 
             )
         }
     ) { padding ->
-        VideoListContent(
+        SearchResultContent(
             state = state,
             onVideoClick = onVideoClick,
-            onRetry = viewModel::retry,
             onChannelClick = onChannelClick,
+            onRetry = viewModel::retry,
             modifier = Modifier.padding(padding)
         )
     }

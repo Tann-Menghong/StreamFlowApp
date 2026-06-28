@@ -1,9 +1,11 @@
 package com.streamflow.app.data.repository
 
 import com.streamflow.app.data.model.ChannelDetails
+import com.streamflow.app.data.model.ChannelItem
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.PlaylistDetails
 import com.streamflow.app.data.model.PlaylistItem
+import com.streamflow.app.data.model.SearchResultItem
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.model.VideoItem
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +14,7 @@ import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
@@ -41,14 +44,18 @@ class YoutubeRepository {
         }
     }
 
-    suspend fun search(query: String): Result<List<VideoItem>> = withContext(Dispatchers.IO) {
+    suspend fun search(query: String): Result<List<SearchResultItem>> = withContext(Dispatchers.IO) {
         runCatching {
             val searchExtractor = service.getSearchExtractor(query)
             searchExtractor.fetchPage()
             val searchInfo = SearchInfo.getInfo(searchExtractor)
-            searchInfo.relatedItems
-                .filterIsInstance<StreamInfoItem>()
-                .map { it.toVideoItem() }
+            searchInfo.relatedItems.mapNotNull { item ->
+                when (item) {
+                    is StreamInfoItem -> SearchResultItem.Video(item.toVideoItem())
+                    is ChannelInfoItem -> SearchResultItem.Channel(item.toChannelItem())
+                    else -> null
+                }
+            }
         }
     }
 
@@ -170,5 +177,13 @@ class YoutubeRepository {
         thumbnailUrl = bestThumbnail(thumbnails),
         uploaderName = uploaderName ?: "",
         streamCount = streamCount
+    )
+
+    private fun ChannelInfoItem.toChannelItem(): ChannelItem = ChannelItem(
+        url = url,
+        name = name,
+        thumbnailUrl = bestThumbnail(thumbnails),
+        subscriberCount = subscriberCount,
+        description = description.orEmpty()
     )
 }
