@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -15,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.streamflow.ui.donghua.DonghuaScreen
 import com.streamflow.ui.home.HomeScreen
 import com.streamflow.ui.library.LibraryScreen
 import com.streamflow.ui.player.PlayerScreen
@@ -23,17 +25,20 @@ import com.streamflow.ui.settings.SettingsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
-sealed class Screen(val route: String, val label: String) {
-    object Home     : Screen("home", "Home")
-    object Search   : Screen("search", "Search")
-    object Library  : Screen("library", "Library")
-    object Settings : Screen("settings", "Settings")
-    object Player   : Screen("player/{videoUrl}", "Player") {
+sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
+    object Home     : Screen("home",     "Home",    Icons.Default.Home)
+    object Search   : Screen("search",   "Search",  Icons.Default.Search)
+    object Donghua  : Screen("donghua",  "Donghua", Icons.Default.LiveTv)
+    object Library  : Screen("library",  "Library", Icons.Default.VideoLibrary)
+    object Settings : Screen("settings", "Settings",Icons.Default.Settings)
+    object Player   : Screen("player/{videoUrl}", "Player", Icons.Default.PlayArrow) {
         fun createRoute(url: String) = "player/${URLEncoder.encode(url, "UTF-8")}"
     }
 }
 
-private val bottomItems = listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Settings)
+private val bottomItems = listOf(
+    Screen.Home, Screen.Search, Screen.Donghua, Screen.Library, Screen.Settings
+)
 
 @Composable
 fun NavGraph() {
@@ -49,17 +54,7 @@ fun NavGraph() {
                     bottomItems.forEach { screen ->
                         val selected = currentDest?.hierarchy?.any { it.route == screen.route } == true
                         NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = when (screen) {
-                                        Screen.Home     -> Icons.Default.Home
-                                        Screen.Search   -> Icons.Default.Search
-                                        Screen.Library  -> Icons.Default.VideoLibrary
-                                        else            -> Icons.Default.Settings
-                                    },
-                                    contentDescription = screen.label
-                                )
-                            },
+                            icon = { Icon(screen.icon, contentDescription = screen.label) },
                             label = { Text(screen.label) },
                             selected = selected,
                             onClick = {
@@ -85,6 +80,9 @@ fun NavGraph() {
             }
             composable(Screen.Search.route) {
                 SearchScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
+            }
+            composable(Screen.Donghua.route) {
+                DonghuaScreen(onPlayNative = { navController.navigate(Screen.Player.createRoute(it)) })
             }
             composable(Screen.Library.route) {
                 LibraryScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })

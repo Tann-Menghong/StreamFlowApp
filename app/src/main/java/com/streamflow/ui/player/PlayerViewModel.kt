@@ -37,13 +37,31 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         _currentUrl.value = videoUrl
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
-            val quality = prefs.quality.first()
-            val details = repo.getVideoDetails(videoUrl, quality)
-            if (details == null) {
-                _uiState.value = PlayerUiState.Error("Could not load video stream.")
-            } else {
+            if (isDirectStream(videoUrl)) {
+                // Raw HLS/MP4 stream (e.g. from Donghua tab) — play directly
+                val details = VideoDetails(
+                    url = videoUrl,
+                    title = extractTitleFromUrl(videoUrl),
+                    uploaderName = extractHostFromUrl(videoUrl),
+                    viewCount = 0L,
+                    likeCount = 0L,
+                    description = "",
+                    streamUrl = videoUrl,
+                    audioUrl = null,
+                    thumbnailUrl = ""
+                )
                 _uiState.value = PlayerUiState.Ready(details)
                 recordHistory(details, videoUrl)
+            } else {
+                // YouTube URL — use NewPipe extractor
+                val quality = prefs.quality.first()
+                val details = repo.getVideoDetails(videoUrl, quality)
+                if (details == null) {
+                    _uiState.value = PlayerUiState.Error("Could not load video stream.")
+                } else {
+                    _uiState.value = PlayerUiState.Ready(details)
+                    recordHistory(details, videoUrl)
+                }
             }
         }
     }
@@ -78,5 +96,30 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             viewCount = details.viewCount,
             duration = 0L
         ))
+    }
+
+    private fun isDirectStream(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(".m3u8") || lower.contains(".mp4") ||
+               lower.contains(".webm") || lower.contains("/hls/") ||
+               lower.contains("/stream/")
+    }
+
+    private fun extractTitleFromUrl(url: String): String {
+        return try {
+            val path = url.substringAfterLast("/").substringBefore("?")
+                .replace("-", " ").replace("_", " ")
+                .substringBeforeLast(".")
+                .replaceFirstChar { it.uppercase() }
+            path.ifBlank { "Video" }
+        } catch (e: Exception) { "Video" }
+    }
+
+    private fun extractHostFromUrl(url: String): String {
+        return try {
+            val host = url.removePrefix("https://").removePrefix("http://")
+                .substringBefore("/")
+            host.ifBlank { "Unknown" }
+        } catch (e: Exception) { "Unknown" }
     }
 }
