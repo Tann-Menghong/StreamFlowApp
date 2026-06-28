@@ -61,6 +61,10 @@ class VideoDetailViewModel(
         playerController.setPlaybackSpeed(speed)
     }
 
+    fun seekBy(deltaMs: Long) {
+        playerController.seekBy(deltaMs)
+    }
+
     fun toggleBookmark(details: VideoDetails) {
         viewModelScope.launch {
             if (isBookmarked.value) {

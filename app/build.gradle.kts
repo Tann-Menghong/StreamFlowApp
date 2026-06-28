@@ -16,8 +16,8 @@ android {
         // CI overrides these via -PreleaseVersionName/-PreleaseVersionCode so the APK
         // attached to a GitHub release actually reports the tagged version; the literals
         // below are only the fallback for local/dev builds.
-        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 5
-        versionName = (project.findProperty("releaseVersionName") as String?) ?: "0.4.0"
+        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 6
+        versionName = (project.findProperty("releaseVersionName") as String?) ?: "0.5.0"
 
         vectorDrawables.useSupportLibrary = true
     }
@@ -80,6 +80,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.animation:animation")
     implementation("androidx.navigation:navigation-compose:2.8.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 

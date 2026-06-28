@@ -91,6 +91,13 @@ class PlayerController(private val appContext: Context) {
         withController { player -> player.setPlaybackSpeed(speed) }
     }
 
+    fun seekBy(deltaMs: Long) {
+        withController { player ->
+            val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+            player.seekTo((player.currentPosition + deltaMs).coerceIn(0, duration))
+        }
+    }
+
     fun attachTo(playerView: PlayerView) {
         withController { player -> playerView.player = player }
     }

@@ -2,6 +2,10 @@
 
 package com.streamflow.app.ui.video
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,12 +14,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -30,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -52,6 +62,7 @@ import com.streamflow.app.di.ServiceLocator
 import com.streamflow.app.ui.components.UiState
 import com.streamflow.app.ui.components.VideoListItem
 import com.streamflow.app.ui.components.formatViewCount
+import kotlinx.coroutines.delay
 
 @Composable
 fun VideoDetailScreen(
@@ -80,6 +91,7 @@ fun VideoDetailScreen(
         PlayerSurface(
             playbackSpeed = playerState.playbackSpeed,
             onSelectSpeed = viewModel::setPlaybackSpeed,
+            onSeek = viewModel::seekBy,
             showSpeedControl = false,
             modifier = Modifier.fillMaxSize()
         )
@@ -109,6 +121,7 @@ fun VideoDetailScreen(
                     onToggleBookmark = { viewModel.toggleBookmark(current.data) },
                     onSelectSource = { source -> viewModel.selectPlaybackSource(source, current.data.title) },
                     onSelectSpeed = viewModel::setPlaybackSpeed,
+                    onSeek = viewModel::seekBy,
                     onVideoClick = onVideoClick
                 )
             }
@@ -124,6 +137,7 @@ private fun VideoDetailBody(
     onToggleBookmark: () -> Unit,
     onSelectSource: (PlaybackSource) -> Unit,
     onSelectSpeed: (Float) -> Unit,
+    onSeek: (Long) -> Unit,
     onVideoClick: (VideoItem) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -131,6 +145,7 @@ private fun VideoDetailBody(
             PlayerSurface(
                 playbackSpeed = playbackSpeed,
                 onSelectSpeed = onSelectSpeed,
+                onSeek = onSeek,
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
             )
         }
@@ -226,15 +241,21 @@ private fun formatSpeedLabel(speed: Float): String {
     return "${trimmed}x"
 }
 
+private enum class SeekDirection { BACKWARD, FORWARD }
+
+private const val SEEK_STEP_MS = 10_000L
+
 @Composable
 private fun PlayerSurface(
     playbackSpeed: Float,
     onSelectSpeed: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    onSeek: (Long) -> Unit = {},
     showSpeedControl: Boolean = true
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var speedMenuExpanded by remember { mutableStateOf(false) }
+    var seekFeedback by remember { mutableStateOf<SeekDirection?>(null) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -242,7 +263,28 @@ private fun PlayerSurface(
         }
     }
 
-    Box(modifier = modifier) {
+    LaunchedEffect(seekFeedback) {
+        if (seekFeedback != null) {
+            delay(500)
+            seekFeedback = null
+        }
+    }
+
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onDoubleTap = { offset ->
+                    if (offset.x < size.width / 2f) {
+                        onSeek(-SEEK_STEP_MS)
+                        seekFeedback = SeekDirection.BACKWARD
+                    } else {
+                        onSeek(SEEK_STEP_MS)
+                        seekFeedback = SeekDirection.FORWARD
+                    }
+                }
+            )
+        }
+    ) {
         AndroidView(
             factory = { context ->
                 PlayerView(context).also {
@@ -252,6 +294,34 @@ private fun PlayerSurface(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        AnimatedVisibility(
+            visible = seekFeedback == SeekDirection.BACKWARD,
+            modifier = Modifier.align(Alignment.CenterStart).padding(24.dp),
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Icon(
+                imageVector = Icons.Default.FastRewind,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = seekFeedback == SeekDirection.FORWARD,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(24.dp),
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Icon(
+                imageVector = Icons.Default.FastForward,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(48.dp)
+            )
+        }
 
         if (showSpeedControl) {
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
