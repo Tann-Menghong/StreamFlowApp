@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import com.streamflow.app.ui.components.UiState
 import com.streamflow.app.ui.components.VideoListItem
 import com.streamflow.app.ui.components.formatSubscriberCount
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChannelDetailScreen(
     channelUrl: String,
