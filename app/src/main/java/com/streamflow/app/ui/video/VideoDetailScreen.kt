@@ -17,8 +17,11 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +73,7 @@ fun VideoDetailScreen(
     )
     val state by viewModel.state.collectAsState()
     val isBookmarked by viewModel.isBookmarked.collectAsState()
+    val playerState by viewModel.playerState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -90,8 +94,10 @@ fun VideoDetailScreen(
                 is UiState.Success -> VideoDetailBody(
                     details = current.data,
                     isBookmarked = isBookmarked,
+                    playbackSpeed = playerState.playbackSpeed,
                     onToggleBookmark = { viewModel.toggleBookmark(current.data) },
                     onSelectSource = { source -> viewModel.selectPlaybackSource(source, current.data.title) },
+                    onSelectSpeed = viewModel::setPlaybackSpeed,
                     onVideoClick = onVideoClick
                 )
             }
@@ -103,13 +109,19 @@ fun VideoDetailScreen(
 private fun VideoDetailBody(
     details: VideoDetails,
     isBookmarked: Boolean,
+    playbackSpeed: Float,
     onToggleBookmark: () -> Unit,
     onSelectSource: (PlaybackSource) -> Unit,
+    onSelectSpeed: (Float) -> Unit,
     onVideoClick: (VideoItem) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            PlayerSurface(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+            PlayerSurface(
+                playbackSpeed = playbackSpeed,
+                onSelectSpeed = onSelectSpeed,
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+            )
         }
 
         item {
@@ -196,9 +208,21 @@ private fun VideoDetailBody(
     }
 }
 
+private val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+private fun formatSpeedLabel(speed: Float): String {
+    val trimmed = if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()
+    return "${trimmed}x"
+}
+
 @Composable
-private fun PlayerSurface(modifier: Modifier = Modifier) {
+private fun PlayerSurface(
+    playbackSpeed: Float,
+    onSelectSpeed: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    var speedMenuExpanded by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -206,13 +230,32 @@ private fun PlayerSurface(modifier: Modifier = Modifier) {
         }
     }
 
-    AndroidView(
-        factory = { context ->
-            PlayerView(context).also {
-                playerView = it
-                ServiceLocator.playerController.attachTo(it)
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { context ->
+                PlayerView(context).also {
+                    playerView = it
+                    ServiceLocator.playerController.attachTo(it)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            FilledTonalButton(onClick = { speedMenuExpanded = true }) {
+                Text(formatSpeedLabel(playbackSpeed))
             }
-        },
-        modifier = modifier
-    )
+            DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
+                PLAYBACK_SPEEDS.forEach { speed ->
+                    DropdownMenuItem(
+                        text = { Text(formatSpeedLabel(speed)) },
+                        onClick = {
+                            onSelectSpeed(speed)
+                            speedMenuExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
 }

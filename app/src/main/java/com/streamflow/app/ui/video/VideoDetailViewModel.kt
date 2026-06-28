@@ -57,6 +57,10 @@ class VideoDetailViewModel(
         }
     }
 
+    fun setPlaybackSpeed(speed: Float) {
+        playerController.setPlaybackSpeed(speed)
+    }
+
     fun toggleBookmark(details: VideoDetails) {
         viewModelScope.launch {
             if (isBookmarked.value) {

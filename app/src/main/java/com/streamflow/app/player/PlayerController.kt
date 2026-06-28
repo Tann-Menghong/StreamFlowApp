@@ -6,6 +6,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
@@ -31,6 +32,7 @@ data class PlayerUiState(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val qualityLabel: String = "",
+    val playbackSpeed: Float = 1f,
     val error: String? = null
 )
 
@@ -61,6 +63,10 @@ class PlayerController(private val appContext: Context) {
             _state.update { it.copy(isBuffering = playbackState == Player.STATE_BUFFERING) }
         }
 
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            _state.update { it.copy(playbackSpeed = playbackParameters.speed) }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             _state.update { it.copy(error = error.message) }
         }
@@ -68,7 +74,8 @@ class PlayerController(private val appContext: Context) {
 
     fun play(url: String, title: String, qualityLabel: String) {
         withController { player ->
-            _state.update { PlayerUiState(title = title, qualityLabel = qualityLabel) }
+            val speed = _state.value.playbackSpeed
+            _state.update { PlayerUiState(title = title, qualityLabel = qualityLabel, playbackSpeed = speed) }
             val mediaItem = MediaItem.Builder()
                 .setUri(url)
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
@@ -76,7 +83,12 @@ class PlayerController(private val appContext: Context) {
             player.setMediaItem(mediaItem)
             player.prepare()
             player.playWhenReady = true
+            player.setPlaybackSpeed(speed)
         }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        withController { player -> player.setPlaybackSpeed(speed) }
     }
 
     fun attachTo(playerView: PlayerView) {
