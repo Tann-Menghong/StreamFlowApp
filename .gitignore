@@ -14,3 +14,4 @@ local.properties
 *.aab
 *.keystore
 *.jks
+!/app/streamflow-debug.keystore

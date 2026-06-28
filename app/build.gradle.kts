@@ -22,6 +22,19 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        // AGP's auto-generated debug keystore is regenerated per machine, so every
+        // GitHub Actions run (a fresh VM) signed releases with a different random key,
+        // making every "update" install fail with a signature mismatch. Pinning a
+        // committed keystore here keeps every CI-built APK signed identically.
+        getByName("debug") {
+            storeFile = file("streamflow-debug.keystore")
+            storePassword = "streamflow-debug"
+            keyAlias = "streamflow-debug"
+            keyPassword = "streamflow-debug"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
