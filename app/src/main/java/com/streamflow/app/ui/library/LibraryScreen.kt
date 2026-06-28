@@ -25,6 +25,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +45,7 @@ import com.streamflow.app.R
 import com.streamflow.app.data.db.SubscriptionEntity
 import com.streamflow.app.data.model.VideoItem
 import com.streamflow.app.di.ServiceLocator
+import com.streamflow.app.ui.components.VideoListContent
 import com.streamflow.app.ui.components.VideoListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,12 +56,19 @@ fun LibraryScreen(
     onCheckForUpdates: () -> Unit = {}
 ) {
     val viewModel: LibraryViewModel = viewModel(
-        factory = viewModelFactory { initializer { LibraryViewModel(ServiceLocator.database) } }
+        factory = viewModelFactory {
+            initializer { LibraryViewModel(ServiceLocator.database, ServiceLocator.repository) }
+        }
     )
     var selectedTab by remember { mutableIntStateOf(0) }
     val bookmarks by viewModel.bookmarks.collectAsState()
     val history by viewModel.history.collectAsState()
     val subscriptions by viewModel.subscriptions.collectAsState()
+    val feedState by viewModel.feedState.collectAsState()
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 3) viewModel.loadFeed()
+    }
 
     Scaffold(
         topBar = {
@@ -91,6 +100,11 @@ fun LibraryScreen(
                         onClick = { selectedTab = 2 },
                         text = { Text(stringResource(R.string.subscriptions)) }
                     )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text(stringResource(R.string.feed)) }
+                    )
                 }
 
                 when (selectedTab) {
@@ -106,10 +120,17 @@ fun LibraryScreen(
                         onVideoClick = onVideoClick,
                         onChannelClick = onChannelClick
                     )
-                    else -> SubscriptionList(
+                    2 -> SubscriptionList(
                         subscriptions = subscriptions,
                         onChannelClick = onChannelClick,
                         onUnsubscribe = viewModel::unsubscribe
+                    )
+                    else -> VideoListContent(
+                        state = feedState,
+                        onVideoClick = onVideoClick,
+                        onRetry = viewModel::loadFeed,
+                        onChannelClick = onChannelClick,
+                        emptyMessage = stringResource(R.string.empty_feed)
                     )
                 }
             }
