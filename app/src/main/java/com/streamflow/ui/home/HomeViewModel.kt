@@ -33,12 +33,13 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             nextPage = null
-            val result = repo.getTrending()
-            nextPage = result.nextPage
-            _uiState.value = if (result.videos.isEmpty())
-                HomeUiState.Error("Could not load trending videos.")
-            else
-                HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+            try {
+                val result = repo.getTrending()
+                nextPage = result.nextPage
+                _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+            } catch (e: Exception) {
+                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+            }
         }
     }
 

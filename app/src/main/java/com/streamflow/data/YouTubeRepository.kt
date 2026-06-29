@@ -20,18 +20,13 @@ class YouTubeRepository {
     )
 
     suspend fun getTrending(): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val kiosk = youtube.kioskList.getDefaultKioskExtractor()
-            kiosk.fetchPage()
-            val page = kiosk.initialPage
-            PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
-                nextPage = page.nextPage
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            PagedResult(emptyList(), null)
-        }
+        val kiosk = youtube.kioskList.getDefaultKioskExtractor()
+        kiosk.fetchPage()
+        val page = kiosk.initialPage
+        PagedResult(
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            nextPage = page.nextPage
+        )
     }
 
     suspend fun getTrendingNextPage(nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
@@ -50,39 +45,28 @@ class YouTubeRepository {
     }
 
     suspend fun search(query: String): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val extractor = youtube.getSearchExtractor(query)
-            extractor.fetchPage()
-            val page = extractor.initialPage
-            PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
-                nextPage = page.nextPage
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            PagedResult(emptyList(), null)
-        }
+        val extractor = youtube.getSearchExtractor(query)
+        extractor.fetchPage()
+        val page = extractor.initialPage
+        PagedResult(
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            nextPage = page.nextPage
+        )
     }
 
     suspend fun searchNextPage(query: String, nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val extractor = youtube.getSearchExtractor(query)
-            extractor.fetchPage()
-            val page = extractor.getPage(nextPage)
-            PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
-                nextPage = page.nextPage
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            PagedResult(emptyList(), null)
-        }
+        val extractor = youtube.getSearchExtractor(query)
+        extractor.fetchPage()
+        val page = extractor.getPage(nextPage)
+        PagedResult(
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            nextPage = page.nextPage
+        )
     }
 
-    suspend fun getVideoDetails(videoUrl: String, qualityPref: String = "AUTO"): VideoDetails? =
+    suspend fun getVideoDetails(videoUrl: String, qualityPref: String = "AUTO"): VideoDetails =
         withContext(Dispatchers.IO) {
-            try {
-                val info = StreamInfo.getInfo(youtube, videoUrl)
+            val info = StreamInfo.getInfo(youtube, videoUrl)
 
                 val related = info.relatedItems
                     .filterIsInstance<StreamInfoItem>()
@@ -118,11 +102,11 @@ class YouTubeRepository {
 
                 when {
                     muxedStream != null -> {
-                        streamUrl = muxedStream.content ?: return@withContext null
+                        streamUrl = muxedStream.content ?: throw Exception("Muxed stream URL is null")
                         audioUrl = null
                     }
                     videoOnlyStream != null && audioStream != null -> {
-                        streamUrl = videoOnlyStream.content ?: return@withContext null
+                        streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
                         audioUrl = audioStream.content
                     }
                     !hlsUrl.isNullOrEmpty() -> {
@@ -130,10 +114,10 @@ class YouTubeRepository {
                         audioUrl = null
                     }
                     audioStream != null -> {
-                        streamUrl = audioStream.content ?: return@withContext null
+                        streamUrl = audioStream.content ?: throw Exception("Audio stream URL is null")
                         audioUrl = null
                     }
-                    else -> return@withContext null
+                    else -> throw Exception("No playable stream found for: $videoUrl")
                 }
 
                 VideoDetails(
@@ -148,10 +132,6 @@ class YouTubeRepository {
                     thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: "",
                     relatedVideos = related
                 )
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
         }
 
     private fun StreamInfoItem.toVideoItem() = VideoItem(

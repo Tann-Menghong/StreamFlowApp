@@ -54,13 +54,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 recordHistory(details, videoUrl)
             } else {
                 // YouTube URL — use NewPipe extractor
-                val quality = prefs.quality.first()
-                val details = repo.getVideoDetails(videoUrl, quality)
-                if (details == null) {
-                    _uiState.value = PlayerUiState.Error("Could not load video stream.")
-                } else {
+                try {
+                    val quality = prefs.quality.first()
+                    val details = repo.getVideoDetails(videoUrl, quality)
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
+                } catch (e: Exception) {
+                    _uiState.value = PlayerUiState.Error("${e.javaClass.simpleName}: ${e.message}")
                 }
             }
         }

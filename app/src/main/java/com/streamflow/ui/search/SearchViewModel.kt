@@ -34,12 +34,13 @@ class SearchViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = SearchUiState.Loading
             nextPage = null
-            val result = repo.search(query)
-            nextPage = result.nextPage
-            _uiState.value = if (result.videos.isEmpty())
-                SearchUiState.Error("No results for \"$query\".")
-            else
-                SearchUiState.Success(query, result.videos, hasMore = result.nextPage != null)
+            try {
+                val result = repo.search(query)
+                nextPage = result.nextPage
+                _uiState.value = SearchUiState.Success(query, result.videos, hasMore = result.nextPage != null)
+            } catch (e: Exception) {
+                _uiState.value = SearchUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+            }
         }
     }
 

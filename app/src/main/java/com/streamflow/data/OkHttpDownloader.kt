@@ -14,6 +14,13 @@ class OkHttpDownloader private constructor() : Downloader() {
         .readTimeout(30, TimeUnit.SECONDS)
         .connectTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .build()
+            chain.proceed(req)
+        }
         .build()
 
     override fun execute(request: Request): Response {
