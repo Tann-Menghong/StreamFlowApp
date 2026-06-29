@@ -19,10 +19,6 @@ data class UpdateInfo(
 private const val LATEST_RELEASE_URL =
     "https://api.github.com/repos/Tann-Menghong/StreamFlowApp/releases/latest"
 
-/**
- * Checks GitHub Releases for a newer build and can fetch + launch its installer, since the app
- * is sideloaded rather than distributed through a store that would handle updates itself.
- */
 class UpdateManager(private val client: OkHttpClient) {
 
     suspend fun checkForUpdate(currentVersionName: String): UpdateInfo? = withContext(Dispatchers.IO) {
@@ -60,7 +56,11 @@ class UpdateManager(private val client: OkHttpClient) {
         )
     }
 
-    suspend fun download(context: Context, downloadUrl: String): File = withContext(Dispatchers.IO) {
+    suspend fun download(
+        context: Context,
+        downloadUrl: String,
+        onProgress: (Float) -> Unit = {}
+    ): File = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(downloadUrl).build()
         val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
         val apkFile = File(updatesDir, "streamflow-update.apk")
@@ -68,7 +68,21 @@ class UpdateManager(private val client: OkHttpClient) {
         client.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "Download failed: HTTP ${response.code}" }
             val body = checkNotNull(response.body) { "Empty download response" }
-            apkFile.outputStream().use { output -> body.byteStream().copyTo(output) }
+            val contentLength = body.contentLength()
+
+            apkFile.outputStream().use { output ->
+                var bytesWritten = 0L
+                val buffer = ByteArray(8 * 1024)
+                val stream = body.byteStream()
+                var read: Int
+                while (stream.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    bytesWritten += read
+                    if (contentLength > 0) {
+                        onProgress((bytesWritten.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f))
+                    }
+                }
+            }
         }
         apkFile
     }

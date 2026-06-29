@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Splash screen theme: shown by the OS while the process starts -->
+    <style name="Theme.StreamFlow.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/streamflow_dark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/streamflow_dark</item>
+        <item name="postSplashScreenTheme">@style/Theme.StreamFlow</item>
+    </style>
+
+    <!-- App theme (takes over after splash screen is dismissed) -->
     <style name="Theme.StreamFlow" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@color/streamflow_dark</item>
         <item name="android:navigationBarColor">@color/streamflow_dark</item>

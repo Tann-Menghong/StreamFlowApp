@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryBooks
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
     private var inPictureInPictureMode by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             StreamFlowTheme {
@@ -103,6 +106,7 @@ private data class BottomTab(val route: String, val labelRes: Int, val icon: Ima
 private val bottomTabs = listOf(
     BottomTab(Destinations.HOME, R.string.tab_home, Icons.Default.Home),
     BottomTab(Destinations.SEARCH, R.string.tab_search, Icons.Default.Search),
+    BottomTab(Destinations.DONGHUA, R.string.tab_donghua, Icons.Default.Movie),
     BottomTab(Destinations.LIBRARY, R.string.tab_library, Icons.Default.LibraryBooks)
 )
 
@@ -192,7 +196,23 @@ private fun StreamFlowApp(
         AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.check_for_updates)) },
-            text = { Text(stringResource(R.string.update_downloading)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.update_downloading))
+                    if (updateState.downloadProgress > 0f) {
+                        LinearProgressIndicator(
+                            progress = { updateState.downloadProgress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "${(updateState.downloadProgress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
             confirmButton = {}
         )
     }

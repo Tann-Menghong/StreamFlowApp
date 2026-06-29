@@ -13,6 +13,7 @@ data class UpdateUiState(
     val checking: Boolean = false,
     val available: UpdateInfo? = null,
     val downloading: Boolean = false,
+    val downloadProgress: Float = 0f,
     val upToDate: Boolean = false,
     val error: String? = null
 )
@@ -38,14 +39,16 @@ class UpdateViewModel(
     fun startUpdate(context: Context) {
         val info = _state.value.available ?: return
         viewModelScope.launch {
-            _state.update { it.copy(downloading = true, error = null) }
+            _state.update { it.copy(downloading = true, downloadProgress = 0f, error = null) }
             runCatching {
-                val apkFile = updateManager.download(context, info.downloadUrl)
+                val apkFile = updateManager.download(context, info.downloadUrl) { progress ->
+                    _state.update { it.copy(downloadProgress = progress) }
+                }
                 updateManager.install(context, apkFile)
             }.onFailure { e ->
                 _state.update { it.copy(error = e.message ?: "Update failed") }
             }
-            _state.update { it.copy(downloading = false) }
+            _state.update { it.copy(downloading = false, downloadProgress = 0f) }
         }
     }
 

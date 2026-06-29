@@ -1,6 +1,7 @@
 package com.streamflow.app.di
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import com.streamflow.app.data.db.AppDatabase
 import com.streamflow.app.data.repository.YoutubeRepository
@@ -11,10 +12,6 @@ import okhttp3.OkHttpClient
 import org.schabi.newpipe.extractor.NewPipe
 import java.util.concurrent.TimeUnit
 
-/**
- * Minimal manual DI container. The app is small enough that a framework like Hilt would add
- * more boilerplate than it removes.
- */
 object ServiceLocator {
 
     @Volatile
@@ -43,7 +40,11 @@ object ServiceLocator {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
-            NewPipe.init(OkHttpDownloader(okHttpClient))
+            try {
+                NewPipe.init(OkHttpDownloader(okHttpClient))
+            } catch (e: Exception) {
+                Log.e("ServiceLocator", "NewPipe init failed — video loading may not work", e)
+            }
 
             database = Room.databaseBuilder(
                 context.applicationContext,

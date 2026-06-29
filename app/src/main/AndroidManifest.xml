@@ -29,7 +29,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:supportsPictureInPicture="true"
-            android:theme="@style/Theme.StreamFlow">
+            android:theme="@style/Theme.StreamFlow.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

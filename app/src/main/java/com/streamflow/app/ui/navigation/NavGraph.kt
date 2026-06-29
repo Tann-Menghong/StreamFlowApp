@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.streamflow.app.ui.channel.ChannelDetailScreen
+import com.streamflow.app.ui.donghua.DonghuaScreen
 import com.streamflow.app.ui.home.HomeScreen
 import com.streamflow.app.ui.library.LibraryScreen
 import com.streamflow.app.ui.playlist.PlaylistDetailScreen
@@ -21,6 +22,7 @@ object Destinations {
     const val HOME = "home"
     const val SEARCH = "search"
     const val LIBRARY = "library"
+    const val DONGHUA = "donghua"
     const val VIDEO_DETAIL = "video/{videoUrl}"
     const val CHANNEL = "channel/{channelUrl}"
     const val PLAYLIST = "playlist/{playlistUrl}"
@@ -67,6 +69,9 @@ fun StreamFlowNavGraph(
                 onChannelClick = { url -> navController.navigateToChannel(url) },
                 onCheckForUpdates = onCheckForUpdates
             )
+        }
+        composable(Destinations.DONGHUA) {
+            DonghuaScreen()
         }
         composable(
             route = Destinations.VIDEO_DETAIL,

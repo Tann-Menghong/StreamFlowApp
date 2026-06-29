@@ -4,6 +4,7 @@
     <string name="tab_home">Home</string>
     <string name="tab_search">Search</string>
     <string name="tab_library">Library</string>
+    <string name="tab_donghua">Donghua</string>
     <string name="search_hint">Search videos</string>
     <string name="background_play">Background play</string>
     <string name="audio_only">Audio only</string>
