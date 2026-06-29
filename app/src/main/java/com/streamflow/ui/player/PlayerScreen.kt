@@ -53,6 +53,18 @@ fun PlayerScreen(
     val activity = context as? Activity
     var isFullscreen by remember { mutableStateOf(false) }
 
+    // Hoisted here so they run in a @Composable scope (not inside LazyListScope)
+    val heartScale by animateFloatAsState(
+        targetValue   = if (isFavorite) 1.25f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label         = "heart"
+    )
+    val heartColor by animateColorAsState(
+        targetValue   = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        animationSpec = tween(200),
+        label         = "heart_color"
+    )
+
     LaunchedEffect(videoUrl) { vm.loadVideo(videoUrl) }
 
     val player = remember {
@@ -161,18 +173,6 @@ fun PlayerScreen(
         // Info card
         if (state is PlayerUiState.Ready) {
             val details = (state as PlayerUiState.Ready).details
-
-            // Animated heart scale
-            val heartScale by animateFloatAsState(
-                targetValue = if (isFavorite) 1.25f else 1f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                label = "heart"
-            )
-            val heartColor by animateColorAsState(
-                targetValue = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                animationSpec = tween(200),
-                label = "heart_color"
-            )
 
             item {
                 Surface(
