@@ -3,14 +3,13 @@ package com.streamflow.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "history")
-data class HistoryEntity(
+@Entity(tableName = "watch_later")
+data class WatchLaterEntity(
     @PrimaryKey val url: String,
     val title: String,
     val thumbnailUrl: String,
     val uploaderName: String,
     val viewCount: Long,
     val duration: Long,
-    val watchedAt: Long = System.currentTimeMillis(),
-    val position: Long = 0L
+    val addedAt: Long = System.currentTimeMillis()
 )

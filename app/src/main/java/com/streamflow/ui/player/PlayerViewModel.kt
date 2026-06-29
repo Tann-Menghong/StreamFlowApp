@@ -7,6 +7,7 @@ import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoDetails
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -29,6 +30,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _currentUrl = MutableStateFlow("")
     val isFavorite: Flow<Boolean> = _currentUrl
         .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.favoriteDao().isFavorite(url) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isInWatchLater: Flow<Boolean> = _currentUrl
+        .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.watchLaterDao().isInWatchLater(url) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val autoPlay: Flow<Boolean> = prefs.autoPlay
@@ -84,6 +89,41 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     duration = 0L
                 ))
             }
+        }
+    }
+
+    fun toggleWatchLater() {
+        val state = _uiState.value as? PlayerUiState.Ready ?: return
+        val details = state.details
+        viewModelScope.launch {
+            val wl = db.watchLaterDao()
+            val currently = wl.isInWatchLater(details.url).first()
+            if (currently) {
+                wl.delete(details.url)
+            } else {
+                wl.insert(WatchLaterEntity(
+                    url = details.url,
+                    title = details.title,
+                    thumbnailUrl = details.thumbnailUrl,
+                    uploaderName = details.uploaderName,
+                    viewCount = details.viewCount,
+                    duration = 0L
+                ))
+            }
+        }
+    }
+
+    fun savePosition(url: String, positionMs: Long) {
+        viewModelScope.launch {
+            db.historyDao().updatePosition(url, positionMs)
+        }
+    }
+
+    suspend fun getSavedPosition(url: String): Long {
+        return try {
+            db.historyDao().getPosition(url)
+        } catch (e: Exception) {
+            0L
         }
     }
 

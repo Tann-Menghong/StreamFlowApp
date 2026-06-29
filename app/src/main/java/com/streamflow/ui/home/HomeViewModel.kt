@@ -1,11 +1,14 @@
 package com.streamflow.ui.home
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
@@ -19,9 +22,10 @@ sealed class HomeUiState {
     data class Error(val message: String) : HomeUiState()
 }
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = YouTubeRepository()
+    private val prefs = (app as StreamFlowApp).prefs
     private var nextPage: Page? = null
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -34,7 +38,8 @@ class HomeViewModel : ViewModel() {
             _uiState.value = HomeUiState.Loading
             nextPage = null
             try {
-                val result = repo.getTrending()
+                val country = prefs.country.first()
+                val result = repo.getTrending(country)
                 nextPage = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {

@@ -181,12 +181,7 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             mediaPlaybackRequiresUserGesture = false
                             allowContentAccess = true
-                            setSupportZoom(true)
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
-                                "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                                "Chrome/124.0.0.0 Mobile Safari/537.36"
+                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                         }
                         CookieManager.getInstance().apply {
                             setAcceptCookie(true)

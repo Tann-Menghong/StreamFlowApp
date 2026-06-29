@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
@@ -19,7 +20,8 @@ class YouTubeRepository {
         val nextPage: Page?
     )
 
-    suspend fun getTrending(): PagedResult = withContext(Dispatchers.IO) {
+    suspend fun getTrending(country: String = "US"): PagedResult = withContext(Dispatchers.IO) {
+        NewPipe.setPreferredContentCountry(ContentCountry(country))
         val kiosk = youtube.kioskList.getDefaultKioskExtractor()
         kiosk.fetchPage()
         val page = kiosk.initialPage

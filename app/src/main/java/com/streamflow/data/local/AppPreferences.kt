@@ -19,6 +19,7 @@ class AppPreferences(private val context: Context) {
         val QUALITY_KEY = stringPreferencesKey("quality")
         val AUTO_PLAY_KEY = booleanPreferencesKey("auto_play")
         val DATA_SAVER_KEY = booleanPreferencesKey("data_saver")
+        val COUNTRY_KEY = stringPreferencesKey("country")
 
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
@@ -30,9 +31,11 @@ class AppPreferences(private val context: Context) {
     val quality: Flow<String> = context.dataStore.data.map { it[QUALITY_KEY] ?: "AUTO" }
     val autoPlay: Flow<Boolean> = context.dataStore.data.map { it[AUTO_PLAY_KEY] ?: true }
     val dataSaver: Flow<Boolean> = context.dataStore.data.map { it[DATA_SAVER_KEY] ?: false }
+    val country: Flow<String> = context.dataStore.data.map { it[COUNTRY_KEY] ?: "US" }
 
     suspend fun setTheme(value: String) = context.dataStore.edit { it[THEME_KEY] = value }
     suspend fun setQuality(value: String) = context.dataStore.edit { it[QUALITY_KEY] = value }
     suspend fun setAutoPlay(value: Boolean) = context.dataStore.edit { it[AUTO_PLAY_KEY] = value }
     suspend fun setDataSaver(value: Boolean) = context.dataStore.edit { it[DATA_SAVER_KEY] = value }
+    suspend fun setCountry(value: String) = context.dataStore.edit { it[COUNTRY_KEY] = value }
 }

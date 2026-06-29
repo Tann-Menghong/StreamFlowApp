@@ -20,4 +20,10 @@ interface HistoryDao {
 
     @Query("SELECT COUNT(*) FROM history")
     fun count(): Flow<Int>
+
+    @Query("UPDATE history SET position = :pos WHERE url = :url")
+    suspend fun updatePosition(url: String, pos: Long)
+
+    @Query("SELECT position FROM history WHERE url = :url LIMIT 1")
+    suspend fun getPosition(url: String): Long
 }

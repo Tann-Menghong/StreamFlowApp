@@ -24,6 +24,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+private val countryOptions = listOf(
+    "US" to "United States",
+    "GB" to "United Kingdom",
+    "JP" to "Japan",
+    "KH" to "Cambodia",
+    "KR" to "South Korea",
+    "IN" to "India",
+    "FR" to "France",
+    "DE" to "Germany",
+    "CA" to "Canada",
+    "AU" to "Australia"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
@@ -31,6 +44,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val quality   by vm.quality.collectAsState()
     val autoPlay  by vm.autoPlay.collectAsState()
     val dataSaver by vm.dataSaver.collectAsState()
+    val country   by vm.country.collectAsState()
     val favCount  by vm.favoritesCount.collectAsState()
     val histCount by vm.historyCount.collectAsState()
     val update    by vm.update.collectAsState()
@@ -38,6 +52,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
 
     var showThemeDialog   by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showCountryDialog by remember { mutableStateOf(false) }
     var showClearHist     by remember { mutableStateOf(false) }
     var showClearFav      by remember { mutableStateOf(false) }
 
@@ -98,7 +113,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             SettingsSection("Appearance")
             SettingsCard {
                 SettingsItem(Icons.Default.Palette, "Theme",
-                    when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; else -> "Dark" }
+                    when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                 ) { showThemeDialog = true }
             }
 
@@ -112,6 +127,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play", "Play related videos automatically", autoPlay) { vm.setAutoPlay(it) }
                 SettingsDivider()
                 SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver", "Prefer lower quality to save data", dataSaver) { vm.setDataSaver(it) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Language, "Trending country",
+                    countryOptions.firstOrNull { it.first == country }?.second ?: country
+                ) { showCountryDialog = true }
             }
 
             // ── Storage ──────────────────────────────────────────────────
@@ -139,7 +158,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     }
 
     if (showThemeDialog) {
-        val opts = listOf("DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
+        val opts = listOf("SYSTEM" to "Follow system", "DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
         PickerDialog("Theme", opts.map { it.second }, opts.indexOfFirst { it.first == theme }.coerceAtLeast(0),
             { vm.setTheme(opts[it].first); showThemeDialog = false }, { showThemeDialog = false })
     }
@@ -147,6 +166,15 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         val opts = listOf("AUTO" to "Auto", "1080P" to "1080p", "720P" to "720p", "480P" to "480p", "360P" to "360p")
         PickerDialog("Video quality", opts.map { it.second }, opts.indexOfFirst { it.first == quality }.coerceAtLeast(0),
             { vm.setQuality(opts[it].first); showQualityDialog = false }, { showQualityDialog = false })
+    }
+    if (showCountryDialog) {
+        PickerDialog(
+            "Trending country",
+            countryOptions.map { it.second },
+            countryOptions.indexOfFirst { it.first == country }.coerceAtLeast(0),
+            { vm.setCountry(countryOptions[it].first); showCountryDialog = false },
+            { showCountryDialog = false }
+        )
     }
     if (showClearHist) {
         ConfirmDialog("Clear history", "Remove all $histCount watch history entries?",

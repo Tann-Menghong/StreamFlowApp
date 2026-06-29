@@ -1,12 +1,17 @@
 package com.streamflow.ui.player
 
 import android.app.Activity
+import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.os.Build
+import android.util.Rational
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,8 +24,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +43,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatViews
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 
 @Composable
@@ -49,11 +55,23 @@ fun PlayerScreen(
 ) {
     val state by vm.uiState.collectAsState()
     val isFavorite by vm.isFavorite.collectAsState(initial = false)
+    val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val context = LocalContext.current
     val activity = context as? Activity
     var isFullscreen by remember { mutableStateOf(false) }
 
-    // Hoisted here so they run in a @Composable scope (not inside LazyListScope)
+    // Speed control
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var currentSpeed by remember { mutableFloatStateOf(1f) }
+    val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+    // Seek feedback
+    var seekFeedback by remember { mutableStateOf("") }
+    var showSeekFeedback by remember { mutableStateOf(false) }
+
+    // PlayerView reference for controller toggle
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+
     val heartScale by animateFloatAsState(
         targetValue   = if (isFavorite) 1.25f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
@@ -72,6 +90,13 @@ fun PlayerScreen(
     }
     DisposableEffect(Unit) { onDispose { player.release() } }
 
+    // Save position when screen is disposed
+    DisposableEffect(videoUrl) {
+        onDispose {
+            vm.savePosition(videoUrl, player.currentPosition)
+        }
+    }
+
     LaunchedEffect(state) {
         val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
         val d = ready.details
@@ -83,7 +108,11 @@ fun PlayerScreen(
         } else {
             player.setMediaItem(MediaItem.fromUri(d.streamUrl))
         }
-        player.prepare(); player.play()
+        player.prepare()
+        player.play()
+        // Seek to saved position
+        val savedPos = vm.getSavedPosition(videoUrl)
+        if (savedPos > 0L) player.seekTo(savedPos)
     }
 
     LaunchedEffect(isFullscreen) {
@@ -103,18 +132,86 @@ fun PlayerScreen(
         }
     }
 
+    // Seek feedback auto-dismiss
+    if (showSeekFeedback) {
+        LaunchedEffect(seekFeedback) {
+            delay(600)
+            showSeekFeedback = false
+        }
+    }
+
+    // Gesture modifier for double-tap seek + single-tap controller toggle
+    val gestureModifier = Modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onTap = {
+                playerViewRef?.let { pv ->
+                    if (pv.isControllerFullyVisible) pv.hideController() else pv.showController()
+                }
+            },
+            onDoubleTap = { offset ->
+                val width = size.width
+                if (offset.x < width / 2) {
+                    player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0))
+                    seekFeedback = "- 10s"
+                } else {
+                    player.seekTo(player.currentPosition + 10_000)
+                    seekFeedback = "+ 10s"
+                }
+                showSeekFeedback = true
+            }
+        )
+    }
+
     // ── Fullscreen layout ────────────────────────────────────────────
     if (isFullscreen) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
-                factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        this.player = player
+                        useController = true
+                        playerViewRef = this
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
+            // Gesture + seek feedback overlay
+            Box(
+                modifier = Modifier.fillMaxSize().then(gestureModifier),
+                contentAlignment = Alignment.Center
+            ) {
+                if (showSeekFeedback) {
+                    Text(
+                        seekFeedback,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            // Exit fullscreen
             IconButton(
                 onClick = { isFullscreen = false },
                 modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
             ) {
                 Icon(Icons.Default.FullscreenExit, contentDescription = null, tint = Color.White)
+            }
+            // PiP button
+            IconButton(
+                onClick = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val params = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(16, 9))
+                            .build()
+                        activity?.enterPictureInPictureMode(params)
+                    }
+                },
+                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+            ) {
+                Icon(Icons.Default.PictureInPicture, contentDescription = "Picture in Picture", tint = Color.White)
             }
         }
         return
@@ -126,7 +223,7 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Player
+        // Player box
         item {
             Box(
                 modifier = Modifier
@@ -149,18 +246,41 @@ fun PlayerScreen(
                         Button(onClick = { vm.loadVideo(videoUrl) }) { Text("Retry") }
                     }
                     is PlayerUiState.Ready   -> AndroidView(
-                        factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                this.player = player
+                                useController = true
+                                playerViewRef = this
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                // Back
+                // Gesture + seek feedback overlay
+                Box(
+                    modifier = Modifier.fillMaxSize().then(gestureModifier),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showSeekFeedback) {
+                        Text(
+                            seekFeedback,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                // Back button
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier.align(Alignment.TopStart).padding(4.dp)
                 ) {
                     Icon(Icons.Default.ArrowBack, null, tint = Color.White)
                 }
-                // Fullscreen
+                // Fullscreen button
                 IconButton(
                     onClick = { isFullscreen = true },
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
@@ -191,7 +311,7 @@ fun PlayerScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 Text(
                                     details.uploaderName,
                                     fontWeight = FontWeight.SemiBold,
@@ -224,6 +344,27 @@ fun PlayerScreen(
                                     }
                                     Spacer(Modifier.width(8.dp))
                                 }
+                                // Share button
+                                IconButton(onClick = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, videoUrl)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share video"))
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                }
+                                // Watch Later button
+                                IconButton(onClick = { vm.toggleWatchLater() }) {
+                                    Icon(
+                                        imageVector = if (isInWatchLater) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        contentDescription = "Watch Later",
+                                        tint = if (isInWatchLater) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                                // Favorite button
                                 IconButton(onClick = { vm.toggleFavorite() }) {
                                     Icon(
                                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -231,6 +372,38 @@ fun PlayerScreen(
                                         tint = heartColor,
                                         modifier = Modifier.size(24.dp).scale(heartScale)
                                     )
+                                }
+                            }
+                        }
+
+                        // Playback speed row
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Speed, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Speed", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Box {
+                                TextButton(onClick = { showSpeedMenu = true }) {
+                                    Text("${currentSpeed}×", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                }
+                                DropdownMenu(expanded = showSpeedMenu, onDismissRequest = { showSpeedMenu = false }) {
+                                    speeds.forEach { speed ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "${speed}×",
+                                                    fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                currentSpeed = speed
+                                                player.setPlaybackSpeed(speed)
+                                                showSpeedMenu = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -268,7 +441,7 @@ fun PlayerScreen(
                 }
             }
 
-            // Related
+            // Related videos
             if (details.relatedVideos.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(4.dp))

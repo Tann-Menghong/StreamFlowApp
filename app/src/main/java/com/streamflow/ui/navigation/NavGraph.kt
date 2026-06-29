@@ -52,11 +52,17 @@ private val bottomItems = listOf(
 )
 
 @Composable
-fun NavGraph() {
+fun NavGraph(startUrl: String? = null) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
     val showBottom = bottomItems.any { it.route == currentDest?.route }
+
+    LaunchedEffect(startUrl) {
+        if (startUrl != null) {
+            navController.navigate(Screen.Player.createRoute(startUrl))
+        }
+    }
 
     Scaffold(
         bottomBar = {

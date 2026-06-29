@@ -1,5 +1,6 @@
 package com.streamflow.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -7,11 +8,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-enum class AppTheme { DARK, AMOLED, LIGHT }
+enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM }
 
 fun String.toAppTheme(): AppTheme = when (this) {
     "AMOLED" -> AppTheme.AMOLED
     "LIGHT"  -> AppTheme.LIGHT
+    "SYSTEM" -> AppTheme.SYSTEM
     else     -> AppTheme.DARK
 }
 
@@ -84,6 +86,7 @@ fun StreamFlowTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
             AppTheme.DARK   -> DarkColors
             AppTheme.AMOLED -> AmoledColors
             AppTheme.LIGHT  -> LightColors
+            AppTheme.SYSTEM -> if (isSystemInDarkTheme()) DarkColors else LightColors
         },
         typography = AppTypography,
         content = content

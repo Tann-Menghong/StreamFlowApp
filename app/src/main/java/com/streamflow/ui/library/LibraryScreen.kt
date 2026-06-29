@@ -18,16 +18,18 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.VideoCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewModel()) {
-    val favorites by vm.favorites.collectAsState()
-    val history   by vm.history.collectAsState()
+    val favorites  by vm.favorites.collectAsState()
+    val history    by vm.history.collectAsState()
+    val watchLater by vm.watchLater.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Favorites", "History")
+    val tabs = listOf("Favorites", "History", "Watch Later")
 
     Scaffold(
         topBar = {
@@ -42,6 +44,11 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
                     }
                     AnimatedVisibility(selectedTab == 1 && history.isNotEmpty()) {
                         IconButton(onClick = { vm.clearHistory() }) {
+                            Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    AnimatedVisibility(selectedTab == 2 && watchLater.isNotEmpty()) {
+                        IconButton(onClick = { vm.clearWatchLater() }) {
                             Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -78,7 +85,8 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
             ) { tab ->
                 when (tab) {
                     0 -> VideoList(favorites.map { it.toVideoItem() }, onVideoClick, vm::removeFavorite, "No favorites yet.\nTap ♥ on any video to save it.")
-                    else -> VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory, "No watch history yet.")
+                    1 -> VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory, "No watch history yet.")
+                    else -> VideoList(watchLater.map { it.toVideoItem() }, onVideoClick, vm::removeWatchLater, "No watch later items yet.\nTap 🔖 on any video to save it.")
                 }
             }
         }
@@ -109,3 +117,4 @@ private fun VideoList(items: List<VideoItem>, onVideoClick: (String) -> Unit, on
 
 private fun FavoriteEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
 private fun HistoryEntity.toVideoItem()  = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+private fun WatchLaterEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
