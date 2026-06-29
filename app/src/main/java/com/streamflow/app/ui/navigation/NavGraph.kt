@@ -47,7 +47,6 @@ fun NavHostController.navigateToPlaylist(url: String) {
 fun StreamFlowNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    onCheckForUpdates: () -> Unit = {},
     isInPictureInPictureMode: Boolean = false
 ) {
     NavHost(navController = navController, startDestination = Destinations.HOME, modifier = modifier) {
@@ -66,8 +65,7 @@ fun StreamFlowNavGraph(
         composable(Destinations.LIBRARY) {
             LibraryScreen(
                 onVideoClick = { video -> navController.navigateToVideo(video.url) },
-                onChannelClick = { url -> navController.navigateToChannel(url) },
-                onCheckForUpdates = onCheckForUpdates
+                onChannelClick = { url -> navController.navigateToChannel(url) }
             )
         }
         composable(Destinations.DONGHUA) {

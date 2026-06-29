@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,8 +51,7 @@ import com.streamflow.app.ui.components.VideoListItem
 @Composable
 fun LibraryScreen(
     onVideoClick: (VideoItem) -> Unit,
-    onChannelClick: (String) -> Unit = {},
-    onCheckForUpdates: () -> Unit = {}
+    onChannelClick: (String) -> Unit = {}
 ) {
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory {
@@ -73,12 +71,7 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.tab_library)) },
-                actions = {
-                    IconButton(onClick = onCheckForUpdates) {
-                        Icon(Icons.Default.SystemUpdate, contentDescription = stringResource(R.string.check_for_updates))
-                    }
-                }
+                title = { Text(stringResource(R.string.tab_library)) }
             )
         }
     ) { padding ->
