@@ -97,33 +97,43 @@ class YouTubeRepository {
                     else -> Int.MAX_VALUE
                 }
 
-                val videoOnlyStream = info.videoOnlyStreams
-                    .filter { !it.getUrl().isNullOrEmpty() && it.height <= maxHeight }
-                    .maxByOrNull { it.height }
-
-                val audioStream = info.audioStreams
-                    .filter { !it.getUrl().isNullOrEmpty() }
-                    .maxByOrNull { it.averageBitrate }
-
-                // Fall back to muxed if no video-only streams
-                val muxedStream = info.videoStreams
-                    .filter { !it.getUrl().isNullOrEmpty() && it.height <= maxHeight }
-                    .maxByOrNull { it.height }
-
                 val streamUrl: String
                 val audioUrl: String?
 
-                if (videoOnlyStream != null && audioStream != null) {
-                    streamUrl = videoOnlyStream.getUrl()!!
-                    audioUrl = audioStream.getUrl()
-                } else if (muxedStream != null) {
-                    streamUrl = muxedStream.getUrl()!!
-                    audioUrl = null
-                } else if (audioStream != null) {
-                    streamUrl = audioStream.getUrl()!!
-                    audioUrl = null
-                } else {
-                    return@withContext null
+                // 1. Prefer muxed progressive streams — most compatible with ExoPlayer
+                val muxedStream = info.videoStreams
+                    .filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
+                    .maxByOrNull { it.height }
+
+                val videoOnlyStream = info.videoOnlyStreams
+                    .filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
+                    .maxByOrNull { it.height }
+
+                val audioStream = info.audioStreams
+                    .filter { !it.content.isNullOrEmpty() }
+                    .maxByOrNull { it.averageBitrate }
+
+                // 2. Try HLS manifest URL (YouTube's most reliable format)
+                val hlsUrl = info.hlsUrl
+
+                when {
+                    muxedStream != null -> {
+                        streamUrl = muxedStream.content ?: return@withContext null
+                        audioUrl = null
+                    }
+                    videoOnlyStream != null && audioStream != null -> {
+                        streamUrl = videoOnlyStream.content ?: return@withContext null
+                        audioUrl = audioStream.content
+                    }
+                    !hlsUrl.isNullOrEmpty() -> {
+                        streamUrl = hlsUrl!!
+                        audioUrl = null
+                    }
+                    audioStream != null -> {
+                        streamUrl = audioStream.content ?: return@withContext null
+                        audioUrl = null
+                    }
+                    else -> return@withContext null
                 }
 
                 VideoDetails(

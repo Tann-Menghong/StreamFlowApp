@@ -24,10 +24,16 @@ class OkHttpDownloader private constructor() : Downloader() {
         }
 
         when (request.httpMethod()) {
-            "POST" -> builder.post(
-                (request.dataToSend() ?: ByteArray(0))
-                    .toRequestBody("application/x-www-form-urlencoded".toMediaType())
-            )
+            "POST" -> {
+                val contentType = request.headers()
+                    ?.entries?.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+                    ?.value?.firstOrNull()
+                    ?: "application/json"
+                builder.post(
+                    (request.dataToSend() ?: ByteArray(0))
+                        .toRequestBody(contentType.toMediaType())
+                )
+            }
             else -> builder.get()
         }
 

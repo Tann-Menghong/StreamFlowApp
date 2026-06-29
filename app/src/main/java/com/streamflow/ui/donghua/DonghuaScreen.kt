@@ -23,25 +23,40 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 private const val SITE_URL = "https://donghuafun.com/"
 
-// ── Ad-blocking: known ad/tracker domains ────────────────────────────────────
+// ── Ad-blocking ───────────────────────────────────────────────────────────────
 private val AD_DOMAINS = setOf(
+    // Google ads
     "doubleclick.net", "googlesyndication.com", "googletagmanager.com",
     "googletagservices.com", "google-analytics.com", "googleadservices.com",
     "adservice.google.com", "analytics.google.com", "pagead2.googlesyndication.com",
+    "adwords.google.com", "googletag.com",
+    // Programmatic / exchanges
     "adnxs.com", "adsrvr.org", "adform.net", "rubiconproject.com",
     "pubmatic.com", "openx.net", "moatads.com", "scorecardresearch.com",
     "amazon-adsystem.com", "media.net", "criteo.com", "taboola.com",
     "outbrain.com", "revcontent.com", "mgid.com", "ads.yahoo.com",
-    "advertising.com", "casalemedia.com", "turn.com", "adsystem.com",
+    "advertising.com", "casalemedia.com", "turn.com",
     "smartadserver.com", "bidswitch.net", "contextweb.com", "spotxchange.com",
-    "lijit.com", "appnexus.com", "trafficjunky.net", "exoclick.com",
-    "propellerads.com", "popcash.net", "clksite.com", "popads.net",
-    "adsterra.com", "hilltopads.net", "clickadu.com", "yllix.com"
+    "lijit.com", "appnexus.com", "33across.com", "triplelift.com",
+    "sharethrough.com", "yieldmo.com", "sovrn.com", "indexexchange.com",
+    // Pop/push/redirect ad networks
+    "trafficjunky.net", "exoclick.com", "propellerads.com", "popcash.net",
+    "clksite.com", "popads.net", "adsterra.com", "hilltopads.net",
+    "clickadu.com", "yllix.com", "juicyads.com", "trafficstars.com",
+    "plugrush.com", "ero-advertising.com", "tsyndicate.com",
+    "adspyglass.com", "adskeeper.com", "mgid.com", "evadav.com",
+    // Trackers & analytics
+    "hotjar.com", "mixpanel.com", "segment.io", "segment.com",
+    "fullstory.com", "mouseflow.com", "clarity.ms", "quantserve.com",
+    "chartbeat.com", "parsely.com", "optimizely.com", "ab.tasty.com",
+    "facebook.com/tr", "connect.facebook.net"
 )
 
 private val AD_URL_PATTERNS = listOf(
     "/ads/", "/ad/", "/advert", "banner_ad", "pop-ad", "popup_ad",
-    "/pagead/", "/adframe", "ad_slot", "adsense"
+    "/pagead/", "/adframe", "ad_slot", "adsense", "/serve/",
+    "adclick", "clickthrough", "impression", "/track/", "/pixel/",
+    "prebid", "bidder", "openrtb", "vast.xml", "vpaid"
 )
 
 private fun isAdRequest(url: String): Boolean {
@@ -51,7 +66,57 @@ private fun isAdRequest(url: String): Boolean {
     return false
 }
 
-private val EMPTY_RESPONSE = WebResourceResponse("text/plain", "utf-8", null)
+private val EMPTY_RESPONSE = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
+
+// Brave-style scriptlet + CSS injection — kills ad containers, pop-ups, and overlays
+private val AD_BLOCK_JS = """
+(function(){
+  // 1. Noop known ad globals before they run
+  var noop = function(){};
+  var noopObj = new Proxy({}, { get: function(){ return noop; } });
+  ['adsbygoogle','googletag','ga','_gaq','dataLayer','pbjs','apntag',
+   '__cmp','__tcfapi','__uspapi','ExoLoader','ExoJSPlayerAPI',
+   'PopAds','popns','adsbytrafficjunky'].forEach(function(k){
+    try{ if(!window[k]) Object.defineProperty(window,k,{get:function(){return noopObj},set:noop}); }catch(e){}
+  });
+
+  // 2. Block window.open (pop-unders)
+  window.open = noop;
+
+  // 3. Kill setInterval/setTimeout used by ad overlays
+  var _si = window.setInterval, _st = window.setTimeout;
+  window.setInterval = function(fn, t){ try{ var s=String(fn); if(s.indexOf('ad')>-1||s.indexOf('pop')>-1) return 0; }catch(e){} return _si(fn,t); };
+  window.setTimeout  = function(fn, t){ try{ var s=String(fn); if(s.indexOf('pop')>-1) return 0; }catch(e){} return _st(fn,t); };
+
+  // 4. CSS — hide ad containers
+  var css = [
+    '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"]',
+    '.ads,.advertisement,.adsbygoogle,.ad-banner,.ad-slot,.ad-unit',
+    'iframe[src*="ad"],iframe[src*="doubleclick"],iframe[src*="pagead"]',
+    '[class*="popup"],[class*="overlay"],[id*="overlay"],[class*="modal-ad"]',
+    '.gdpr-overlay,.cookie-consent-overlay,.consent-banner',
+    '[class*="interstitial"],[class*="splash-ad"]',
+    'ins.adsbygoogle'
+  ].join(',');
+  var s = document.createElement('style');
+  s.textContent = css + '{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
+  (document.head||document.documentElement).appendChild(s);
+
+  // 5. MutationObserver — remove injected ad nodes dynamically
+  var blocked = /doubleclick|googlesyndication|adsbygoogle|exoclick|propellerads|popcash|popads/i;
+  new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      m.addedNodes.forEach(function(n){
+        if(n.nodeType!==1) return;
+        var src = n.src||n.getAttribute&&n.getAttribute('src')||'';
+        if(blocked.test(src)||blocked.test(n.outerHTML||'')){
+          try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
+        }
+      });
+    });
+  }).observe(document.documentElement,{childList:true,subtree:true});
+})();
+""".trimIndent()
 
 // ── Stream detection ─────────────────────────────────────────────────────────
 private fun isVideoStream(url: String): Boolean {
@@ -135,20 +200,16 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                                     canGoBack = view.canGoBack()
                                     vm.clearDetectedStream()
                                 }
+                                // Early injection — noop ad globals before page scripts run
+                                view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                             }
                             override fun onPageFinished(view: WebView, url: String) {
                                 mainHandler.post {
                                     isLoading = false
                                     canGoBack = view.canGoBack()
                                 }
-                                // Inject CSS to hide ad containers
-                                view.evaluateJavascript("""
-                                    (function(){
-                                      var style = document.createElement('style');
-                                      style.textContent = '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"],.ads,.advertisement,.adsbygoogle,iframe[src*="ad"]{display:none!important}';
-                                      document.head.appendChild(style);
-                                    })()
-                                """.trimIndent(), null)
+                                // Re-inject after page fully loads (catches late-injected ads)
+                                view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                             }
                             override fun shouldInterceptRequest(
                                 view: WebView,
