@@ -142,8 +142,8 @@ private fun AnimatedNavBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .height(62.dp)
-                .padding(horizontal = 6.dp),
+                .height(60.dp)
+                .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment     = Alignment.CenterVertically
         ) {

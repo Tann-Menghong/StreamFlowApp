@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,89 +46,66 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                         color = MaterialTheme.colorScheme.primary
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                actions = {
+                    IconButton(onClick = { vm.loadTrending() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
             AnimatedContent(
                 targetState = state,
-                transitionSpec = {
-                    fadeIn(tween(300)) togetherWith fadeOut(tween(200))
-                },
+                transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
                 label = "home_state"
             ) { s ->
                 when (s) {
                     is HomeUiState.Loading -> ShimmerList()
 
                     is HomeUiState.Error -> Column(
+                        Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize()
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            "Oops!",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+                        Text("Could not load", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            s.message,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = { vm.loadTrending() },
-                            shape = MaterialTheme.shapes.medium
-                        ) { Text("Retry") }
+                        Text(s.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 32.dp))
+                        Spacer(Modifier.height(20.dp))
+                        FilledTonalButton(onClick = { vm.loadTrending() }) { Text("Retry") }
                     }
 
                     is HomeUiState.Success -> LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         item {
                             Text(
-                                text = "Trending",
-                                style = MaterialTheme.typography.titleSmall.copy(
+                                "Trending",
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 1.2.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
-                                modifier = Modifier.padding(bottom = 14.dp, top = 4.dp)
+                                modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
                             )
                         }
                         itemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
                             var visible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) {
-                                delay((index * 40L).coerceAtMost(320L))
-                                visible = true
-                            }
+                            LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
                             AnimatedVisibility(
                                 visible = visible,
-                                enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 5 }
+                                enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }
                             ) {
                                 VideoCard(video = video, onClick = { onVideoClick(video.url) })
                             }
                         }
                         if (s.isLoadingMore) {
                             item {
-                                Box(
-                                    Modifier.fillMaxWidth().padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(28.dp),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        strokeWidth = 2.5.dp
-                                    )
+                                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                                 }
                             }
                         }

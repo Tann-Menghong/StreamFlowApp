@@ -16,22 +16,24 @@ fun String.toAppTheme(): AppTheme = when (this) {
 }
 
 private val AppTypography = Typography(
-    titleLarge  = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 22.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 17.sp, lineHeight = 24.sp),
-    titleSmall  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
-    bodyLarge   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium  = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp, lineHeight = 16.sp),
-    labelLarge  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
-    labelMedium = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp, letterSpacing = 0.3.sp),
-    labelSmall  = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 10.sp, letterSpacing = 0.4.sp),
+    displaySmall = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 28.sp, lineHeight = 34.sp),
+    headlineMedium= TextStyle(fontWeight = FontWeight.Bold,    fontSize = 22.sp, lineHeight = 28.sp),
+    titleLarge   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 20.sp, lineHeight = 26.sp),
+    titleMedium  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    titleSmall   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
+    bodyLarge    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 13.sp, lineHeight = 19.sp),
+    bodySmall    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp, lineHeight = 16.sp),
+    labelLarge   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.1.sp),
+    labelMedium  = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp, letterSpacing = 0.3.sp),
+    labelSmall   = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 10.sp, letterSpacing = 0.5.sp),
 )
 
 private val DarkColors = darkColorScheme(
     primary            = PrimaryRed,
     onPrimary          = Color.White,
-    primaryContainer   = Color(0xFF2D0A0A),
-    onPrimaryContainer = Color(0xFFFF8080),
+    primaryContainer   = Color(0xFF2A0808),
+    onPrimaryContainer = Color(0xFFFFAAAA),
     secondary          = PrimaryRedDim,
     background         = BackgroundDark,
     surface            = SurfaceDark,
@@ -39,37 +41,40 @@ private val DarkColors = darkColorScheme(
     onBackground       = OnSurfaceDark,
     onSurface          = OnSurfaceDark,
     onSurfaceVariant   = SubtextDark,
-    outline            = Color(0xFF2E2E40)
+    outline            = Color(0xFF282838),
+    outlineVariant     = Color(0xFF1E1E2C),
 )
 
 private val AmoledColors = darkColorScheme(
     primary            = PrimaryRed,
     onPrimary          = Color.White,
-    primaryContainer   = Color(0xFF1A0000),
-    onPrimaryContainer = Color(0xFFFF8080),
+    primaryContainer   = Color(0xFF180000),
+    onPrimaryContainer = Color(0xFFFFAAAA),
     secondary          = PrimaryRedDim,
     background         = BackgroundAmoled,
     surface            = SurfaceAmoled,
-    surfaceVariant     = Color(0xFF141420),
+    surfaceVariant     = Color(0xFF12121C),
     onBackground       = Color.White,
     onSurface          = Color.White,
-    onSurfaceVariant   = Color(0xFF7777A0),
-    outline            = Color(0xFF1A1A28)
+    onSurfaceVariant   = Color(0xFF6A6A88),
+    outline            = Color(0xFF18181E),
+    outlineVariant     = Color(0xFF10101A),
 )
 
 private val LightColors = lightColorScheme(
     primary            = PrimaryRedLight,
     onPrimary          = Color.White,
-    primaryContainer   = Color(0xFFFFEAEA),
-    onPrimaryContainer = Color(0xFF8B0000),
-    secondary          = Color(0xFFAA1111),
+    primaryContainer   = Color(0xFFFFE8E8),
+    onPrimaryContainer = Color(0xFF7A0000),
+    secondary          = Color(0xFF9B0B0B),
     background         = BackgroundLight,
     surface            = SurfaceLight,
     surfaceVariant     = SurfaceVariantLight,
     onBackground       = OnSurfaceLight,
     onSurface          = OnSurfaceLight,
     onSurfaceVariant   = SubtextLight,
-    outline            = Color(0xFFDDDDEA)
+    outline            = Color(0xFFD8D8E8),
+    outlineVariant     = Color(0xFFEAEAF2),
 )
 
 @Composable

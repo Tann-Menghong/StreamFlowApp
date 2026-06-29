@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,12 +29,9 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.965f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessHigh
-        ),
-        label = "card_scale"
+        targetValue   = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label         = "card_scale"
     )
 
     Column(
@@ -43,37 +39,35 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
             .fillMaxWidth()
             .scale(scale)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(bottom = 22.dp)
+            .padding(bottom = 20.dp)
     ) {
-        // ── Thumbnail ────────────────────────────────────────────────
+        // Thumbnail
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
-                model = video.thumbnailUrl,
-                contentDescription = video.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                model             = video.thumbnailUrl,
+                contentDescription = null,
+                contentScale      = ContentScale.Crop,
+                modifier          = Modifier.fillMaxSize()
             )
-            // Duration badge
             if (video.duration > 0) {
-                Surface(
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(6.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    color = Color.Black.copy(alpha = 0.82f)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = formatDuration(video.duration),
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                        color = Color.White,
-                        fontSize = 11.sp,
+                        text       = formatDuration(video.duration),
+                        color      = Color.White,
+                        fontSize   = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.3.sp
+                        letterSpacing = 0.2.sp
                     )
                 }
             }
@@ -81,41 +75,37 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
 
         Spacer(Modifier.height(10.dp))
 
-        // ── Info row ─────────────────────────────────────────────────
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Channel initial avatar
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = video.uploaderName.firstOrNull()?.uppercase() ?: "?",
-                    color = MaterialTheme.colorScheme.primary,
+                    text       = video.uploaderName.firstOrNull()?.uppercase() ?: "?",
+                    color      = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize   = 14.sp
                 )
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = video.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    lineHeight = 19.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground
+                    text      = video.title,
+                    style     = MaterialTheme.typography.titleSmall,
+                    maxLines  = 2,
+                    overflow  = TextOverflow.Ellipsis,
+                    color     = MaterialTheme.colorScheme.onBackground
                 )
-                Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = buildString {
+                    text     = buildString {
                         append(video.uploaderName)
                         if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
                     },
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -131,8 +121,6 @@ internal fun formatViews(count: Long): String = when {
 }
 
 internal fun formatDuration(seconds: Long): String {
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
+    val h = seconds / 3600; val m = (seconds % 3600) / 60; val s = seconds % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
