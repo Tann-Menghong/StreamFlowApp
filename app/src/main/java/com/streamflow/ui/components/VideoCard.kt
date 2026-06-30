@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 
 @Composable
@@ -111,6 +113,126 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue   = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label         = "hero_scale"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .scale(scale)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+    ) {
+        AsyncImage(
+            model              = video.thumbnailUrl,
+            contentDescription = null,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.fillMaxSize()
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.55f)
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.88f))))
+        )
+        if (video.duration > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+                    .background(Color.Black.copy(0.75f), RoundedCornerShape(5.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(formatDuration(video.duration), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(12.dp)
+                .padding(end = 70.dp)
+        ) {
+            Text(
+                video.title,
+                color      = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize   = 15.sp,
+                maxLines   = 2,
+                overflow   = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                buildString {
+                    append(video.uploaderName)
+                    if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
+                },
+                color    = Color.White.copy(0.75f),
+                fontSize = 12.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(160.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication        = null,
+                onClick           = onClick
+            )
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+        ) {
+            AsyncImage(
+                model              = entity.thumbnailUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize()
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(5.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(0.88f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    "▶ ${formatDuration(entity.position / 1000)}",
+                    color      = Color.White,
+                    fontSize   = 9.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            entity.title,
+            fontSize   = 11.sp,
+            maxLines   = 2,
+            overflow   = TextOverflow.Ellipsis,
+            color      = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 15.sp
+        )
     }
 }
 

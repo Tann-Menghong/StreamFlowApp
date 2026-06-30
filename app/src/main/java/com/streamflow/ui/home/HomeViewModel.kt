@@ -5,12 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
@@ -26,32 +23,46 @@ sealed class HomeUiState {
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val repo = YouTubeRepository()
+    private val repo  = YouTubeRepository()
     private val prefs = (app as StreamFlowApp).prefs
+    private val db    = (app as StreamFlowApp).database
     private var nextPage: Page? = null
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState
 
-    val homeLayout = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
+    val homeLayout = prefs.homeLayout
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
 
-    fun toggleLayout() {
-        viewModelScope.launch {
-            val current = prefs.homeLayout.first()
-            prefs.setHomeLayout(if (current == "GRID") "LIST" else "GRID")
-        }
-    }
+    val categories = listOf("All", "Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
+
+    private val _selectedCategory = MutableStateFlow("All")
+    val selectedCategory: StateFlow<String> = _selectedCategory
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
+    val continueWatching: StateFlow<List<HistoryEntity>> = db.historyDao()
+        .getRecentWithProgress(8)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Tracks whether current content is from search or trending
+    private var isSearchMode = false
+    private var currentQuery = ""
 
     init { loadTrending() }
 
     fun loadTrending() {
+        isSearchMode = false
+        currentQuery = ""
+        _selectedCategory.value = "All"
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             nextPage = null
             try {
                 val country = prefs.country.first()
-                val result = repo.getTrending(country)
-                nextPage = result.nextPage
+                val result  = repo.getTrending(country)
+                nextPage    = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
@@ -59,19 +70,75 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun selectCategory(cat: String) {
+        _selectedCategory.value = cat
+        if (cat == "All") {
+            loadTrending()
+        } else {
+            isSearchMode = true
+            currentQuery = cat
+            viewModelScope.launch {
+                _uiState.value = HomeUiState.Loading
+                nextPage = null
+                try {
+                    val result = repo.search(cat)
+                    nextPage   = result.nextPage
+                    _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+                } catch (e: Exception) {
+                    _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                if (isSearchMode) {
+                    val result = repo.search(currentQuery)
+                    nextPage   = result.nextPage
+                    _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+                } else {
+                    val country = prefs.country.first()
+                    val result  = repo.getTrending(country)
+                    nextPage    = result.nextPage
+                    _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+                }
+            } catch (e: Exception) {
+                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
     fun loadMore() {
         val current = _uiState.value as? HomeUiState.Success ?: return
-        val page = nextPage ?: return
+        val page    = nextPage ?: return
         if (current.isLoadingMore) return
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
-            val result = repo.getTrendingNextPage(page)
+            val result = try {
+                if (isSearchMode) repo.searchNextPage(currentQuery, page)
+                else              repo.getTrendingNextPage(page)
+            } catch (e: Exception) {
+                _uiState.value = current.copy(isLoadingMore = false)
+                return@launch
+            }
             nextPage = result.nextPage
             _uiState.value = current.copy(
-                videos = current.videos + result.videos,
-                isLoadingMore = false,
-                hasMore = result.nextPage != null
+                videos         = current.videos + result.videos,
+                isLoadingMore  = false,
+                hasMore        = result.nextPage != null
             )
+        }
+    }
+
+    fun toggleLayout() {
+        viewModelScope.launch {
+            val current = prefs.homeLayout.first()
+            prefs.setHomeLayout(if (current == "GRID") "LIST" else "GRID")
         }
     }
 }

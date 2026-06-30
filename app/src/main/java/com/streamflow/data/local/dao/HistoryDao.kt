@@ -21,6 +21,9 @@ interface HistoryDao {
     @Query("SELECT COUNT(*) FROM history")
     fun count(): Flow<Int>
 
+    @Query("SELECT * FROM history WHERE position > 30000 ORDER BY watchedAt DESC LIMIT :limit")
+    fun getRecentWithProgress(limit: Int): Flow<List<HistoryEntity>>
+
     @Query("UPDATE history SET position = :pos WHERE url = :url")
     suspend fun updatePosition(url: String, pos: Long)
 
