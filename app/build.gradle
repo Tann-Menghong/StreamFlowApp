@@ -20,9 +20,19 @@ android {
         buildConfigField "String", "GITHUB_RELEASES_URL", '"https://github.com/Tann-Menghong/StreamFlowApp/releases"'
     }
 
+    signingConfigs {
+        release {
+            storeFile     file('streamflow-release.jks')
+            storePassword 'streamflow2024'
+            keyAlias      'streamflow'
+            keyPassword   'streamflow2024'
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled true
+            signingConfig   signingConfigs.release
+            minifyEnabled   true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

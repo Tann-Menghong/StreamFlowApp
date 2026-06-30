@@ -7,3 +7,12 @@
 -keep class kotlin.** { *; }
 -keepattributes *Annotation*
 -keepattributes Signature
+
+# Rhino JS engine (transitive from NewPipe) references Java SE classes not in Android
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn org.mozilla.javascript.**
+
+# Media3 session
+-keep class androidx.media3.session.** { *; }
+-dontwarn androidx.media3.**
