@@ -39,6 +39,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
@@ -116,17 +118,40 @@ fun PlayerScreen(
     LaunchedEffect(state) {
         val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
         val d = ready.details
-        val dsf = OkHttpDataSource.Factory(OkHttpClient())
+
+        // Build OkHttp client with WebView cookies + desktop UA + Referer so
+        // CDN servers that protect HLS streams don't reject the request.
+        val cookies = android.webkit.CookieManager.getInstance().getCookie(d.streamUrl) ?: ""
+        val referer = try {
+            val u = android.net.Uri.parse(d.streamUrl)
+            "${u.scheme}://${u.host}/"
+        } catch (e: Exception) { "" }
+        val httpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val req = chain.request().newBuilder()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                    .apply {
+                        if (cookies.isNotBlank()) header("Cookie", cookies)
+                        if (referer.isNotBlank()) header("Referer", referer)
+                    }
+                    .build()
+                chain.proceed(req)
+            }
+            .build()
+        val dsf = OkHttpDataSource.Factory(httpClient)
+
         if (d.audioUrl != null) {
+            // YouTube: separate video + audio tracks merged
             val vs = ProgressiveMediaSource.Factory(dsf).createMediaSource(MediaItem.fromUri(d.streamUrl))
             val `as` = ProgressiveMediaSource.Factory(dsf).createMediaSource(MediaItem.fromUri(d.audioUrl))
             player.setMediaSource(MergingMediaSource(vs, `as`))
         } else {
-            player.setMediaItem(MediaItem.fromUri(d.streamUrl))
+            // Direct stream (HLS / MP4): DefaultMediaSourceFactory auto-detects type
+            val source = DefaultMediaSourceFactory(dsf).createMediaSource(MediaItem.fromUri(d.streamUrl))
+            player.setMediaSource(source)
         }
         player.prepare()
         player.play()
-        // Seek to saved position
         val savedPos = vm.getSavedPosition(videoUrl)
         if (savedPos > 0L) player.seekTo(savedPos)
     }
