@@ -49,6 +49,7 @@ import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PlayerScreen(
     videoUrl: String,
@@ -61,6 +62,13 @@ fun PlayerScreen(
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val context = LocalContext.current
     val activity = context as? Activity
+
+    // Detect Donghua / direct stream vs YouTube
+    val isDirectStream = remember(videoUrl) {
+        val lower = videoUrl.lowercase()
+        lower.contains(".m3u8") || lower.contains(".mp4") || lower.contains(".webm") ||
+        lower.contains("/hls/") || lower.contains("/stream/")
+    }
     var isFullscreen by remember { mutableStateOf(true) }
 
     // Reset orientation/system bars when leaving the player
@@ -116,6 +124,7 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(state) {
+        if (isDirectStream) return@LaunchedEffect   // WebView handles direct streams
         val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
         val d = ready.details
 
@@ -201,6 +210,54 @@ fun PlayerScreen(
                 showSeekFeedback = true
             }
         )
+    }
+
+    // ── Donghua direct stream — WebView player ───────────────────────
+    // WebView inherits the shared CookieManager cookies from DonghuaScreen
+    // and uses donghuafun.com as Referer via loadDataWithBaseURL.
+    if (isDirectStream) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).also { wv ->
+                        wv.settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            mediaPlaybackRequiresUserGesture = false
+                            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                            allowContentAccess = true
+                        }
+                        android.webkit.CookieManager.getInstance().apply {
+                            setAcceptCookie(true)
+                            setAcceptThirdPartyCookies(wv, true)
+                        }
+                        wv.webChromeClient = android.webkit.WebChromeClient()
+                        val safeUrl = videoUrl.replace("\\", "\\\\").replace("\"", "\\\"")
+                        val html = """<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;width:100vw;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+video{width:100%;height:100%;object-fit:contain}</style></head><body>
+<video id="v" src="$safeUrl" autoplay playsinline controls></video>
+<script>var v=document.getElementById('v');v.play().catch(function(){});</script>
+</body></html>"""
+                        wv.loadDataWithBaseURL(
+                            "https://donghuafun.com/", html,
+                            "text/html", "utf-8", null
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+        }
+        return
     }
 
     // ── Fullscreen layout ────────────────────────────────────────────
