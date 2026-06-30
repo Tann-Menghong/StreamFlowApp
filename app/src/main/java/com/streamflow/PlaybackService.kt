@@ -1,0 +1,76 @@
+package com.streamflow
+
+import android.os.Bundle
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import okhttp3.OkHttpClient
+
+class PlaybackService : MediaSessionService() {
+
+    private var mediaSession: MediaSession? = null
+
+    override fun onCreate() {
+        super.onCreate()
+
+        val httpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val req = chain.request().newBuilder()
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
+                        "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+                    )
+                    .header("Accept-Language", "en-US,en;q=0.9")
+                    .build()
+                chain.proceed(req)
+            }
+            .build()
+        val dsf = OkHttpDataSource.Factory(httpClient)
+
+        // When audioUrl is in requestMetadata extras, merge video + audio tracks.
+        val defaultMsf = DefaultMediaSourceFactory(dsf)
+        val mediaSourceFactory = object : androidx.media3.exoplayer.source.MediaSource.Factory
+            by defaultMsf {
+            override fun createMediaSource(
+                mediaItem: MediaItem
+            ): androidx.media3.exoplayer.source.MediaSource {
+                val audioUrl = mediaItem.requestMetadata.extras?.getString("audioUrl")
+                return if (audioUrl != null) {
+                    val video = ProgressiveMediaSource.Factory(dsf).createMediaSource(mediaItem)
+                    val audio = ProgressiveMediaSource.Factory(dsf)
+                        .createMediaSource(MediaItem.fromUri(audioUrl))
+                    MergingMediaSource(video, audio)
+                } else {
+                    defaultMsf.createMediaSource(mediaItem)
+                }
+            }
+        }
+
+        val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+
+        mediaSession = MediaSession.Builder(this, player).build()
+    }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
+
+    override fun onDestroy() {
+        mediaSession?.run {
+            player.release()
+            release()
+        }
+        mediaSession = null
+        super.onDestroy()
+    }
+}
