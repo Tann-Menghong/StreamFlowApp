@@ -53,6 +53,8 @@ import androidx.media3.ui.PlayerView
 import com.streamflow.MainActivity
 import com.streamflow.PlaybackService
 import com.streamflow.data.local.AppPreferences
+import com.streamflow.ui.components.MiniPlayerData
+import com.streamflow.ui.components.MiniPlayerState
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
@@ -137,6 +139,18 @@ fun PlayerScreen(
     )
 
     LaunchedEffect(videoUrl) { vm.loadVideo(videoUrl) }
+
+    // ── Update MiniPlayerState when ready ────────────────────────────────────
+    LaunchedEffect(state) {
+        val r = state as? PlayerUiState.Ready ?: return@LaunchedEffect
+        MiniPlayerState.update(MiniPlayerData(
+            url = videoUrl,
+            title = r.details.title,
+            thumbnailUrl = r.details.thumbnailUrl,
+            uploaderName = r.details.uploaderName,
+            isPlaying = true
+        ))
+    }
 
     LaunchedEffect(state, mediaController) {
         if (isDirectStream) return@LaunchedEffect

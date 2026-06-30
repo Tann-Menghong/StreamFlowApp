@@ -16,9 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -27,6 +31,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.streamflow.PlaybackService
+import com.streamflow.ui.components.MiniPlayerBar
+import com.streamflow.ui.components.MiniPlayerState
 import com.streamflow.ui.donghua.DonghuaScreen
 import com.streamflow.ui.home.HomeScreen
 import com.streamflow.ui.library.LibraryScreen
@@ -35,6 +42,7 @@ import com.streamflow.ui.search.SearchScreen
 import com.streamflow.ui.settings.SettingsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
+import android.content.ComponentName
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home     : Screen("home",     "Home",    Icons.Default.Home)
@@ -59,6 +67,26 @@ fun NavGraph(startUrl: String? = null) {
     var isDonghuaFullscreen by remember { mutableStateOf(false) }
     val showBottom = bottomItems.any { it.route == currentDest?.route } && !isDonghuaFullscreen
 
+    val miniState by MiniPlayerState.data.collectAsState()
+    val isOnPlayerScreen = currentDest?.route?.startsWith("player") == true
+    val showMini = miniState.url.isNotEmpty() && !isOnPlayerScreen && showBottom
+
+    // Mini player MediaController
+    val context = LocalContext.current
+    var miniMediaController by remember { mutableStateOf<MediaController?>(null) }
+    DisposableEffect(context) {
+        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        val future = MediaController.Builder(context, token).buildAsync()
+        future.addListener({
+            try { miniMediaController = future.get() } catch (_: Exception) {}
+        }, ContextCompat.getMainExecutor(context))
+        onDispose {
+            future.cancel(false)
+            miniMediaController?.release()
+            miniMediaController = null
+        }
+    }
+
     LaunchedEffect(startUrl) {
         if (startUrl != null) {
             navController.navigate(Screen.Player.createRoute(startUrl))
@@ -72,17 +100,36 @@ fun NavGraph(startUrl: String? = null) {
                 enter = slideInVertically { it } + fadeIn(),
                 exit  = slideOutVertically { it } + fadeOut()
             ) {
-                AnimatedNavBar(
-                    items    = bottomItems,
-                    current  = currentDest,
-                    onSelect = { screen ->
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState    = true
-                        }
+                Column {
+                    // Mini player bar above nav bar
+                    AnimatedVisibility(
+                        visible = showMini,
+                        enter = slideInVertically { it } + fadeIn(tween(200)),
+                        exit  = slideOutVertically { it } + fadeOut(tween(150))
+                    ) {
+                        MiniPlayerBar(
+                            data = miniState,
+                            mediaController = miniMediaController,
+                            onNavigateToPlayer = { url ->
+                                navController.navigate(Screen.Player.createRoute(url)) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onDismiss = { MiniPlayerState.clear() }
+                        )
                     }
-                )
+                    AnimatedNavBar(
+                        items    = bottomItems,
+                        current  = currentDest,
+                        onSelect = { screen ->
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState    = true
+                            }
+                        }
+                    )
+                }
             }
         }
     ) { innerPadding ->
