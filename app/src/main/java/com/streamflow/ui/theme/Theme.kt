@@ -1,9 +1,11 @@
 package com.streamflow.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -98,15 +100,26 @@ private fun buildLightColors(p: AccentPalette) = lightColorScheme(
 
 @Composable
 fun StreamFlowTheme(theme: AppTheme = AppTheme.DARK, accent: String = "RED", content: @Composable () -> Unit) {
+    val isDark   = when (theme) {
+        AppTheme.LIGHT -> false
+        AppTheme.SYSTEM -> isSystemInDarkTheme()
+        else -> true
+    }
+    val context = LocalContext.current
     val palette = accentPalettes[accent] ?: accentPalettes["RED"]!!
-    MaterialTheme(
-        colorScheme = when (theme) {
+    val colors  = when {
+        accent == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        else -> when (theme) {
             AppTheme.DARK   -> buildDarkColors(palette)
             AppTheme.AMOLED -> buildAmoledColors(palette)
             AppTheme.LIGHT  -> buildLightColors(palette)
-            AppTheme.SYSTEM -> if (isSystemInDarkTheme()) buildDarkColors(palette) else buildLightColors(palette)
-        },
-        typography = AppTypography,
-        content = content
+            AppTheme.SYSTEM -> if (isDark) buildDarkColors(palette) else buildLightColors(palette)
+        }
+    }
+    MaterialTheme(
+        colorScheme = colors,
+        typography  = AppTypography,
+        content     = content
     )
 }

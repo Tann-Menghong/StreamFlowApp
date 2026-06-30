@@ -2,6 +2,7 @@ package com.streamflow.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -152,7 +153,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 ) { showThemeDialog = true }
                 SettingsDivider()
                 SettingsItem(Icons.Default.ColorLens, "Accent color",
-                    accentColor.lowercase().replaceFirstChar { it.uppercase() }
+                    if (accentColor == "DYNAMIC") "Dynamic (Material You)"
+                    else accentColor.lowercase().replaceFirstChar { it.uppercase() }
                 ) { showAccentDialog = true }
             }
 
@@ -431,24 +433,73 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
         onDismissRequest = onDismiss,
         title = { Text("Accent color", fontWeight = FontWeight.Bold) },
         text  = {
-            LazyVerticalGrid(
-                columns               = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement   = Arrangement.spacedBy(12.dp),
-                modifier              = Modifier.padding(top = 4.dp)
-            ) {
-                itemsIndexed(accentCircleColors) { _, (key, color) ->
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .then(if (key == selected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
-                            .clickable { onSelect(key) }
+            Column {
+                // Material You option — only on Android 12+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (selected == "DYNAMIC") MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(0.5f)
+                            )
+                            .clickable { onSelect("DYNAMIC") }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (key == selected) Icon(Icons.Default.Check, null,
-                            tint = Color.White, modifier = Modifier.size(20.dp))
+                        Box(
+                            Modifier.size(32.dp).clip(CircleShape)
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.sweepGradient(
+                                        listOf(Color(0xFF6750A4), Color(0xFF006875), Color(0xFF3F6844), Color(0xFF6750A4))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (selected == "DYNAMIC") Icon(Icons.Default.Check, null,
+                                tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Dynamic (Material You)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected == "DYNAMIC") MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onBackground)
+                            Text("Uses your wallpaper colors",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                // Color grid
+                LazyVerticalGrid(
+                    columns               = GridCells.Fixed(4),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement   = Arrangement.spacedBy(12.dp),
+                    modifier              = Modifier.padding(top = 4.dp)
+                ) {
+                    itemsIndexed(accentCircleColors) { _, (key, color) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .then(if (key == selected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
+                                    .clickable { onSelect(key) }
+                            ) {
+                                if (key == selected) Icon(Icons.Default.Check, null,
+                                    tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(key.lowercase().replaceFirstChar { it.uppercase() },
+                                fontSize = 9.sp,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
