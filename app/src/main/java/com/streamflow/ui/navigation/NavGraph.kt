@@ -112,7 +112,7 @@ fun NavGraph(startUrl: String? = null) {
                 SearchScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
             }
             composable(Screen.Donghua.route) {
-                DonghuaScreen(onPlayNative = { navController.navigate(Screen.Player.createRoute(it)) })
+                DonghuaScreen()
             }
             composable(Screen.Library.route) {
                 LibraryScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })

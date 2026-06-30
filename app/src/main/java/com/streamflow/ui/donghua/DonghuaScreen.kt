@@ -1,14 +1,15 @@
 package com.streamflow.ui.donghua
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.view.WindowManager
 import android.webkit.*
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,21 +17,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-
-private const val SITE_URL = "https://donghuafun.com/"
 
 // ── Ad-blocking ───────────────────────────────────────────────────────────────
 private val AD_DOMAINS = setOf(
-    // Google ads
     "doubleclick.net", "googlesyndication.com", "googletagmanager.com",
     "googletagservices.com", "google-analytics.com", "googleadservices.com",
     "adservice.google.com", "analytics.google.com", "pagead2.googlesyndication.com",
     "adwords.google.com", "googletag.com",
-    // Programmatic / exchanges
     "adnxs.com", "adsrvr.org", "adform.net", "rubiconproject.com",
     "pubmatic.com", "openx.net", "moatads.com", "scorecardresearch.com",
     "amazon-adsystem.com", "media.net", "criteo.com", "taboola.com",
@@ -39,17 +40,15 @@ private val AD_DOMAINS = setOf(
     "smartadserver.com", "bidswitch.net", "contextweb.com", "spotxchange.com",
     "lijit.com", "appnexus.com", "33across.com", "triplelift.com",
     "sharethrough.com", "yieldmo.com", "sovrn.com", "indexexchange.com",
-    // Pop/push/redirect ad networks
     "trafficjunky.net", "exoclick.com", "propellerads.com", "popcash.net",
     "clksite.com", "popads.net", "adsterra.com", "hilltopads.net",
     "clickadu.com", "yllix.com", "juicyads.com", "trafficstars.com",
     "plugrush.com", "ero-advertising.com", "tsyndicate.com",
-    "adspyglass.com", "adskeeper.com", "mgid.com", "evadav.com",
-    // Trackers & analytics
+    "adspyglass.com", "adskeeper.com", "evadav.com",
     "hotjar.com", "mixpanel.com", "segment.io", "segment.com",
     "fullstory.com", "mouseflow.com", "clarity.ms", "quantserve.com",
     "chartbeat.com", "parsely.com", "optimizely.com", "ab.tasty.com",
-    "facebook.com/tr", "connect.facebook.net"
+    "connect.facebook.net"
 )
 
 private val AD_URL_PATTERNS = listOf(
@@ -61,17 +60,13 @@ private val AD_URL_PATTERNS = listOf(
 
 private fun isAdRequest(url: String): Boolean {
     val lower = url.lowercase()
-    if (AD_DOMAINS.any { lower.contains(it) }) return true
-    if (AD_URL_PATTERNS.any { lower.contains(it) }) return true
-    return false
+    return AD_DOMAINS.any { lower.contains(it) } || AD_URL_PATTERNS.any { lower.contains(it) }
 }
 
 private val EMPTY_RESPONSE = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
 
-// Brave-style scriptlet + CSS injection — kills ad containers, pop-ups, and overlays
 private val AD_BLOCK_JS = """
 (function(){
-  // 1. Noop known ad globals before they run
   var noop = function(){};
   var noopObj = new Proxy({}, { get: function(){ return noop; } });
   ['adsbygoogle','googletag','ga','_gaq','dataLayer','pbjs','apntag',
@@ -79,16 +74,10 @@ private val AD_BLOCK_JS = """
    'PopAds','popns','adsbytrafficjunky'].forEach(function(k){
     try{ if(!window[k]) Object.defineProperty(window,k,{get:function(){return noopObj},set:noop}); }catch(e){}
   });
-
-  // 2. Block window.open (pop-unders)
   window.open = noop;
-
-  // 3. Kill setInterval/setTimeout used by ad overlays
   var _si = window.setInterval, _st = window.setTimeout;
   window.setInterval = function(fn, t){ try{ var s=String(fn); if(s.indexOf('ad')>-1||s.indexOf('pop')>-1) return 0; }catch(e){} return _si(fn,t); };
   window.setTimeout  = function(fn, t){ try{ var s=String(fn); if(s.indexOf('pop')>-1) return 0; }catch(e){} return _st(fn,t); };
-
-  // 4. CSS — hide ad containers
   var css = [
     '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"]',
     '.ads,.advertisement,.adsbygoogle,.ad-banner,.ad-slot,.ad-unit',
@@ -101,8 +90,6 @@ private val AD_BLOCK_JS = """
   var s = document.createElement('style');
   s.textContent = css + '{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   (document.head||document.documentElement).appendChild(s);
-
-  // 5. MutationObserver — remove injected ad nodes dynamically
   var blocked = /doubleclick|googlesyndication|adsbygoogle|exoclick|propellerads|popcash|popads/i;
   new MutationObserver(function(muts){
     muts.forEach(function(m){
@@ -118,33 +105,52 @@ private val AD_BLOCK_JS = """
 })();
 """.trimIndent()
 
-// ── Stream detection ─────────────────────────────────────────────────────────
-private fun isVideoStream(url: String): Boolean {
-    val lower = url.lowercase()
-    if (!lower.startsWith("http")) return false
-    val excluded = listOf(".js", ".css", ".png", ".jpg", ".jpeg", ".gif",
-        ".svg", ".woff", ".woff2", ".ttf", ".ico", "analytics", "doubleclick",
-        "googlesyndication", "pagead", "adsbygoogle")
-    if (excluded.any { lower.contains(it) }) return false
-    return lower.contains(".m3u8") || lower.contains(".mp4") ||
-           lower.contains(".webm") || lower.contains("/hls/") ||
-           lower.contains("/stream/") ||
-           (lower.contains("playlist") && lower.contains("m3u"))
-}
-
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewModel()) {
-    val detectedUrl by vm.detectedStreamUrl.collectAsState()
+fun DonghuaScreen(vm: DonghuaViewModel = viewModel()) {
+    val context = LocalContext.current
+    val activity = context as? Activity
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var pageTitle by remember { mutableStateOf("Donghua Fun") }
+    var customView by remember { mutableStateOf<android.view.View?>(null) }
+    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
-    BackHandler(enabled = canGoBack) { webViewRef?.goBack() }
+    // Reset orientation when leaving the Donghua tab
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.let { act ->
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                WindowCompat.getInsetsController(act.window, act.window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+                act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
 
+    // Back: exit fullscreen first, then go back in WebView
+    BackHandler(enabled = canGoBack && customView == null) { webViewRef?.goBack() }
+    BackHandler(enabled = customView != null) { customViewCallback?.onCustomViewHidden() }
+
+    // ── Fullscreen video overlay ──────────────────────────────────────────────
+    if (customView != null) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AndroidView(
+                factory = { customView!! },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        return
+    }
+
+    // ── Normal WebView layout ────────────────────────────────────────────────
     Scaffold(
         topBar = {
             TopAppBar(
@@ -153,22 +159,26 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                title = {
-                    Text(pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
+                title = { Text(pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
-                    IconButton(onClick = { webViewRef?.reload(); vm.clearDetectedStream() }) {
+                    IconButton(onClick = { webViewRef?.reload() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Reload")
                     }
-                    IconButton(onClick = { webViewRef?.loadUrl(SITE_URL); vm.clearDetectedStream() }) {
+                    IconButton(onClick = { webViewRef?.loadUrl(DONGHUA_HOME) }) {
                         Icon(Icons.Default.Home, contentDescription = "Home")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).also { wv ->
@@ -193,17 +203,15 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                                 mainHandler.post {
                                     isLoading = true
                                     canGoBack = view.canGoBack()
-                                    vm.clearDetectedStream()
                                 }
-                                // Early injection — noop ad globals before page scripts run
                                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                             }
                             override fun onPageFinished(view: WebView, url: String) {
                                 mainHandler.post {
                                     isLoading = false
                                     canGoBack = view.canGoBack()
+                                    vm.saveLastUrl(url)
                                 }
-                                // Re-inject after page fully loads (catches late-injected ads)
                                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                             }
                             override fun shouldInterceptRequest(
@@ -211,12 +219,7 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                                 request: WebResourceRequest
                             ): WebResourceResponse? {
                                 val url = request.url.toString()
-                                // Block ads
                                 if (isAdRequest(url)) return EMPTY_RESPONSE
-                                // Detect video stream
-                                if (isVideoStream(url)) {
-                                    mainHandler.post { vm.onStreamDetected(url) }
-                                }
                                 return null
                             }
                             override fun onReceivedSslError(
@@ -227,12 +230,53 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
                         }
 
                         wv.webChromeClient = object : WebChromeClient() {
+                            override fun onShowCustomView(
+                                view: android.view.View,
+                                callback: CustomViewCallback
+                            ) {
+                                mainHandler.post {
+                                    customView = view
+                                    customViewCallback = callback
+                                    activity?.let { act ->
+                                        act.requestedOrientation =
+                                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                        WindowCompat.getInsetsController(
+                                            act.window, act.window.decorView
+                                        ).apply {
+                                            hide(WindowInsetsCompat.Type.systemBars())
+                                            systemBarsBehavior =
+                                                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                        }
+                                        act.window.addFlags(
+                                            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                                        )
+                                    }
+                                }
+                            }
+
+                            override fun onHideCustomView() {
+                                mainHandler.post {
+                                    customViewCallback = null
+                                    customView = null
+                                    activity?.let { act ->
+                                        act.requestedOrientation =
+                                            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                        WindowCompat.getInsetsController(
+                                            act.window, act.window.decorView
+                                        ).show(WindowInsetsCompat.Type.systemBars())
+                                        act.window.clearFlags(
+                                            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                                        )
+                                    }
+                                }
+                            }
+
                             override fun onReceivedTitle(view: WebView, title: String) {
                                 mainHandler.post { pageTitle = title }
                             }
                         }
 
-                        wv.loadUrl(SITE_URL)
+                        wv.loadUrl(vm.getLastUrl())
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -240,55 +284,12 @@ fun DonghuaScreen(onPlayNative: (String) -> Unit, vm: DonghuaViewModel = viewMod
 
             if (isLoading) {
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 )
-            }
-
-            AnimatedVisibility(
-                visible = detectedUrl != null,
-                enter = slideInVertically { it },
-                exit  = slideOutVertically { it },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
-            ) {
-                detectedUrl?.let { url ->
-                    Card(
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.PlayCircle, null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                "Video stream found",
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            TextButton(onClick = { onPlayNative(url) }) {
-                                Text("Play in App", color = MaterialTheme.colorScheme.primary)
-                            }
-                            IconButton(
-                                onClick = { vm.clearDetectedStream() },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Default.Close, null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                            }
-                        }
-                    }
-                }
             }
         }
     }

@@ -1,18 +1,19 @@
 package com.streamflow.ui.donghua
 
-import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 
-class DonghuaViewModel : ViewModel() {
-    private val _detectedStreamUrl = MutableStateFlow<String?>(null)
-    val detectedStreamUrl: StateFlow<String?> = _detectedStreamUrl
+private const val PREFS_NAME = "donghua_prefs"
+private const val KEY_LAST_URL = "last_url"
+const val DONGHUA_HOME = "https://donghuafun.com/"
 
-    fun onStreamDetected(url: String) {
-        _detectedStreamUrl.value = url
-    }
+class DonghuaViewModel(app: Application) : AndroidViewModel(app) {
+    private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun clearDetectedStream() {
-        _detectedStreamUrl.value = null
+    fun getLastUrl(): String = prefs.getString(KEY_LAST_URL, DONGHUA_HOME) ?: DONGHUA_HOME
+
+    fun saveLastUrl(url: String) {
+        if (url.startsWith("http")) prefs.edit().putString(KEY_LAST_URL, url).apply()
     }
 }
