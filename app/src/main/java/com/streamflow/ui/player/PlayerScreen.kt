@@ -75,6 +75,7 @@ fun PlayerScreen(
     val state by vm.uiState.collectAsState()
     val isFavorite by vm.isFavorite.collectAsState(initial = false)
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
+    val isDownloaded by vm.isDownloaded.collectAsState(initial = false)
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -691,6 +692,14 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         }
                                     }
                                     Spacer(Modifier.width(8.dp))
+                                }
+                                IconButton(onClick = { vm.downloadVideo() }) {
+                                    Icon(
+                                        if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                        "Download",
+                                        tint = if (isDownloaded) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
                                 }
                                 IconButton(onClick = {
                                     val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, videoUrl) }

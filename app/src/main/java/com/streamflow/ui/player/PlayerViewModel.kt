@@ -1,10 +1,14 @@
 package com.streamflow.ui.player
 
 import android.app.Application
+import android.app.DownloadManager
+import android.net.Uri
+import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
@@ -30,6 +34,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _currentUrl = MutableStateFlow("")
     val isFavorite: Flow<Boolean> = _currentUrl
         .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.favoriteDao().isFavorite(url) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isDownloaded: Flow<Boolean> = _currentUrl
+        .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.downloadDao().isDownloaded(url).map { it > 0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val isInWatchLater: Flow<Boolean> = _currentUrl
@@ -125,6 +133,35 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             db.historyDao().getPosition(url)
         } catch (e: Exception) {
             0L
+        }
+    }
+
+    fun downloadVideo() {
+        val state = _uiState.value as? PlayerUiState.Ready ?: return
+        val details = state.details
+        viewModelScope.launch {
+            try {
+                val downloadUrl = details.streamUrl
+                val fileName = "StreamFlow_${details.title.take(40).replace("[^a-zA-Z0-9 ]".toRegex(), "")}.mp4"
+                val dm = getApplication<Application>().getSystemService(DownloadManager::class.java)
+                val request = DownloadManager.Request(Uri.parse(downloadUrl))
+                    .setTitle(details.title)
+                    .setDescription("StreamFlow download")
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                @Suppress("DEPRECATION")
+                request.allowScanningByMediaScanner()
+                val downloadId = dm.enqueue(request)
+                val filePath = "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/$fileName"
+                db.downloadDao().insert(DownloadEntity(
+                    url = details.url,
+                    title = details.title,
+                    thumbnailUrl = details.thumbnailUrl,
+                    uploaderName = details.uploaderName,
+                    filePath = filePath,
+                    downloadId = downloadId
+                ))
+            } catch (_: Exception) {}
         }
     }
 

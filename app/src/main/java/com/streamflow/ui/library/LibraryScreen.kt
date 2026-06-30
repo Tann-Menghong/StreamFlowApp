@@ -41,8 +41,9 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
     val history       by vm.history.collectAsState()
     val watchLater    by vm.watchLater.collectAsState()
     val subscriptions by vm.subscriptions.collectAsState()
+    val downloads     by vm.downloads.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Favorites", "History", "Watch Later", "Subscriptions")
+    val tabs = listOf("Favorites", "History", "Watch Later", "Subs", "Downloads")
 
     Scaffold(
         topBar = {
@@ -70,7 +71,7 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size)
+            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, downloads.size)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = MaterialTheme.colorScheme.background,
@@ -156,10 +157,15 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
                             emptySubtitle = "Tap bookmark while watching to add videos here.",
                             emptyIcon = Icons.Default.BookmarkBorder
                         )
-                    else -> SubscriptionsTab(
+                    3 -> SubscriptionsTab(
                             subscriptions = subscriptions,
                             onChannelClick = onVideoClick,
                             onUnsubscribe = vm::unsubscribe
+                        )
+                    else -> DownloadsTab(
+                            downloads = downloads,
+                            onVideoClick = onVideoClick,
+                            onDelete = vm::deleteDownload
                         )
                 }
             }
@@ -296,9 +302,68 @@ private fun VideoListWithSearch(
     }
 }
 
-private fun FavoriteEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
-private fun HistoryEntity.toVideoItem()  = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
-private fun WatchLaterEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+private fun FavoriteEntity.toVideoItem()  = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+private fun HistoryEntity.toVideoItem()   = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+private fun WatchLaterEntity.toVideoItem()= VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+
+@Composable
+private fun DownloadsTab(
+    downloads: List<com.streamflow.data.local.entity.DownloadEntity>,
+    onVideoClick: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    if (downloads.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(40.dp)) {
+                Icon(Icons.Default.Download, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                    modifier = Modifier.size(64.dp))
+                Spacer(Modifier.height(16.dp))
+                Text("No downloads yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(0.55f))
+                Spacer(Modifier.height(6.dp))
+                Text("Tap the download icon while watching a video.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                    textAlign = TextAlign.Center)
+            }
+        }
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        items(downloads, key = { it.url }) { dl ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onVideoClick(dl.url) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AsyncImage(model = dl.thumbnailUrl, contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(width = 72.dp, height = 40.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant))
+                Column(Modifier.weight(1f)) {
+                    Text(dl.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                        maxLines = 2, color = MaterialTheme.colorScheme.onBackground)
+                    Text(dl.uploaderName, fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { onDelete(dl.url) },
+                    modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.DeleteOutline, null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error.copy(0.7f))
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.1f))
+        }
+    }
+}
 
 @Composable
 private fun SubscriptionsTab(

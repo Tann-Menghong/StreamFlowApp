@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
@@ -29,6 +30,9 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val subscriptions: StateFlow<List<SubscriptionEntity>> = db.subscriptionDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val downloads: StateFlow<List<DownloadEntity>> = db.downloadDao().getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun removeFavorite(url: String) = viewModelScope.launch { db.favoriteDao().delete(url) }
     fun removeHistory(url: String) = viewModelScope.launch { db.historyDao().delete(url) }
     fun removeWatchLater(url: String) = viewModelScope.launch { db.watchLaterDao().delete(url) }
@@ -36,4 +40,5 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
     fun clearWatchLater() = viewModelScope.launch { db.watchLaterDao().clearAll() }
     fun unsubscribe(url: String) = viewModelScope.launch { db.subscriptionDao().delete(url) }
+    fun deleteDownload(url: String) = viewModelScope.launch { db.downloadDao().delete(url) }
 }
