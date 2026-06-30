@@ -105,6 +105,21 @@ fun ChannelScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            Spacer(Modifier.height(12.dp))
+                            val isSubscribed by vm.isSubscribed(channelUrl).collectAsState()
+                            Button(
+                                onClick = {
+                                    if (isSubscribed) vm.unsubscribe(channelUrl)
+                                    else vm.subscribe(channelUrl, ch.name, ch.avatarUrl)
+                                },
+                                colors = if (isSubscribed)
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor   = MaterialTheme.colorScheme.onSurfaceVariant)
+                                else ButtonDefaults.buttonColors()
+                            ) {
+                                Text(if (isSubscribed) "Subscribed" else "Subscribe")
+                            }
                             if (ch.description.isNotBlank()) {
                                 Spacer(Modifier.height(10.dp))
                                 var expanded by remember { mutableStateOf(false) }

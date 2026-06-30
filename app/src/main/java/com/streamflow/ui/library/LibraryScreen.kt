@@ -3,9 +3,11 @@ package com.streamflow.ui.library
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -21,8 +23,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.VideoCard
@@ -31,11 +37,12 @@ import com.streamflow.ui.components.formatDuration
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewModel()) {
-    val favorites  by vm.favorites.collectAsState()
-    val history    by vm.history.collectAsState()
-    val watchLater by vm.watchLater.collectAsState()
+    val favorites     by vm.favorites.collectAsState()
+    val history       by vm.history.collectAsState()
+    val watchLater    by vm.watchLater.collectAsState()
+    val subscriptions by vm.subscriptions.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Favorites", "History", "Watch Later")
+    val tabs = listOf("Favorites", "History", "Watch Later", "Subscriptions")
 
     Scaffold(
         topBar = {
@@ -63,7 +70,7 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            val tabCounts = listOf(favorites.size, history.size, watchLater.size)
+            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = MaterialTheme.colorScheme.background,
@@ -141,13 +148,18 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
                             remainingSeconds = remainingMap
                         )
                     }
-                    else -> VideoListWithSearch(
+                    2 -> VideoListWithSearch(
                             items = watchLater.map { it.toVideoItem() },
                             onVideoClick = onVideoClick,
                             onRemove = vm::removeWatchLater,
                             emptyTitle = "No videos saved",
                             emptySubtitle = "Tap bookmark while watching to add videos here.",
                             emptyIcon = Icons.Default.BookmarkBorder
+                        )
+                    else -> SubscriptionsTab(
+                            subscriptions = subscriptions,
+                            onChannelClick = onVideoClick,
+                            onUnsubscribe = vm::unsubscribe
                         )
                 }
             }
@@ -287,3 +299,68 @@ private fun VideoListWithSearch(
 private fun FavoriteEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
 private fun HistoryEntity.toVideoItem()  = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
 private fun WatchLaterEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+
+@Composable
+private fun SubscriptionsTab(
+    subscriptions: List<SubscriptionEntity>,
+    onChannelClick: (String) -> Unit,
+    onUnsubscribe: (String) -> Unit
+) {
+    if (subscriptions.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(40.dp)) {
+                Icon(Icons.Default.Subscriptions, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                    modifier = Modifier.size(64.dp))
+                Spacer(Modifier.height(16.dp))
+                Text("No subscriptions yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(0.55f))
+                Spacer(Modifier.height(6.dp))
+                Text("Visit a channel page and tap Subscribe.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                    textAlign = TextAlign.Center)
+            }
+        }
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        items(subscriptions, key = { it.channelUrl }) { sub ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onChannelClick(sub.channelUrl) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (sub.avatarUrl.isNotEmpty()) {
+                    AsyncImage(model = sub.avatarUrl, contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant))
+                } else {
+                    Box(Modifier.size(44.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(0.15f)),
+                        contentAlignment = Alignment.Center) {
+                        Text(sub.channelName.firstOrNull()?.uppercaseChar()?.toString() ?: "C",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Text(sub.channelName, modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground)
+                IconButton(onClick = { onUnsubscribe(sub.channelUrl) },
+                    modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.NotificationsOff, null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.1f))
+        }
+    }
+}
