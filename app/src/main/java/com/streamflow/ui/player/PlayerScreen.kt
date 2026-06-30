@@ -186,6 +186,17 @@ fun PlayerScreen(
         LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
     }
 
+    // ── Auto-save position every 5 s while playing ──────────────────────────
+    LaunchedEffect(videoUrl, mediaController) {
+        while (true) {
+            delay(5_000L)
+            val mc = mediaController ?: continue
+            if (mc.isPlaying && mc.currentPosition > 0L) {
+                vm.savePosition(videoUrl, mc.currentPosition)
+            }
+        }
+    }
+
     // ── Lock state ───────────────────────────────────────────────────────────
     var isLocked by remember { mutableStateOf(false) }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -59,6 +60,7 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            val tabCounts = listOf(favorites.size, history.size, watchLater.size)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = MaterialTheme.colorScheme.background,
@@ -68,15 +70,38 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
                 tabs.forEachIndexed { i, title ->
                     Tab(
                         selected = selectedTab == i,
-                        onClick  = { selectedTab = i },
-                        text     = {
+                        onClick  = { selectedTab = i }
+                    ) {
+                        Row(
+                            Modifier.padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Text(
                                 title,
                                 fontWeight = if (selectedTab == i) FontWeight.SemiBold else FontWeight.Normal,
-                                fontSize   = 13.sp
+                                fontSize   = 13.sp,
+                                color      = if (selectedTab == i) MaterialTheme.colorScheme.primary
+                                             else MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (tabCounts[i] > 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (selectedTab == i) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        tabCounts[i].toString(),
+                                        fontSize   = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color      = if (selectedTab == i) MaterialTheme.colorScheme.onPrimary
+                                                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier   = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
                         }
-                    )
+                    }
                 }
             }
 
