@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.BuildConfig
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.BackupManager
 import com.streamflow.data.UpdateInfo
 import com.streamflow.data.UpdateManager
 import kotlinx.coroutines.flow.*
@@ -42,6 +43,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── New player prefs ──────────────────────────────────────────
     val skipSeconds = prefs.skipSeconds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "10")
+    val appLock     = prefs.appLock.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -92,6 +94,27 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setShowHeroCard(v: Boolean)  = viewModelScope.launch { prefs.setShowHeroCard(v) }
     fun setGridColumns(v: String)    = viewModelScope.launch { prefs.setGridColumns(v) }
     fun setSkipSeconds(v: String)    = viewModelScope.launch { prefs.setSkipSeconds(v) }
+    fun setAppLock(v: Boolean)       = viewModelScope.launch { prefs.setAppLock(v) }
     fun clearHistory()   = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
+
+    private val _backupMsg = MutableStateFlow<String?>(null)
+    val backupMsg: StateFlow<String?> = _backupMsg
+
+    fun exportBackup(context: android.content.Context) {
+        viewModelScope.launch {
+            val result = BackupManager.exportToJson(context)
+            _backupMsg.value = result.getOrNull()?.let { "Saved to $it" }
+                ?: "Export failed: ${result.exceptionOrNull()?.message}"
+        }
+    }
+
+    fun importBackup(context: android.content.Context, filePath: String) {
+        viewModelScope.launch {
+            val result = BackupManager.importFromJson(context, filePath)
+            _backupMsg.value = result.getOrNull() ?: "Import failed: ${result.exceptionOrNull()?.message}"
+        }
+    }
+
+    fun clearBackupMsg() { _backupMsg.value = null }
 }

@@ -73,6 +73,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val favCount             by vm.favoritesCount.collectAsState()
     val histCount            by vm.historyCount.collectAsState()
     val update               by vm.update.collectAsState()
+    val appLock              by vm.appLock.collectAsState()
+    val backupMsg            by vm.backupMsg.collectAsState()
     val context              = LocalContext.current
 
     var showThemeDialog    by remember { mutableStateOf(false) }
@@ -217,6 +219,47 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     "$histCount entries"
                 ) { if (histCount > 0) showClearHist = true }
             }
+
+            // ── Security & Backup ────────────────────────────────────────
+            SettingsSection("Security & Backup")
+            SettingsCard {
+                SettingsSwitchItem(
+                    Icons.Default.Fingerprint, "App Lock",
+                    "Require biometric auth on launch",
+                    checked = appLock, onCheckedChange = { vm.setAppLock(it) }
+                )
+                SettingsDivider()
+                SettingsItem(Icons.Default.BackupTable, "Export backup",
+                    "Save favorites, history & watch-later to Downloads"
+                ) { vm.exportBackup(context) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Restore, "Import backup",
+                    "Restore from StreamFlow_backup.json in Downloads"
+                ) {
+                    val path = android.os.Environment
+                        .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        .absolutePath + "/StreamFlow_backup.json"
+                    vm.importBackup(context, path)
+                }
+            }
+            if (backupMsg != null) {
+                Spacer(Modifier.height(6.dp))
+                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(backupMsg!!, fontSize = 12.sp, modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        IconButton(onClick = { vm.clearBackupMsg() }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Default.Close, null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
 
             // ── About ────────────────────────────────────────────────────
             SettingsSection("About")

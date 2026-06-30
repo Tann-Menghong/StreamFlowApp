@@ -8,21 +8,25 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.navigation.NavGraph
 import com.streamflow.ui.theme.StreamFlowTheme
 import com.streamflow.ui.theme.toAppTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     var isInPip by mutableStateOf(false)
         private set
@@ -44,6 +48,24 @@ class MainActivity : ComponentActivity() {
         }
 
         val prefs = AppPreferences.get(this)
+
+        // Biometric lock on launch
+        val appLockEnabled = runBlocking { prefs.appLock.first() }
+        if (appLockEnabled) {
+            val bm = BiometricManager.from(this)
+            if (bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS) {
+                val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationFailed() { finish() }
+                        override fun onAuthenticationError(code: Int, msg: CharSequence) { finish() }
+                    })
+                prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Unlock StreamFlow")
+                    .setSubtitle("Use biometric to continue")
+                    .setNegativeButtonText("Cancel")
+                    .build())
+            }
+        }
 
         val sharedUrl = intent?.takeIf { it.action == Intent.ACTION_SEND }
             ?.getStringExtra(Intent.EXTRA_TEXT)

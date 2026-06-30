@@ -31,6 +31,8 @@ class AppPreferences(private val context: Context) {
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         // Search
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
+        // Security
+        val APP_LOCK_KEY = booleanPreferencesKey("app_lock")
 
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
@@ -52,6 +54,8 @@ class AppPreferences(private val context: Context) {
     val gridColumns         : Flow<String>  = context.dataStore.data.map { it[GRID_COLUMNS_KEY]           ?: "2" }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
+    // Security
+    val appLock: Flow<Boolean> = context.dataStore.data.map { it[APP_LOCK_KEY] ?: false }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
@@ -78,4 +82,5 @@ class AppPreferences(private val context: Context) {
         prefs[RECENT_SEARCHES_KEY] = updated.joinToString("|||")
     }
     suspend fun clearRecentSearches() = context.dataStore.edit { it.remove(RECENT_SEARCHES_KEY) }
+    suspend fun setAppLock(v: Boolean) = context.dataStore.edit { it[APP_LOCK_KEY] = v }
 }
