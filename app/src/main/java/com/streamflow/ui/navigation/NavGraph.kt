@@ -42,8 +42,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Donghua  : Screen("donghua",  "Donghua", Icons.Default.LiveTv)
     object Library  : Screen("library",  "Library", Icons.Default.VideoLibrary)
     object Settings : Screen("settings", "Settings",Icons.Default.Settings)
-    object Player   : Screen("player/{videoUrl}", "Player", Icons.Default.PlayArrow) {
-        fun createRoute(url: String) = "player/${URLEncoder.encode(url, "UTF-8")}"
+    object Player   : Screen("player?videoUrl={videoUrl}", "Player", Icons.Default.PlayArrow) {
+        fun createRoute(url: String) = "player?videoUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
 }
 
@@ -88,7 +88,7 @@ fun NavGraph(startUrl: String? = null) {
         NavHost(
             navController    = navController,
             startDestination = Screen.Home.route,
-            modifier         = Modifier.padding(innerPadding),
+            modifier         = if (showBottom) Modifier.padding(innerPadding) else Modifier.fillMaxSize(),
             enterTransition  = {
                 fadeIn(tween(270, easing = EaseInOut)) +
                 scaleIn(initialScale = 0.96f, animationSpec = tween(270, easing = EaseInOut))
@@ -120,7 +120,11 @@ fun NavGraph(startUrl: String? = null) {
             composable(Screen.Settings.route) { SettingsScreen() }
             composable(
                 route = Screen.Player.route,
-                arguments = listOf(navArgument("videoUrl") { type = NavType.StringType })
+                arguments = listOf(navArgument("videoUrl") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                })
             ) { back ->
                 val videoUrl = URLDecoder.decode(back.arguments?.getString("videoUrl") ?: "", "UTF-8")
                 PlayerScreen(

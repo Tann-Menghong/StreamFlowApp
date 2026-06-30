@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 import android.os.Build
 import android.util.Rational
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -58,7 +59,22 @@ fun PlayerScreen(
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val context = LocalContext.current
     val activity = context as? Activity
-    var isFullscreen by remember { mutableStateOf(false) }
+    var isFullscreen by remember { mutableStateOf(true) }
+
+    // Reset orientation/system bars when leaving the player
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.let { act ->
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                WindowCompat.getInsetsController(act.window, act.window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+                act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
+    // Back press exits fullscreen before navigating back
+    BackHandler(enabled = isFullscreen) { isFullscreen = false }
 
     // Speed control
     var showSpeedMenu by remember { mutableStateOf(false) }
