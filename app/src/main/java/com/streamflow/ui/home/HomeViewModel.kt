@@ -53,6 +53,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val recentSearches: StateFlow<List<String>> = prefs.recentSearches
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val currentCountry: StateFlow<String> = prefs.country
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "US")
+
+    fun setCountry(code: String) {
+        viewModelScope.launch {
+            prefs.setCountry(code)
+            loadTrending()
+        }
+    }
+
     private var isSearchMode = false
     private var currentQuery = ""
 

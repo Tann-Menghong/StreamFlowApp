@@ -61,7 +61,9 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
     val showHero         by vm.showHeroCard.collectAsState()
     val gridCols         by vm.gridColumns.collectAsState()
     val recentSearches   by vm.recentSearches.collectAsState()
+    val currentCountry   by vm.currentCountry.collectAsState()
     val listState        = rememberLazyListState()
+    var showCountryPicker by remember { mutableStateOf(false) }
 
     // Search bar state
     var searchExpanded by remember { mutableStateOf(false) }
@@ -195,6 +197,24 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                             )
                         }
                         if (!searchExpanded) {
+                            // Country quick-picker
+                            Box {
+                                TextButton(onClick = { showCountryPicker = true }) {
+                                    Text(currentCountry, fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                                DropdownMenu(expanded = showCountryPicker,
+                                    onDismissRequest = { showCountryPicker = false }) {
+                                    countryList.forEach { (code, name) ->
+                                        DropdownMenuItem(
+                                            text = { Text("$name ($code)", fontSize = 13.sp,
+                                                fontWeight = if (code == currentCountry) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = { vm.setCountry(code); showCountryPicker = false }
+                                        )
+                                    }
+                                }
+                            }
                             IconButton(onClick = { vm.toggleLayout() }) {
                                 Icon(
                                     if (homeLayout == "GRID") Icons.Default.ViewList else Icons.Default.GridView,
@@ -421,6 +441,14 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
         }
     }
 }
+
+private val countryList = listOf(
+    "US" to "United States", "GB" to "United Kingdom", "CA" to "Canada", "AU" to "Australia",
+    "JP" to "Japan", "KR" to "South Korea", "KH" to "Cambodia", "TH" to "Thailand",
+    "VN" to "Vietnam", "ID" to "Indonesia", "MY" to "Malaysia", "SG" to "Singapore",
+    "PH" to "Philippines", "IN" to "India", "FR" to "France", "DE" to "Germany",
+    "BR" to "Brazil", "MX" to "Mexico", "RU" to "Russia", "TR" to "Turkey"
+)
 
 @Composable
 private fun CategoryChipsRow(
