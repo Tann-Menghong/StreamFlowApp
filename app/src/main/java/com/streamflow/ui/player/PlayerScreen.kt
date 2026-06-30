@@ -188,6 +188,47 @@ fun PlayerScreen(
         mc.setPlaybackSpeed(speedStr.toFloatOrNull() ?: 1f)
     }
 
+    // ── Subtitle state ───────────────────────────────────────────────────────
+    var showSubMenu by remember { mutableStateOf(false) }
+    var selectedSubUrl by remember { mutableStateOf("") }
+
+    // Apply selected subtitle track whenever it changes
+    LaunchedEffect(selectedSubUrl, state, mediaController) {
+        val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
+        val mc = mediaController ?: return@LaunchedEffect
+        val d = ready.details
+        val currentPos = mc.currentPosition
+        val playing = mc.isPlaying
+
+        val subConf = if (selectedSubUrl.isNotEmpty()) {
+            listOf(MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(selectedSubUrl))
+                .setMimeType("text/vtt")
+                .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+                .build())
+        } else emptyList()
+
+        val extras = Bundle().apply {
+            if (d.audioUrl != null) putString("audioUrl", d.audioUrl)
+        }
+        val mediaItem = MediaItem.Builder()
+            .setUri(d.streamUrl)
+            .setSubtitleConfigurations(subConf)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(d.title)
+                    .setArtist(d.uploaderName)
+                    .setArtworkUri(d.thumbnailUrl.toUri())
+                    .build()
+            )
+            .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
+            .build()
+
+        mc.setMediaItem(mediaItem)
+        mc.prepare()
+        mc.seekTo(currentPos)
+        if (playing) mc.play()
+    }
+
     // ── Fullscreen orientation ───────────────────────────────────────────────
     LaunchedEffect(isFullscreen) {
         activity?.let { act ->
@@ -223,10 +264,6 @@ fun PlayerScreen(
     if (showSeekFeedback) {
         LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
     }
-
-    // ── Subtitle state ───────────────────────────────────────────────────────
-    var showSubMenu by remember { mutableStateOf(false) }
-    var selectedSubUrl by remember { mutableStateOf("") }
 
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
