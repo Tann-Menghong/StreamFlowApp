@@ -2,7 +2,11 @@ package com.streamflow.ui.home
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +25,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewList
@@ -54,6 +60,7 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
     val showCW           by vm.showContinueWatching.collectAsState()
     val showHero         by vm.showHeroCard.collectAsState()
     val gridCols         by vm.gridColumns.collectAsState()
+    val recentSearches   by vm.recentSearches.collectAsState()
     val listState        = rememberLazyListState()
 
     // Search bar state
@@ -61,6 +68,8 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
     var searchText     by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
+
+    val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
 
     // Sync search text with active query (e.g. when category chip clears search)
     LaunchedEffect(activeSearch) {
@@ -77,7 +86,25 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.loadMore() }
 
+    val coroutineScope = rememberCoroutineScope()
     Scaffold(
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = showFab,
+                enter   = fadeIn(tween(200)) + scaleIn(tween(200)),
+                exit    = fadeOut(tween(150)) + scaleOut(tween(150))
+            ) {
+                FloatingActionButton(
+                    onClick           = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+                    containerColor    = MaterialTheme.colorScheme.primary,
+                    contentColor      = MaterialTheme.colorScheme.onPrimary,
+                    shape             = RoundedCornerShape(16.dp),
+                    modifier          = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, "Scroll to top", modifier = Modifier.size(22.dp))
+                }
+            }
+        },
         topBar = {
             Column {
                 TopAppBar(
@@ -184,6 +211,60 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background)
                 )
+                // Recent searches — shown when search bar is open and user hasn't typed yet
+                AnimatedVisibility(
+                    visible = searchExpanded && searchText.isEmpty() && recentSearches.isNotEmpty(),
+                    enter   = fadeIn(tween(150)) + expandVertically(tween(150)),
+                    exit    = fadeOut(tween(100)) + shrinkVertically(tween(100))
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            Text("Recent", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = { vm.clearRecentSearches() }) {
+                                Text("Clear", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        recentSearches.forEach { q ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        Modifier.padding(vertical = 6.dp)
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.History, null,
+                                    tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
+                                    modifier = Modifier.size(16.dp))
+                                Text(
+                                    q,
+                                    style    = MaterialTheme.typography.bodyMedium,
+                                    color    = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.weight(1f).clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication        = null
+                                    ) {
+                                        searchText = q
+                                        vm.search(q)
+                                        focusManager.clearFocus()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
                 // Category chips — hidden when typing a search
                 AnimatedVisibility(
                     visible = !searchExpanded || activeSearch.isEmpty(),

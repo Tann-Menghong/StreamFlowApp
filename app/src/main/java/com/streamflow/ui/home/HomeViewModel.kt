@@ -50,6 +50,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         .getRecentWithProgress(10)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val recentSearches: StateFlow<List<String>> = prefs.recentSearches
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private var isSearchMode = false
     private var currentQuery = ""
 
@@ -82,6 +85,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _selectedCategory.value = "All"
         _activeSearchQuery.value = query
         viewModelScope.launch {
+            prefs.addRecentSearch(query)
             _uiState.value = HomeUiState.Loading
             nextPage = null
             try {
@@ -93,6 +97,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun clearRecentSearches() { viewModelScope.launch { prefs.clearRecentSearches() } }
 
     // Called by category chips
     fun selectCategory(cat: String) {

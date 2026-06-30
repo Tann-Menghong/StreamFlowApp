@@ -29,6 +29,8 @@ class AppPreferences(private val context: Context) {
         val GRID_COLUMNS_KEY           = stringPreferencesKey("grid_columns")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
+        // Search
+        val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
 
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
@@ -50,6 +52,10 @@ class AppPreferences(private val context: Context) {
     val gridColumns         : Flow<String>  = context.dataStore.data.map { it[GRID_COLUMNS_KEY]           ?: "2" }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
+    // Search
+    val recentSearches: Flow<List<String>> = context.dataStore.data.map {
+        it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
+    }
 
     suspend fun setTheme(v: String)    = context.dataStore.edit { it[THEME_KEY]    = v }
     suspend fun setQuality(v: String)  = context.dataStore.edit { it[QUALITY_KEY]  = v }
@@ -65,4 +71,11 @@ class AppPreferences(private val context: Context) {
     suspend fun setGridColumns(v: String)           = context.dataStore.edit { it[GRID_COLUMNS_KEY]           = v }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
+    // Search
+    suspend fun addRecentSearch(query: String) = context.dataStore.edit { prefs ->
+        val current = prefs[RECENT_SEARCHES_KEY]?.split("|||")?.filter { it.isNotBlank() } ?: emptyList()
+        val updated = (listOf(query) + current.filter { it != query }).take(8)
+        prefs[RECENT_SEARCHES_KEY] = updated.joinToString("|||")
+    }
+    suspend fun clearRecentSearches() = context.dataStore.edit { it.remove(RECENT_SEARCHES_KEY) }
 }
