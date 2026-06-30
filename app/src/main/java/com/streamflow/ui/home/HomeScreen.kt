@@ -6,8 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +29,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) {
     val state by vm.uiState.collectAsState()
+    val homeLayout by vm.homeLayout.collectAsState()
     val listState = rememberLazyListState()
 
     val shouldLoadMore by remember {
@@ -47,6 +53,13 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                     )
                 },
                 actions = {
+                    IconButton(onClick = { vm.toggleLayout() }) {
+                        Icon(
+                            if (homeLayout == "GRID") Icons.Default.ViewList else Icons.Default.GridView,
+                            contentDescription = "Toggle layout",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { vm.loadTrending() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -76,36 +89,57 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                         FilledTonalButton(onClick = { vm.loadTrending() }) { Text("Retry") }
                     }
 
-                    is HomeUiState.Success -> LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        item {
-                            Text(
-                                "Trending",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.2.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
-                            )
-                        }
-                        itemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
-                            var visible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
-                            AnimatedVisibility(
-                                visible = visible,
-                                enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }
-                            ) {
-                                VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                    is HomeUiState.Success -> if (homeLayout == "GRID") {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            gridItemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
+                                var visible by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
+                                AnimatedVisibility(
+                                    visible = visible,
+                                    enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }
+                                ) {
+                                    VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                                }
                             }
                         }
-                        if (s.isLoadingMore) {
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
                             item {
-                                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                                Text(
+                                    "Trending",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.2.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
+                                )
+                            }
+                            itemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
+                                var visible by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
+                                AnimatedVisibility(
+                                    visible = visible,
+                                    enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }
+                                ) {
+                                    VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                                }
+                            }
+                            if (s.isLoadingMore) {
+                                item {
+                                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                                    }
                                 }
                             }
                         }

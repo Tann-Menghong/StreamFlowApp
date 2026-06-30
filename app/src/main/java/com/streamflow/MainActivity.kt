@@ -51,7 +51,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeStr by prefs.theme.collectAsState(initial = "DARK")
-            StreamFlowTheme(theme = themeStr.toAppTheme()) {
+            val accentStr by prefs.accentColor.collectAsState(initial = "RED")
+            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr) {
                 NavGraph(startUrl = sharedUrl)
             }
         }

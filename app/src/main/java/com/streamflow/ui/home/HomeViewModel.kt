@@ -7,8 +7,10 @@ import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
@@ -30,6 +32,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState
+
+    val homeLayout = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
+
+    fun toggleLayout() {
+        viewModelScope.launch {
+            val current = prefs.homeLayout.first()
+            prefs.setHomeLayout(if (current == "GRID") "LIST" else "GRID")
+        }
+    }
 
     init { loadTrending() }
 

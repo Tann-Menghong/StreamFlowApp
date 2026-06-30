@@ -4,9 +4,15 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -40,19 +47,24 @@ private val countryOptions = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
-    val theme     by vm.theme.collectAsState()
-    val quality   by vm.quality.collectAsState()
-    val autoPlay  by vm.autoPlay.collectAsState()
-    val dataSaver by vm.dataSaver.collectAsState()
-    val country   by vm.country.collectAsState()
-    val favCount  by vm.favoritesCount.collectAsState()
-    val histCount by vm.historyCount.collectAsState()
-    val update    by vm.update.collectAsState()
-    val context   = LocalContext.current
+    val theme       by vm.theme.collectAsState()
+    val quality     by vm.quality.collectAsState()
+    val autoPlay    by vm.autoPlay.collectAsState()
+    val dataSaver   by vm.dataSaver.collectAsState()
+    val country     by vm.country.collectAsState()
+    val accentColor by vm.accentColor.collectAsState()
+    val defaultSpeed by vm.defaultSpeed.collectAsState()
+    val homeLayout  by vm.homeLayout.collectAsState()
+    val favCount    by vm.favoritesCount.collectAsState()
+    val histCount   by vm.historyCount.collectAsState()
+    val update      by vm.update.collectAsState()
+    val context     = LocalContext.current
 
     var showThemeDialog   by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
     var showCountryDialog by remember { mutableStateOf(false) }
+    var showAccentDialog  by remember { mutableStateOf(false) }
+    var showSpeedDialog   by remember { mutableStateOf(false) }
     var showClearHist     by remember { mutableStateOf(false) }
     var showClearFav      by remember { mutableStateOf(false) }
 
@@ -115,6 +127,12 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.Palette, "Theme",
                     when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                 ) { showThemeDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.ColorLens, "Accent color", accentColor.lowercase().replaceFirstChar { it.uppercase() }) { showAccentDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.GridView, "Home layout", if (homeLayout == "GRID") "Grid" else "List", homeLayout == "GRID") {
+                    vm.setHomeLayout(if (it) "GRID" else "LIST")
+                }
             }
 
             // ── Playback ─────────────────────────────────────────────────
@@ -127,6 +145,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play", "Play related videos automatically", autoPlay) { vm.setAutoPlay(it) }
                 SettingsDivider()
                 SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver", "Prefer lower quality to save data", dataSaver) { vm.setDataSaver(it) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Speed, "Default speed",
+                    when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
+                ) { showSpeedDialog = true }
                 SettingsDivider()
                 SettingsItem(Icons.Default.Language, "Trending country",
                     countryOptions.firstOrNull { it.first == country }?.second ?: country
@@ -175,6 +197,14 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             { vm.setCountry(countryOptions[it].first); showCountryDialog = false },
             { showCountryDialog = false }
         )
+    }
+    if (showAccentDialog) {
+        AccentPickerDialog(accentColor, { vm.setAccentColor(it); showAccentDialog = false }, { showAccentDialog = false })
+    }
+    if (showSpeedDialog) {
+        val speedOpts = listOf("0.5" to "0.5×", "0.75" to "0.75×", "1.0" to "1×", "1.25" to "1.25×", "1.5" to "1.5×", "2.0" to "2×")
+        PickerDialog("Default speed", speedOpts.map { it.second }, speedOpts.indexOfFirst { it.first == defaultSpeed }.coerceAtLeast(0),
+            { vm.setDefaultSpeed(speedOpts[it].first); showSpeedDialog = false }, { showSpeedDialog = false })
     }
     if (showClearHist) {
         ConfirmDialog("Clear history", "Remove all $histCount watch history entries?",
@@ -274,6 +304,55 @@ private fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text  = { Text(message, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = { TextButton(onConfirm) { Text("Clear", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+private val accentCircleColors = listOf(
+    "RED"    to Color(0xFFFF3B3B),
+    "BLUE"   to Color(0xFF448AFF),
+    "GREEN"  to Color(0xFF00C853),
+    "PURPLE" to Color(0xFFA855F7),
+    "ORANGE" to Color(0xFFFF7722),
+    "PINK"   to Color(0xFFF472B6),
+    "TEAL"   to Color(0xFF2DD4BF),
+    "YELLOW" to Color(0xFFFACC15),
+)
+
+@Composable
+private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Accent color", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                itemsIndexed(accentCircleColors) { _, (key, color) ->
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .then(
+                                if (key == selected) Modifier.border(3.dp, Color.White, CircleShape)
+                                else Modifier
+                            )
+                            .clickable { onSelect(key) }
+                    ) {
+                        if (key == selected) {
+                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
         shape = RoundedCornerShape(16.dp)
     )

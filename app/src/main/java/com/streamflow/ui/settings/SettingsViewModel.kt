@@ -30,6 +30,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val autoPlay = prefs.autoPlay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val dataSaver= prefs.dataSaver.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val country  = prefs.country.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "US")
+    val accentColor  = prefs.accentColor.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "RED")
+    val defaultSpeed = prefs.defaultSpeed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "1.0")
+    val homeLayout   = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val historyCount   = db.historyDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
@@ -69,6 +72,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoPlay(v: Boolean) = viewModelScope.launch { prefs.setAutoPlay(v) }
     fun setDataSaver(v: Boolean)= viewModelScope.launch { prefs.setDataSaver(v) }
     fun setCountry(v: String)  = viewModelScope.launch { prefs.setCountry(v) }
+    fun setAccentColor(v: String) = viewModelScope.launch { prefs.setAccentColor(v) }
+    fun setDefaultSpeed(v: String) = viewModelScope.launch { prefs.setDefaultSpeed(v) }
+    fun setHomeLayout(v: String)   = viewModelScope.launch { prefs.setHomeLayout(v) }
     fun clearHistory()   = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
 }
