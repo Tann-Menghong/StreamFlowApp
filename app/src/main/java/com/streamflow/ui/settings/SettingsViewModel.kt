@@ -43,7 +43,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── New player prefs ──────────────────────────────────────────
     val skipSeconds = prefs.skipSeconds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "10")
-    val appLock     = prefs.appLock.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val appLock        = prefs.appLock.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val autoTheme      = prefs.autoTheme.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val nightThemeStart = prefs.nightThemeStart.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "21:00")
+    val nightThemeEnd   = prefs.nightThemeEnd.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "07:00")
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -94,7 +97,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setShowHeroCard(v: Boolean)  = viewModelScope.launch { prefs.setShowHeroCard(v) }
     fun setGridColumns(v: String)    = viewModelScope.launch { prefs.setGridColumns(v) }
     fun setSkipSeconds(v: String)    = viewModelScope.launch { prefs.setSkipSeconds(v) }
-    fun setAppLock(v: Boolean)       = viewModelScope.launch { prefs.setAppLock(v) }
+    fun setAppLock(v: Boolean)        = viewModelScope.launch { prefs.setAppLock(v) }
+    fun setAutoTheme(v: Boolean)      = viewModelScope.launch { prefs.setAutoTheme(v) }
+    fun setNightThemeStart(v: String) = viewModelScope.launch { prefs.setNightThemeStart(v) }
+    fun setNightThemeEnd(v: String)   = viewModelScope.launch { prefs.setNightThemeEnd(v) }
     fun clearHistory()   = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
 

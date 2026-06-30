@@ -74,6 +74,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val histCount            by vm.historyCount.collectAsState()
     val update               by vm.update.collectAsState()
     val appLock              by vm.appLock.collectAsState()
+    val autoTheme            by vm.autoTheme.collectAsState()
+    val nightStart           by vm.nightThemeStart.collectAsState()
+    val nightEnd             by vm.nightThemeEnd.collectAsState()
     val backupMsg            by vm.backupMsg.collectAsState()
     val context              = LocalContext.current
 
@@ -158,6 +161,21 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     if (accentColor == "DYNAMIC") "Dynamic (Material You)"
                     else accentColor.lowercase().replaceFirstChar { it.uppercase() }
                 ) { showAccentDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Schedule, "Auto dark/light",
+                    "Switch theme automatically by time of day",
+                    checked = autoTheme
+                ) { vm.setAutoTheme(it) }
+                if (autoTheme) {
+                    SettingsDivider()
+                    SettingsItem(Icons.Default.Bedtime, "Night theme starts",
+                        nightStart
+                    ) { /* time picker would go here; use text for now */ }
+                    SettingsDivider()
+                    SettingsItem(Icons.Default.WbSunny, "Day theme starts",
+                        nightEnd
+                    ) { /* time picker */ }
+                }
             }
 
             // ── Home customization ────────────────────────────────────────

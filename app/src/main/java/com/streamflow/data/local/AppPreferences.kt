@@ -33,6 +33,10 @@ class AppPreferences(private val context: Context) {
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
         // Security
         val APP_LOCK_KEY = booleanPreferencesKey("app_lock")
+        // Scheduled theme switching
+        val NIGHT_THEME_START_KEY = stringPreferencesKey("night_theme_start") // "HH:mm"
+        val NIGHT_THEME_END_KEY   = stringPreferencesKey("night_theme_end")   // "HH:mm"
+        val AUTO_THEME_KEY        = booleanPreferencesKey("auto_theme")
 
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
@@ -56,6 +60,10 @@ class AppPreferences(private val context: Context) {
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     // Security
     val appLock: Flow<Boolean> = context.dataStore.data.map { it[APP_LOCK_KEY] ?: false }
+    // Scheduled theme
+    val autoTheme      : Flow<Boolean> = context.dataStore.data.map { it[AUTO_THEME_KEY]        ?: false }
+    val nightThemeStart: Flow<String>  = context.dataStore.data.map { it[NIGHT_THEME_START_KEY] ?: "21:00" }
+    val nightThemeEnd  : Flow<String>  = context.dataStore.data.map { it[NIGHT_THEME_END_KEY]   ?: "07:00" }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
@@ -83,4 +91,7 @@ class AppPreferences(private val context: Context) {
     }
     suspend fun clearRecentSearches() = context.dataStore.edit { it.remove(RECENT_SEARCHES_KEY) }
     suspend fun setAppLock(v: Boolean) = context.dataStore.edit { it[APP_LOCK_KEY] = v }
+    suspend fun setAutoTheme(v: Boolean) = context.dataStore.edit { it[AUTO_THEME_KEY] = v }
+    suspend fun setNightThemeStart(v: String) = context.dataStore.edit { it[NIGHT_THEME_START_KEY] = v }
+    suspend fun setNightThemeEnd(v: String)   = context.dataStore.edit { it[NIGHT_THEME_END_KEY]   = v }
 }

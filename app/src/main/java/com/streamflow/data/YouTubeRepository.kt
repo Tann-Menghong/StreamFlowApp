@@ -8,6 +8,7 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.localization.ContentCountry
+import com.streamflow.data.model.SubtitleTrack
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
@@ -122,6 +123,16 @@ class YouTubeRepository {
                     else -> throw Exception("No playable stream found for: $videoUrl")
                 }
 
+                val subs = try {
+                    info.subtitles.map { s ->
+                        SubtitleTrack(
+                            name = s.displayLanguageName ?: s.languageTag ?: "Unknown",
+                            url  = s.content ?: "",
+                            code = s.languageTag ?: ""
+                        )
+                    }.filter { it.url.isNotEmpty() }
+                } catch (_: Exception) { emptyList() }
+
                 VideoDetails(
                     url = videoUrl,
                     title = info.name,
@@ -133,7 +144,8 @@ class YouTubeRepository {
                     streamUrl = streamUrl,
                     audioUrl = audioUrl,
                     thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: "",
-                    relatedVideos = related
+                    relatedVideos = related,
+                    subtitles = subs
                 )
         }
 

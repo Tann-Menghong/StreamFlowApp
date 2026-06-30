@@ -76,9 +76,23 @@ class MainActivity : AppCompatActivity() {
         enableHighRefreshRate()
         enableEdgeToEdge()
         setContent {
-            val themeStr by prefs.theme.collectAsState(initial = "DARK")
-            val accentStr by prefs.accentColor.collectAsState(initial = "RED")
-            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr) {
+            val themeStr    by prefs.theme.collectAsState(initial = "DARK")
+            val accentStr   by prefs.accentColor.collectAsState(initial = "RED")
+            val autoTheme   by prefs.autoTheme.collectAsState(initial = false)
+            val nightStart  by prefs.nightThemeStart.collectAsState(initial = "21:00")
+            val nightEnd    by prefs.nightThemeEnd.collectAsState(initial = "07:00")
+
+            val effectiveTheme = if (autoTheme) {
+                val now = java.util.Calendar.getInstance()
+                val nowMin = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 + now.get(java.util.Calendar.MINUTE)
+                val startMin = nightStart.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 21) * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+                val endMin   = nightEnd.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 7)  * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+                val isNight = if (startMin < endMin) nowMin in startMin until endMin
+                              else nowMin >= startMin || nowMin < endMin
+                if (isNight) "DARK" else "LIGHT"
+            } else themeStr
+
+            StreamFlowTheme(theme = effectiveTheme.toAppTheme(), accent = accentStr) {
                 NavGraph(startUrl = sharedUrl)
             }
         }

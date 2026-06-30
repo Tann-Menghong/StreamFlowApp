@@ -224,6 +224,10 @@ fun PlayerScreen(
         LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
     }
 
+    // ── Subtitle state ───────────────────────────────────────────────────────
+    var showSubMenu by remember { mutableStateOf(false) }
+    var selectedSubUrl by remember { mutableStateOf("") }
+
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
@@ -751,6 +755,29 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     modifier = Modifier.size(20.dp)
                                 )
+                            }
+                            // Subtitle (CC) button
+                            if (details.subtitles.isNotEmpty()) {
+                                Box {
+                                    IconButton(onClick = { showSubMenu = true }) {
+                                        Icon(Icons.Default.ClosedCaption, "Subtitles",
+                                            tint = if (selectedSubUrl.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                                            modifier = Modifier.size(20.dp))
+                                    }
+                                    DropdownMenu(expanded = showSubMenu, onDismissRequest = { showSubMenu = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text("Off", fontWeight = if (selectedSubUrl.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = { selectedSubUrl = ""; showSubMenu = false }
+                                        )
+                                        details.subtitles.forEach { sub ->
+                                            DropdownMenuItem(
+                                                text = { Text(sub.name, fontWeight = if (selectedSubUrl == sub.url) FontWeight.Bold else FontWeight.Normal) },
+                                                onClick = { selectedSubUrl = sub.url; showSubMenu = false }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 

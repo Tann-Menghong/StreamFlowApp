@@ -10,6 +10,8 @@ data class VideoItem(
     val uploaderUrl: String = ""
 )
 
+data class SubtitleTrack(val name: String, val url: String, val code: String)
+
 data class VideoDetails(
     val url: String,
     val title: String,
@@ -21,5 +23,6 @@ data class VideoDetails(
     val streamUrl: String,
     val audioUrl: String?,
     val thumbnailUrl: String,
-    val relatedVideos: List<VideoItem> = emptyList()
+    val relatedVideos: List<VideoItem> = emptyList(),
+    val subtitles: List<SubtitleTrack> = emptyList()
 )
