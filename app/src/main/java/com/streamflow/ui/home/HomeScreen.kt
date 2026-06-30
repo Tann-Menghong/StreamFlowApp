@@ -15,15 +15,25 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,8 +49,23 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
     val state            by vm.uiState.collectAsState()
     val homeLayout       by vm.homeLayout.collectAsState()
     val selectedCategory by vm.selectedCategory.collectAsState()
+    val activeSearch     by vm.activeSearchQuery.collectAsState()
     val continueWatching by vm.continueWatching.collectAsState()
-    val listState = rememberLazyListState()
+    val showCW           by vm.showContinueWatching.collectAsState()
+    val showHero         by vm.showHeroCard.collectAsState()
+    val gridCols         by vm.gridColumns.collectAsState()
+    val listState        = rememberLazyListState()
+
+    // Search bar state
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchText     by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager   = LocalFocusManager.current
+
+    // Sync search text with active query (e.g. when category chip clears search)
+    LaunchedEffect(activeSearch) {
+        if (activeSearch.isEmpty() && searchText.isNotEmpty()) searchText = ""
+    }
 
     // Load more when near end of list
     val shouldLoadMore by remember {
@@ -54,30 +79,129 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "StreamFlow",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize   = 22.sp,
-                        color      = MaterialTheme.colorScheme.primary
+            Column {
+                TopAppBar(
+                    title = {
+                        AnimatedContent(
+                            targetState = searchExpanded,
+                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                            label = "title_search"
+                        ) { expanded ->
+                            if (expanded) {
+                                // Inline search field
+                                Surface(
+                                    modifier      = Modifier.fillMaxWidth().padding(end = 8.dp).height(40.dp),
+                                    shape         = RoundedCornerShape(12.dp),
+                                    color         = MaterialTheme.colorScheme.surfaceVariant,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Search, null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp))
+                                        BasicTextField(
+                                            value          = searchText,
+                                            onValueChange  = { searchText = it },
+                                            modifier       = Modifier.weight(1f)
+                                                .focusRequester(focusRequester),
+                                            singleLine     = true,
+                                            textStyle      = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onBackground),
+                                            cursorBrush    = SolidColor(MaterialTheme.colorScheme.primary),
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                            keyboardActions = KeyboardActions(onSearch = {
+                                                vm.search(searchText)
+                                                focusManager.clearFocus()
+                                            }),
+                                            decorationBox  = { inner ->
+                                                if (searchText.isEmpty()) Text(
+                                                    "Search YouTube…",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                inner()
+                                            }
+                                        )
+                                        if (searchText.isNotEmpty()) {
+                                            IconButton(
+                                                onClick  = { searchText = ""; vm.loadTrending() },
+                                                modifier = Modifier.size(20.dp)
+                                            ) {
+                                                Icon(Icons.Default.Close, null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                                LaunchedEffect(Unit) {
+                                    delay(80); focusRequester.requestFocus()
+                                }
+                            } else {
+                                Text(
+                                    "StreamFlow",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize   = 22.sp,
+                                    color      = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            if (searchExpanded) {
+                                searchExpanded = false
+                                searchText     = ""
+                                focusManager.clearFocus()
+                                vm.loadTrending()
+                            } else {
+                                searchExpanded = true
+                            }
+                        }) {
+                            Icon(
+                                if (searchExpanded) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = if (searchExpanded) "Close search" else "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (!searchExpanded) {
+                            IconButton(onClick = { vm.toggleLayout() }) {
+                                Icon(
+                                    if (homeLayout == "GRID") Icons.Default.ViewList else Icons.Default.GridView,
+                                    contentDescription = "Toggle layout",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { vm.refresh() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Refresh",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background)
+                )
+                // Category chips — hidden when typing a search
+                AnimatedVisibility(
+                    visible = !searchExpanded || activeSearch.isEmpty(),
+                    enter   = fadeIn(tween(180)) + expandVertically(tween(180)),
+                    exit    = fadeOut(tween(130)) + shrinkVertically(tween(130))
+                ) {
+                    CategoryChipsRow(
+                        categories       = vm.categories,
+                        selectedCategory = selectedCategory,
+                        onSelect         = {
+                            searchExpanded = false
+                            searchText     = ""
+                            focusManager.clearFocus()
+                            vm.selectCategory(it)
+                        }
                     )
-                },
-                actions = {
-                    IconButton(onClick = { vm.toggleLayout() }) {
-                        Icon(
-                            if (homeLayout == "GRID") Icons.Default.ViewList else Icons.Default.GridView,
-                            contentDescription = "Toggle layout",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = { vm.loadTrending() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+                }
+            }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -102,109 +226,110 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                             modifier = Modifier.padding(horizontal = 32.dp))
                         Spacer(Modifier.height(20.dp))
                         FilledTonalButton(onClick = {
-                            if (selectedCategory == "All") vm.loadTrending()
+                            if (activeSearch.isNotEmpty()) vm.search(activeSearch)
+                            else if (selectedCategory == "All") vm.loadTrending()
                             else vm.selectCategory(selectedCategory)
                         }) { Text("Retry") }
                     }
 
-                    is HomeUiState.Success -> if (homeLayout == "GRID") {
-                        LazyVerticalGrid(
-                            columns             = GridCells.Fixed(2),
-                            modifier            = Modifier.fillMaxSize(),
-                            contentPadding      = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            gridItemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
-                                var visible by remember { mutableStateOf(false) }
-                                LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
-                                AnimatedVisibility(visible = visible,
-                                    enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
-                                    VideoCard(video = video, onClick = { onVideoClick(video.url) })
-                                }
-                            }
-                        }
-                    } else {
-                        LazyColumn(
-                            state          = listState,
-                            modifier       = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 16.dp)
-                        ) {
-                            // ── Category chips ─────────────────────────────
-                            item {
-                                CategoryChipsRow(
-                                    categories       = vm.categories,
-                                    selectedCategory = selectedCategory,
-                                    onSelect         = { vm.selectCategory(it) }
-                                )
-                            }
-
-                            // ── Continue Watching ──────────────────────────
-                            if (continueWatching.isNotEmpty()) {
-                                item {
-                                    ContinueWatchingSection(
-                                        items       = continueWatching,
-                                        onVideoClick = onVideoClick
-                                    )
-                                }
-                            }
-
-                            // ── Section label ──────────────────────────────
-                            item {
-                                Text(
-                                    if (selectedCategory == "All") "Trending" else selectedCategory,
-                                    style    = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight   = FontWeight.Bold,
-                                        letterSpacing = 1.2.sp,
-                                        color        = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 16.dp, bottom = 10.dp, top = 8.dp)
-                                )
-                            }
-
-                            // ── Hero first card ────────────────────────────
-                            if (s.videos.isNotEmpty()) {
-                                item(key = "hero_${s.videos.first().url}") {
+                    is HomeUiState.Success -> {
+                        val cols = gridCols.toIntOrNull() ?: 2
+                        if (homeLayout == "GRID") {
+                            LazyVerticalGrid(
+                                columns               = GridCells.Fixed(cols),
+                                modifier              = Modifier.fillMaxSize(),
+                                contentPadding        = PaddingValues(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement   = Arrangement.spacedBy(8.dp)
+                            ) {
+                                gridItemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
                                     var visible by remember { mutableStateOf(false) }
-                                    LaunchedEffect(Unit) { visible = true }
-                                    AnimatedVisibility(visible = visible,
-                                        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 8 }
-                                    ) {
-                                        Box(Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
-                                            HeroVideoCard(
-                                                video   = s.videos.first(),
-                                                onClick = { onVideoClick(s.videos.first().url) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // ── Rest of videos ─────────────────────────────
-                            itemsIndexed(
-                                s.videos.drop(1),
-                                key = { _, v -> v.url }
-                            ) { index, video ->
-                                var visible by remember { mutableStateOf(false) }
-                                LaunchedEffect(Unit) { delay((index * 30L).coerceAtMost(250L)); visible = true }
-                                AnimatedVisibility(visible = visible,
-                                    enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 6 }
-                                ) {
-                                    Box(Modifier.padding(horizontal = 16.dp)) {
+                                    LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
+                                    AnimatedVisibility(visible,
+                                        enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
                                         VideoCard(video = video, onClick = { onVideoClick(video.url) })
                                     }
                                 }
                             }
-
-                            if (s.isLoadingMore) {
-                                item {
-                                    Box(Modifier.fillMaxWidth().padding(16.dp),
-                                        contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator(
-                                            Modifier.size(24.dp),
-                                            color       = MaterialTheme.colorScheme.primary,
-                                            strokeWidth = 2.dp
+                        } else {
+                            LazyColumn(
+                                state          = listState,
+                                modifier       = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 16.dp)
+                            ) {
+                                // ── Continue Watching ──────────────────────────
+                                if (showCW && continueWatching.isNotEmpty() && activeSearch.isEmpty() && selectedCategory == "All") {
+                                    item {
+                                        ContinueWatchingSection(
+                                            items        = continueWatching,
+                                            onVideoClick = onVideoClick
                                         )
+                                    }
+                                }
+
+                                // ── Section label ──────────────────────────────
+                                item {
+                                    val label = when {
+                                        activeSearch.isNotEmpty() -> "Results for \"$activeSearch\""
+                                        selectedCategory != "All" -> selectedCategory
+                                        else -> "Trending"
+                                    }
+                                    Text(
+                                        label,
+                                        style    = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight    = FontWeight.Bold,
+                                            letterSpacing = 1.2.sp,
+                                            color         = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.padding(start = 16.dp, bottom = 10.dp, top = 8.dp)
+                                    )
+                                }
+
+                                // ── Hero first card (only on trending, not search) ──
+                                if (showHero && s.videos.isNotEmpty() && activeSearch.isEmpty() && selectedCategory == "All") {
+                                    item(key = "hero_${s.videos.first().url}") {
+                                        var visible by remember { mutableStateOf(false) }
+                                        LaunchedEffect(Unit) { visible = true }
+                                        AnimatedVisibility(visible,
+                                            enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 8 }
+                                        ) {
+                                            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                                HeroVideoCard(
+                                                    video   = s.videos.first(),
+                                                    onClick = { onVideoClick(s.videos.first().url) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── Video list ─────────────────────────────────
+                                val startIndex = if (showHero && activeSearch.isEmpty() && selectedCategory == "All") 1 else 0
+                                itemsIndexed(
+                                    s.videos.drop(startIndex),
+                                    key = { _, v -> v.url }
+                                ) { index, video ->
+                                    var visible by remember { mutableStateOf(false) }
+                                    LaunchedEffect(Unit) { delay((index * 30L).coerceAtMost(250L)); visible = true }
+                                    AnimatedVisibility(visible,
+                                        enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 6 }
+                                    ) {
+                                        Box(Modifier.padding(horizontal = 16.dp)) {
+                                            VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                                        }
+                                    }
+                                }
+
+                                if (s.isLoadingMore) {
+                                    item {
+                                        Box(Modifier.fillMaxWidth().padding(16.dp),
+                                            contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(
+                                                Modifier.size(24.dp),
+                                                color       = MaterialTheme.colorScheme.primary,
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -212,7 +337,6 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                     }
                 }
             }
-
         }
     }
 }
@@ -223,31 +347,34 @@ private fun CategoryChipsRow(
     selectedCategory: String,
     onSelect: (String) -> Unit
 ) {
-    val scrollState = rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(scrollState)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         categories.forEach { cat ->
             val selected = cat == selectedCategory
             FilterChip(
-                selected  = selected,
-                onClick   = { onSelect(cat) },
-                label     = { Text(cat, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) },
-                shape     = RoundedCornerShape(20.dp),
-                colors    = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor    = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor        = MaterialTheme.colorScheme.onPrimary,
-                    containerColor            = MaterialTheme.colorScheme.surface,
-                    labelColor                = MaterialTheme.colorScheme.onSurfaceVariant
+                selected = selected,
+                onClick  = { onSelect(cat) },
+                label    = {
+                    Text(cat,
+                        fontSize   = 13.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                },
+                shape  = RoundedCornerShape(20.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
+                    containerColor         = MaterialTheme.colorScheme.surface,
+                    labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
-                border    = FilterChipDefaults.filterChipBorder(
-                    enabled          = true,
-                    selected         = selected,
-                    borderColor      = MaterialTheme.colorScheme.outline.copy(0.4f),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled             = true,
+                    selected            = selected,
+                    borderColor         = MaterialTheme.colorScheme.outline.copy(0.4f),
                     selectedBorderColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -260,7 +387,7 @@ private fun ContinueWatchingSection(
     items: List<com.streamflow.data.local.entity.HistoryEntity>,
     onVideoClick: (String) -> Unit
 ) {
-    Column(Modifier.padding(bottom = 8.dp)) {
+    Column(Modifier.padding(bottom = 4.dp)) {
         Text(
             "Continue Watching",
             style    = MaterialTheme.typography.labelMedium.copy(
@@ -271,14 +398,11 @@ private fun ContinueWatchingSection(
             modifier = Modifier.padding(start = 16.dp, bottom = 10.dp)
         )
         LazyRow(
-            contentPadding      = PaddingValues(horizontal = 16.dp),
+            contentPadding        = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(items, key = { it.url }) { entity ->
-                ContinueWatchingCard(
-                    entity  = entity,
-                    onClick = { onVideoClick(entity.url) }
-                )
+                ContinueWatchingCard(entity = entity, onClick = { onVideoClick(entity.url) })
             }
         }
         Spacer(Modifier.height(16.dp))

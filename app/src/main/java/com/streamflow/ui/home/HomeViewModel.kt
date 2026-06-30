@@ -31,22 +31,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState
 
-    val homeLayout = prefs.homeLayout
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
+    // Persisted layout/display prefs
+    val homeLayout           = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
+    val showContinueWatching = prefs.showContinueWatching.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val showHeroCard         = prefs.showHeroCard.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val gridColumns          = prefs.gridColumns.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "2")
 
     val categories = listOf("All", "Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
 
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+    // Active text search query (empty = not in text-search mode)
+    private val _activeSearchQuery = MutableStateFlow("")
+    val activeSearchQuery: StateFlow<String> = _activeSearchQuery
 
     val continueWatching: StateFlow<List<HistoryEntity>> = db.historyDao()
-        .getRecentWithProgress(8)
+        .getRecentWithProgress(10)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Tracks whether current content is from search or trending
     private var isSearchMode = false
     private var currentQuery = ""
 
@@ -56,6 +59,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         isSearchMode = false
         currentQuery = ""
         _selectedCategory.value = "All"
+        _activeSearchQuery.value = ""
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             nextPage = null
@@ -70,8 +74,30 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Called by the search bar when user submits a text query
+    fun search(query: String) {
+        if (query.isBlank()) { loadTrending(); return }
+        isSearchMode = true
+        currentQuery = query
+        _selectedCategory.value = "All"
+        _activeSearchQuery.value = query
+        viewModelScope.launch {
+            _uiState.value = HomeUiState.Loading
+            nextPage = null
+            try {
+                val result = repo.search(query)
+                nextPage   = result.nextPage
+                _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+            } catch (e: Exception) {
+                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
+    }
+
+    // Called by category chips
     fun selectCategory(cat: String) {
         _selectedCategory.value = cat
+        _activeSearchQuery.value = ""
         if (cat == "All") {
             loadTrending()
         } else {
@@ -93,7 +119,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         viewModelScope.launch {
-            _isRefreshing.value = true
             try {
                 if (isSearchMode) {
                     val result = repo.search(currentQuery)
@@ -107,8 +132,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
-            } finally {
-                _isRefreshing.value = false
             }
         }
     }
@@ -128,9 +151,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
             nextPage = result.nextPage
             _uiState.value = current.copy(
-                videos         = current.videos + result.videos,
-                isLoadingMore  = false,
-                hasMore        = result.nextPage != null
+                videos        = current.videos + result.videos,
+                isLoadingMore = false,
+                hasMore       = result.nextPage != null
             )
         }
     }

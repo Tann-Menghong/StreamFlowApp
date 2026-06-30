@@ -48,7 +48,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 private val bottomItems = listOf(
-    Screen.Home, Screen.Search, Screen.Donghua, Screen.Library, Screen.Settings
+    Screen.Home, Screen.Donghua, Screen.Library, Screen.Settings
 )
 
 @Composable

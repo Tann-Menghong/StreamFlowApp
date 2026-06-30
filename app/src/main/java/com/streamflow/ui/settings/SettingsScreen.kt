@@ -34,50 +34,70 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 private val countryOptions = listOf(
     "US" to "United States",
     "GB" to "United Kingdom",
+    "CA" to "Canada",
+    "AU" to "Australia",
     "JP" to "Japan",
-    "KH" to "Cambodia",
     "KR" to "South Korea",
+    "KH" to "Cambodia",
+    "TH" to "Thailand",
+    "VN" to "Vietnam",
+    "ID" to "Indonesia",
+    "MY" to "Malaysia",
+    "SG" to "Singapore",
+    "PH" to "Philippines",
     "IN" to "India",
     "FR" to "France",
     "DE" to "Germany",
-    "CA" to "Canada",
-    "AU" to "Australia"
+    "BR" to "Brazil",
+    "MX" to "Mexico",
+    "RU" to "Russia",
+    "TR" to "Turkey"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
-    val theme       by vm.theme.collectAsState()
-    val quality     by vm.quality.collectAsState()
-    val autoPlay    by vm.autoPlay.collectAsState()
-    val dataSaver   by vm.dataSaver.collectAsState()
-    val country     by vm.country.collectAsState()
-    val accentColor by vm.accentColor.collectAsState()
-    val defaultSpeed by vm.defaultSpeed.collectAsState()
-    val homeLayout  by vm.homeLayout.collectAsState()
-    val favCount    by vm.favoritesCount.collectAsState()
-    val histCount   by vm.historyCount.collectAsState()
-    val update      by vm.update.collectAsState()
-    val context     = LocalContext.current
+    val theme                by vm.theme.collectAsState()
+    val quality              by vm.quality.collectAsState()
+    val autoPlay             by vm.autoPlay.collectAsState()
+    val dataSaver            by vm.dataSaver.collectAsState()
+    val country              by vm.country.collectAsState()
+    val accentColor          by vm.accentColor.collectAsState()
+    val defaultSpeed         by vm.defaultSpeed.collectAsState()
+    val homeLayout           by vm.homeLayout.collectAsState()
+    val showContinueWatching by vm.showContinueWatching.collectAsState()
+    val showHeroCard         by vm.showHeroCard.collectAsState()
+    val gridColumns          by vm.gridColumns.collectAsState()
+    val skipSeconds          by vm.skipSeconds.collectAsState()
+    val favCount             by vm.favoritesCount.collectAsState()
+    val histCount            by vm.historyCount.collectAsState()
+    val update               by vm.update.collectAsState()
+    val context              = LocalContext.current
 
-    var showThemeDialog   by remember { mutableStateOf(false) }
-    var showQualityDialog by remember { mutableStateOf(false) }
-    var showCountryDialog by remember { mutableStateOf(false) }
-    var showAccentDialog  by remember { mutableStateOf(false) }
-    var showSpeedDialog   by remember { mutableStateOf(false) }
-    var showClearHist     by remember { mutableStateOf(false) }
-    var showClearFav      by remember { mutableStateOf(false) }
+    var showThemeDialog    by remember { mutableStateOf(false) }
+    var showQualityDialog  by remember { mutableStateOf(false) }
+    var showCountryDialog  by remember { mutableStateOf(false) }
+    var showAccentDialog   by remember { mutableStateOf(false) }
+    var showSpeedDialog    by remember { mutableStateOf(false) }
+    var showColumnsDialog  by remember { mutableStateOf(false) }
+    var showSkipDialog     by remember { mutableStateOf(false) }
+    var showClearHist      by remember { mutableStateOf(false) }
+    var showClearFav       by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title  = { Text("Settings", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(bottom = 32.dp)
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(bottom = 32.dp)
         ) {
 
             // ── Update banner ────────────────────────────────────────────
@@ -92,26 +112,29 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp))
                             Text(
-                                if (update.downloading) "Downloading update…" else "Update available — v${update.info?.latestVersion}",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize   = 14.sp,
-                                color      = MaterialTheme.colorScheme.onPrimaryContainer
+                                if (update.downloading) "Downloading update…"
+                                else "Update available — v${update.info?.latestVersion}",
+                                fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                         if (update.downloading) {
                             LinearProgressIndicator(
                                 progress = { update.progress / 100f },
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                                color        = MaterialTheme.colorScheme.primary,
-                                trackColor   = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.15f)
+                                color      = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.15f)
                             )
-                            Text("${update.progress}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+                            Text("${update.progress}%", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
                         } else {
                             Button(
-                                onClick = { vm.downloadUpdate() },
+                                onClick  = { vm.downloadUpdate() },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape    = RoundedCornerShape(10.dp),
                                 colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -128,11 +151,29 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                 ) { showThemeDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.ColorLens, "Accent color", accentColor.lowercase().replaceFirstChar { it.uppercase() }) { showAccentDialog = true }
+                SettingsItem(Icons.Default.ColorLens, "Accent color",
+                    accentColor.lowercase().replaceFirstChar { it.uppercase() }
+                ) { showAccentDialog = true }
+            }
+
+            // ── Home customization ────────────────────────────────────────
+            SettingsSection("Home")
+            SettingsCard {
+                SettingsSwitchItem(Icons.Default.GridView, "Grid layout",
+                    "Show videos in a grid instead of list", homeLayout == "GRID"
+                ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.GridView, "Home layout", if (homeLayout == "GRID") "Grid" else "List", homeLayout == "GRID") {
-                    vm.setHomeLayout(if (it) "GRID" else "LIST")
-                }
+                SettingsItem(Icons.Default.ViewModule, "Grid columns",
+                    "$gridColumns columns"
+                ) { showColumnsDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.History, "Continue Watching row",
+                    "Show partially watched videos at the top", showContinueWatching
+                ) { vm.setShowContinueWatching(it) }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Stars, "Hero featured card",
+                    "Show first trending video as a large banner", showHeroCard
+                ) { vm.setShowHeroCard(it) }
             }
 
             // ── Playback ─────────────────────────────────────────────────
@@ -142,13 +183,21 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
                 ) { showQualityDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play", "Play related videos automatically", autoPlay) { vm.setAutoPlay(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver", "Prefer lower quality to save data", dataSaver) { vm.setDataSaver(it) }
-                SettingsDivider()
                 SettingsItem(Icons.Default.Speed, "Default speed",
                     when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
                 ) { showSpeedDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.FastForward, "Double-tap skip",
+                    "${skipSeconds}s per tap"
+                ) { showSkipDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play",
+                    "Play related videos automatically", autoPlay
+                ) { vm.setAutoPlay(it) }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver",
+                    "Prefer lower quality to save mobile data", dataSaver
+                ) { vm.setDataSaver(it) }
                 SettingsDivider()
                 SettingsItem(Icons.Default.Language, "Trending country",
                     countryOptions.firstOrNull { it.first == country }?.second ?: country
@@ -158,9 +207,13 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Storage ──────────────────────────────────────────────────
             SettingsSection("Storage")
             SettingsCard {
-                SettingsItem(Icons.Default.FavoriteBorder, "Clear favorites", "$favCount saved") { if (favCount > 0) showClearFav = true }
+                SettingsItem(Icons.Default.FavoriteBorder, "Clear favorites",
+                    "$favCount saved"
+                ) { if (favCount > 0) showClearFav = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.History, "Clear watch history", "$histCount entries") { if (histCount > 0) showClearHist = true }
+                SettingsItem(Icons.Default.History, "Clear watch history",
+                    "$histCount entries"
+                ) { if (histCount > 0) showClearHist = true }
             }
 
             // ── About ────────────────────────────────────────────────────
@@ -172,13 +225,17 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
                 ) { vm.checkForUpdate() }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Code, "Source code", "github.com/Tann-Menghong/StreamFlowApp") {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tann-Menghong/StreamFlowApp")))
+                SettingsItem(Icons.Default.Code, "Source code",
+                    "github.com/Tann-Menghong/StreamFlowApp"
+                ) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/Tann-Menghong/StreamFlowApp")))
                 }
             }
         }
     }
 
+    // ── Dialogs ──────────────────────────────────────────────────────
     if (showThemeDialog) {
         val opts = listOf("SYSTEM" to "Follow system", "DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
         PickerDialog("Theme", opts.map { it.second }, opts.indexOfFirst { it.first == theme }.coerceAtLeast(0),
@@ -192,7 +249,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     if (showCountryDialog) {
         PickerDialog(
             "Trending country",
-            countryOptions.map { it.second },
+            countryOptions.map { "${it.second} (${it.first})" },
             countryOptions.indexOfFirst { it.first == country }.coerceAtLeast(0),
             { vm.setCountry(countryOptions[it].first); showCountryDialog = false },
             { showCountryDialog = false }
@@ -206,6 +263,16 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Default speed", speedOpts.map { it.second }, speedOpts.indexOfFirst { it.first == defaultSpeed }.coerceAtLeast(0),
             { vm.setDefaultSpeed(speedOpts[it].first); showSpeedDialog = false }, { showSpeedDialog = false })
     }
+    if (showColumnsDialog) {
+        val colOpts = listOf("2" to "2 columns", "3" to "3 columns")
+        PickerDialog("Grid columns", colOpts.map { it.second }, colOpts.indexOfFirst { it.first == gridColumns }.coerceAtLeast(0),
+            { vm.setGridColumns(colOpts[it].first); showColumnsDialog = false }, { showColumnsDialog = false })
+    }
+    if (showSkipDialog) {
+        val skipOpts = listOf("5" to "5 seconds", "10" to "10 seconds", "15" to "15 seconds", "30" to "30 seconds")
+        PickerDialog("Double-tap skip", skipOpts.map { it.second }, skipOpts.indexOfFirst { it.first == skipSeconds }.coerceAtLeast(0),
+            { vm.setSkipSeconds(skipOpts[it].first); showSkipDialog = false }, { showSkipDialog = false })
+    }
     if (showClearHist) {
         ConfirmDialog("Clear history", "Remove all $histCount watch history entries?",
             { vm.clearHistory(); showClearHist = false }, { showClearHist = false })
@@ -216,11 +283,14 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     }
 }
 
+// ── Reusable components ───────────────────────────────────────────────────────
+
 @Composable
 private fun SettingsSection(title: String) {
     Text(
         text     = title.uppercase(),
-        style    = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold),
+        style    = MaterialTheme.typography.labelSmall.copy(
+            letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold),
         color    = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp)
     )
@@ -229,22 +299,31 @@ private fun SettingsSection(title: String) {
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape    = RoundedCornerShape(14.dp),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation= CardDefaults.cardElevation(0.dp)
+        modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape     = RoundedCornerShape(14.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) { Column(content = content) }
 }
 
 @Composable
 private fun SettingsDivider() {
-    HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 52.dp),
+        color    = MaterialTheme.colorScheme.outline.copy(0.3f)
+    )
 }
 
 @Composable
-private fun SettingsItem(icon: ImageVector, title: String, subtitle: String? = null, onClick: (() -> Unit)? = null) {
+private fun SettingsItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null
+) {
     Row(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -252,38 +331,64 @@ private fun SettingsItem(icon: ImageVector, title: String, subtitle: String? = n
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground)
+            if (!subtitle.isNullOrBlank()) Text(subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (onClick != null) Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))
+        if (onClick != null) Icon(Icons.Default.ChevronRight, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
+            modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
-private fun SettingsSwitchItem(icon: ImageVector, title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SettingsSwitchItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground)
+            if (!subtitle.isNullOrBlank()) Text(subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = Modifier.scale(0.85f))
     }
 }
 
 @Composable
-private fun PickerDialog(title: String, options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+private fun PickerDialog(
+    title: String,
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
-        text = {
+        text  = {
             Column {
                 options.forEachIndexed { i, label ->
-                    Row(Modifier.fillMaxWidth().clickable { onSelect(i) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onSelect(i) }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         RadioButton(selected = i == selectedIndex, onClick = { onSelect(i) })
                         Spacer(Modifier.width(8.dp))
                         Text(label, style = MaterialTheme.typography.bodyLarge)
@@ -291,9 +396,9 @@ private fun PickerDialog(title: String, options: List<String>, selectedIndex: In
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-        shape = RoundedCornerShape(16.dp)
+        confirmButton  = {},
+        dismissButton  = { TextButton(onDismiss) { Text("Cancel") } },
+        shape          = RoundedCornerShape(16.dp)
     )
 }
 
@@ -301,11 +406,11 @@ private fun PickerDialog(title: String, options: List<String>, selectedIndex: In
 private fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.Bold) },
-        text  = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        title  = { Text(title, fontWeight = FontWeight.Bold) },
+        text   = { Text(message, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = { TextButton(onConfirm) { Text("Clear", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-        shape = RoundedCornerShape(16.dp)
+        shape  = RoundedCornerShape(16.dp)
     )
 }
 
@@ -325,12 +430,12 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Accent color", fontWeight = FontWeight.Bold) },
-        text = {
+        text  = {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
+                columns               = GridCells.Fixed(4),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(top = 4.dp)
+                verticalArrangement   = Arrangement.spacedBy(12.dp),
+                modifier              = Modifier.padding(top = 4.dp)
             ) {
                 itemsIndexed(accentCircleColors) { _, (key, color) ->
                     Box(
@@ -339,21 +444,17 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .then(
-                                if (key == selected) Modifier.border(3.dp, Color.White, CircleShape)
-                                else Modifier
-                            )
+                            .then(if (key == selected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
                             .clickable { onSelect(key) }
                     ) {
-                        if (key == selected) {
-                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
+                        if (key == selected) Icon(Icons.Default.Check, null,
+                            tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-        shape = RoundedCornerShape(16.dp)
+        confirmButton  = {},
+        dismissButton  = { TextButton(onDismiss) { Text("Cancel") } },
+        shape          = RoundedCornerShape(16.dp)
     )
 }
