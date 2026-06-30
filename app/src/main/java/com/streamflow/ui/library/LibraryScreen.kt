@@ -85,7 +85,13 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
             ) { tab ->
                 when (tab) {
                     0 -> VideoList(favorites.map { it.toVideoItem() }, onVideoClick, vm::removeFavorite, "No favorites yet.\nTap ♥ on any video to save it.")
-                    1 -> VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory, "No watch history yet.")
+                    1 -> {
+                        val progressMap = history.associate { h ->
+                            h.url to if (h.duration > 0L)
+                                (h.position / 1000f / h.duration).coerceIn(0f, 1f) else 0f
+                        }
+                        VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory, "No watch history yet.", progressMap)
+                    }
                     else -> VideoList(watchLater.map { it.toVideoItem() }, onVideoClick, vm::removeWatchLater, "No watch later items yet.\nTap 🔖 on any video to save it.")
                 }
             }
@@ -94,7 +100,13 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
 }
 
 @Composable
-private fun VideoList(items: List<VideoItem>, onVideoClick: (String) -> Unit, onRemove: (String) -> Unit, emptyMessage: String) {
+private fun VideoList(
+    items: List<VideoItem>,
+    onVideoClick: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    emptyMessage: String,
+    progressFractions: Map<String, Float> = emptyMap()
+) {
     if (items.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(emptyMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
@@ -105,7 +117,11 @@ private fun VideoList(items: List<VideoItem>, onVideoClick: (String) -> Unit, on
         items(items, key = { it.url }) { video ->
             Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.weight(1f)) {
-                    VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                    VideoCard(
+                        video            = video,
+                        onClick          = { onVideoClick(video.url) },
+                        progressFraction = progressFractions[video.url] ?: 0f
+                    )
                 }
                 IconButton(onClick = { onRemove(video.url) }, modifier = Modifier.padding(top = 4.dp)) {
                     Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))

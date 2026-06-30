@@ -1,15 +1,16 @@
 package com.streamflow.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,7 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,90 +30,149 @@ import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 
 @Composable
-fun VideoCard(video: VideoItem, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
+fun VideoCard(
+    video: VideoItem,
+    onClick: () -> Unit,
+    progressFraction: Float = 0f,
+    onAddToWatchLater: (() -> Unit)? = null,
+    onAddToFavorites:  (() -> Unit)? = null
+) {
+    val context  = LocalContext.current
+    var showMenu by remember { mutableStateOf(false) }
+    var pressed  by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue   = if (isPressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        targetValue   = if (pressed) 0.97f else 1f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
         label         = "card_scale"
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(bottom = 20.dp)
-    ) {
-        // Thumbnail
-        Box(
+    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = 20.dp)) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            AsyncImage(
-                model             = video.thumbnailUrl,
-                contentDescription = null,
-                contentScale      = ContentScale.Crop,
-                modifier          = Modifier.fillMaxSize()
-            )
-            if (video.duration > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(5.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text       = formatDuration(video.duration),
-                        color      = Color.White,
-                        fontSize   = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.2.sp
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { pressed = true; tryAwaitRelease(); pressed = false },
+                        onTap   = { onClick() },
+                        onLongPress = { showMenu = true }
                     )
                 }
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ) {
+            // Thumbnail
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp))
             ) {
-                Text(
-                    text       = video.uploaderName.firstOrNull()?.uppercase() ?: "?",
-                    color      = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp
+                AsyncImage(
+                    model              = video.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize()
                 )
+                // Duration badge
+                if (video.duration > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(0.82f), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(formatDuration(video.duration), color = Color.White,
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                // Watch progress bar
+                if (progressFraction in 0.01f..0.99f) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(3.dp)
+                    ) {
+                        Box(Modifier.fillMaxSize().background(Color.White.copy(0.3f)))
+                        Box(Modifier.fillMaxWidth(progressFraction).fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.primary))
+                    }
+                }
             }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text      = video.title,
-                    style     = MaterialTheme.typography.titleSmall,
-                    maxLines  = 2,
-                    overflow  = TextOverflow.Ellipsis,
-                    color     = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text     = buildString {
-                        append(video.uploaderName)
-                        if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
-                    },
-                    style    = MaterialTheme.typography.bodySmall,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+
+            Spacer(Modifier.height(10.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier.size(34.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text       = video.uploaderName.firstOrNull()?.uppercase() ?: "?",
+                        color      = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 14.sp
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(video.title, style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        buildString {
+                            append(video.uploaderName)
+                            if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Three-dot menu anchor
+                Box {
+                    IconButton(
+                        onClick  = { showMenu = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.MoreVert, null,
+                            tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
+                            modifier = Modifier.size(18.dp))
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        if (onAddToWatchLater != null) {
+                            DropdownMenuItem(
+                                text = { Text("Watch later") },
+                                leadingIcon = { Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(18.dp)) },
+                                onClick = { onAddToWatchLater(); showMenu = false }
+                            )
+                        }
+                        if (onAddToFavorites != null) {
+                            DropdownMenuItem(
+                                text = { Text("Add to favorites") },
+                                leadingIcon = { Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
+                                onClick = { onAddToFavorites(); showMenu = false }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Share") },
+                            leadingIcon = { Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, video.url) }
+                                context.startActivity(Intent.createChooser(i, "Share video"))
+                                showMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Open in browser") },
+                            leadingIcon = { Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.url))) }
+                                showMenu = false
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -118,11 +180,10 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
 
 @Composable
 fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
+    var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue   = if (isPressed) 0.98f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        targetValue   = if (pressed) 0.98f else 1f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
         label         = "hero_scale"
     )
     Box(
@@ -131,7 +192,12 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             .aspectRatio(16f / 9f)
             .scale(scale)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress  = { pressed = true; tryAwaitRelease(); pressed = false },
+                    onTap    = { onClick() }
+                )
+            }
     ) {
         AsyncImage(
             model              = video.thumbnailUrl,
@@ -141,45 +207,41 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
         )
         Box(
             Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.55f)
-                .align(Alignment.BottomCenter)
+                .fillMaxWidth().fillMaxHeight(0.55f).align(Alignment.BottomCenter)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.88f))))
         )
+        // Play button overlay
+        Box(
+            Modifier
+                .size(52.dp)
+                .align(Alignment.Center)
+                .background(Color.White.copy(0.18f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp))
+        }
         if (video.duration > 0) {
             Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(10.dp)
+                Modifier.align(Alignment.BottomEnd).padding(10.dp)
                     .background(Color.Black.copy(0.75f), RoundedCornerShape(5.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text(formatDuration(video.duration), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text(formatDuration(video.duration), color = Color.White,
+                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-                .padding(end = 70.dp)
+            Modifier.align(Alignment.BottomStart).padding(12.dp).padding(end = 70.dp)
         ) {
-            Text(
-                video.title,
-                color      = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize   = 15.sp,
-                maxLines   = 2,
-                overflow   = TextOverflow.Ellipsis
-            )
+            Text(video.title, color = Color.White, fontWeight = FontWeight.Bold,
+                fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(
                 buildString {
                     append(video.uploaderName)
                     if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
                 },
-                color    = Color.White.copy(0.75f),
-                fontSize = 12.sp,
-                maxLines = 1
+                color = Color.White.copy(0.75f), fontSize = 12.sp, maxLines = 1
             )
         }
     }
@@ -187,20 +249,18 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
 
 @Composable
 fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
+    val fraction = if (entity.duration > 0L)
+        (entity.position / 1000f / entity.duration).coerceIn(0f, 1f) else 0f
+
     Column(
         modifier = Modifier
             .width(160.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = onClick
-            )
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onClick() })
+            }
     ) {
         Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(10.dp))
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp))
         ) {
             AsyncImage(
                 model              = entity.thumbnailUrl,
@@ -209,30 +269,26 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
                 modifier           = Modifier.fillMaxSize()
             )
             Box(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(5.dp)
+                Modifier.align(Alignment.BottomStart).padding(5.dp)
                     .background(MaterialTheme.colorScheme.primary.copy(0.88f), RoundedCornerShape(4.dp))
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
-                Text(
-                    "▶ ${formatDuration(entity.position / 1000)}",
-                    color      = Color.White,
-                    fontSize   = 9.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("▶ ${formatDuration(entity.position / 1000)}",
+                    color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+            }
+            // Progress bar
+            if (fraction > 0.01f) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)) {
+                    Box(Modifier.fillMaxSize().background(Color.White.copy(0.3f)))
+                    Box(Modifier.fillMaxWidth(fraction).fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary))
+                }
             }
         }
         Spacer(Modifier.height(5.dp))
-        Text(
-            entity.title,
-            fontSize   = 11.sp,
-            maxLines   = 2,
-            overflow   = TextOverflow.Ellipsis,
-            color      = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Medium,
-            lineHeight = 15.sp
-        )
+        Text(entity.title, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Medium, lineHeight = 15.sp)
     }
 }
 
