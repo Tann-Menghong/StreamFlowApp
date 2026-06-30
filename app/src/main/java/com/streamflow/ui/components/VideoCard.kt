@@ -29,6 +29,18 @@ import coil.compose.AsyncImage
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 
+private val avatarPalette = listOf(
+    Color(0xFF5C6BC0), Color(0xFF26A69A), Color(0xFFEF5350),
+    Color(0xFFAB47BC), Color(0xFF42A5F5), Color(0xFFFF7043),
+    Color(0xFF66BB6A), Color(0xFFD4E157), Color(0xFFEC407A),
+    Color(0xFF29B6F6)
+)
+
+private fun avatarColorFor(name: String): Color {
+    val idx = Math.abs(name.hashCode()) % avatarPalette.size
+    return avatarPalette[idx]
+}
+
 @Composable
 fun VideoCard(
     video: VideoItem,
@@ -102,14 +114,14 @@ fun VideoCard(
             Spacer(Modifier.height(10.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val avatarColor = avatarColorFor(video.uploaderName)
                 Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(avatarColor),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text       = video.uploaderName.firstOrNull()?.uppercase() ?: "?",
-                        color      = MaterialTheme.colorScheme.primary,
+                        color      = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize   = 14.sp
                     )

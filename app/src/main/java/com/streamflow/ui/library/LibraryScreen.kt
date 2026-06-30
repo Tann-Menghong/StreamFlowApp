@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -84,15 +86,18 @@ fun LibraryScreen(onVideoClick: (String) -> Unit, vm: LibraryViewModel = viewMod
                 label = "library_tab"
             ) { tab ->
                 when (tab) {
-                    0 -> VideoList(favorites.map { it.toVideoItem() }, onVideoClick, vm::removeFavorite, "No favorites yet.\nTap ♥ on any video to save it.")
+                    0 -> VideoList(favorites.map { it.toVideoItem() }, onVideoClick, vm::removeFavorite,
+                            "No favorites yet", "Tap ♥ on any video to save it here.", Icons.Default.FavoriteBorder)
                     1 -> {
                         val progressMap = history.associate { h ->
                             h.url to if (h.duration > 0L)
                                 (h.position / 1000f / h.duration).coerceIn(0f, 1f) else 0f
                         }
-                        VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory, "No watch history yet.", progressMap)
+                        VideoList(history.map { it.toVideoItem() }, onVideoClick, vm::removeHistory,
+                            "No history yet", "Videos you watch will appear here.", Icons.Default.History, progressMap)
                     }
-                    else -> VideoList(watchLater.map { it.toVideoItem() }, onVideoClick, vm::removeWatchLater, "No watch later items yet.\nTap 🔖 on any video to save it.")
+                    else -> VideoList(watchLater.map { it.toVideoItem() }, onVideoClick, vm::removeWatchLater,
+                            "No videos saved", "Tap 🔖 while watching to add videos here.", Icons.Default.BookmarkBorder)
                 }
             }
         }
@@ -104,12 +109,25 @@ private fun VideoList(
     items: List<VideoItem>,
     onVideoClick: (String) -> Unit,
     onRemove: (String) -> Unit,
-    emptyMessage: String,
+    emptyTitle: String,
+    emptySubtitle: String,
+    emptyIcon: ImageVector,
     progressFractions: Map<String, Float> = emptyMap()
 ) {
     if (items.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(emptyMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
+                Icon(emptyIcon, null,
+                    tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                    modifier = Modifier.size(64.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(emptyTitle, style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(0.55f))
+                Spacer(Modifier.height(6.dp))
+                Text(emptySubtitle, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                    textAlign = TextAlign.Center)
+            }
         }
         return
     }
