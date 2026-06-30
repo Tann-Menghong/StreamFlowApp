@@ -30,21 +30,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
+import com.streamflow.MainActivity
 import com.streamflow.PlaybackService
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.components.VideoCard
@@ -88,6 +94,13 @@ fun PlayerScreen(
             mediaController?.release()
             mediaController = null
         }
+    }
+
+    // ── Tell MainActivity we're in the player (for auto-PiP) ─────────────────
+    val mainActivity = context as? MainActivity
+    DisposableEffect(Unit) {
+        mainActivity?.isPlayerActive = true
+        onDispose { mainActivity?.isPlayerActive = false }
     }
 
     // ── Cleanup on exit ──────────────────────────────────────────────────────
@@ -136,6 +149,13 @@ fun PlayerScreen(
         }
         val mediaItem = MediaItem.Builder()
             .setUri(d.streamUrl)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(d.title)
+                    .setArtist(d.uploaderName)
+                    .setArtworkUri(d.thumbnailUrl.toUri())
+                    .build()
+            )
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
             .build()
 
@@ -175,7 +195,6 @@ fun PlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var currentSpeed by remember { mutableFloatStateOf(1f) }
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
-    // Sync currentSpeed UI label with the saved pref on first composition
     LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
     var skipMs by remember { mutableLongStateOf(10_000L) }
     LaunchedEffect(Unit) { skipMs = (prefs.skipSeconds.first().toLongOrNull() ?: 10L) * 1000L }
@@ -185,6 +204,10 @@ fun PlayerScreen(
     if (showSeekFeedback) {
         LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
     }
+
+    // ── Repeat mode ──────────────────────────────────────────────────────────
+    var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
+    LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
 
     // ── Auto-save position every 5 s while playing ──────────────────────────
     LaunchedEffect(videoUrl, mediaController) {
@@ -242,11 +265,13 @@ fun PlayerScreen(
     fun DoubleTapZones() {
         val mc = mediaController ?: return
         val skipSec = skipMs / 1000L
+        val haptic = LocalHapticFeedback.current
         Row(Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 72.dp)) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
                         detectTapGestures(onDoubleTap = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0))
                             seekFeedback = "- ${skipSec}s"; showSeekFeedback = true
                         })
@@ -257,6 +282,7 @@ fun PlayerScreen(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
                         detectTapGestures(onDoubleTap = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             mc.seekTo(mc.currentPosition + skipMs)
                             seekFeedback = "+ ${skipSec}s"; showSeekFeedback = true
                         })
@@ -426,7 +452,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
-            // ── Top bar buttons (exit, sleep indicator, sleep menu, lock, PiP) ──
+            // ── Top bar buttons ──────────────────────────────────────────
             if (!isLocked) {
                 Row(
                     modifier = Modifier.align(Alignment.TopStart).fillMaxWidth(),
@@ -581,16 +607,29 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             Text("Speed", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Box {
                                 TextButton(onClick = { showSpeedMenu = true }) {
-                                    Text("${currentSpeed}×", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                    Text("${currentSpeed}x", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                                 }
                                 DropdownMenu(expanded = showSpeedMenu, onDismissRequest = { showSpeedMenu = false }) {
                                     speeds.forEach { speed ->
                                         DropdownMenuItem(
-                                            text = { Text("${speed}×", fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal) },
+                                            text = { Text("${speed}x", fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal) },
                                             onClick = { currentSpeed = speed; mediaController?.setPlaybackSpeed(speed); showSpeedMenu = false }
                                         )
                                     }
                                 }
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            // Repeat button
+                            IconButton(onClick = {
+                                repeatMode = if (repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                            }) {
+                                Icon(
+                                    if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                                    "Repeat",
+                                    tint = if (repeatMode == Player.REPEAT_MODE_ONE) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
 

@@ -1,11 +1,13 @@
 package com.streamflow
 
 import android.Manifest
+import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,6 +26,8 @@ class MainActivity : ComponentActivity() {
 
     var isInPip by mutableStateOf(false)
         private set
+
+    var isPlayerActive by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,9 +62,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isPlayerActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9)).build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
     private fun enableHighRefreshRate() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Pick the display mode with the highest refresh rate (covers 120 Hz, 144 Hz, etc.)
             @Suppress("DEPRECATION")
             val best = windowManager.defaultDisplay.supportedModes
                 .maxByOrNull { it.refreshRate }
@@ -70,7 +82,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } else {
-            // API 21–22 fallback: hint with an uncapped preferred rate
             window.attributes = window.attributes.also {
                 it.preferredRefreshRate = Float.MAX_VALUE
             }

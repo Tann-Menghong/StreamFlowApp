@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -35,7 +36,6 @@ class PlaybackService : MediaSessionService() {
             .build()
         val dsf = OkHttpDataSource.Factory(httpClient)
 
-        // When audioUrl is in requestMetadata extras, merge video + audio tracks.
         val defaultMsf = DefaultMediaSourceFactory(dsf)
         val mediaSourceFactory = object : androidx.media3.exoplayer.source.MediaSource.Factory
             by defaultMsf {
@@ -60,7 +60,21 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, player)
+            .setCallback(object : MediaSession.Callback {
+                override fun onConnect(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo
+                ): MediaSession.ConnectionResult {
+                    val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                        .build()
+                    return MediaSession.ConnectionResult.accept(
+                        sessionCommands,
+                        Player.Commands.Builder().addAllCommands().build()
+                    )
+                }
+            })
+            .build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
