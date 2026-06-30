@@ -47,7 +47,8 @@ fun VideoCard(
     onClick: () -> Unit,
     progressFraction: Float = 0f,
     onAddToWatchLater: (() -> Unit)? = null,
-    onAddToFavorites:  (() -> Unit)? = null
+    onAddToFavorites:  (() -> Unit)? = null,
+    remainingLabel: String? = null
 ) {
     val context  = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
@@ -83,8 +84,19 @@ fun VideoCard(
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize()
                 )
-                // Duration badge
-                if (video.duration > 0) {
+                // Duration badge or remaining label
+                if (remainingLabel != null) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(0.82f), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(remainingLabel, color = Color.White,
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                } else if (video.duration > 0) {
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)
