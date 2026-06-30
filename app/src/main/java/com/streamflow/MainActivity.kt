@@ -47,11 +47,31 @@ class MainActivity : ComponentActivity() {
                 Regex("https?://(?:www\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
             }
 
+        enableHighRefreshRate()
         enableEdgeToEdge()
         setContent {
             val themeStr by prefs.theme.collectAsState(initial = "DARK")
             StreamFlowTheme(theme = themeStr.toAppTheme()) {
                 NavGraph(startUrl = sharedUrl)
+            }
+        }
+    }
+
+    private fun enableHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Pick the display mode with the highest refresh rate (covers 120 Hz, 144 Hz, etc.)
+            @Suppress("DEPRECATION")
+            val best = windowManager.defaultDisplay.supportedModes
+                .maxByOrNull { it.refreshRate }
+            if (best != null) {
+                window.attributes = window.attributes.also {
+                    it.preferredDisplayModeId = best.modeId
+                }
+            }
+        } else {
+            // API 21–22 fallback: hint with an uncapped preferred rate
+            window.attributes = window.attributes.also {
+                it.preferredRefreshRate = Float.MAX_VALUE
             }
         }
     }
