@@ -35,6 +35,7 @@ import com.streamflow.PlaybackService
 import com.streamflow.ui.components.MiniPlayerBar
 import com.streamflow.ui.components.MiniPlayerState
 import com.streamflow.ui.donghua.DonghuaScreen
+import com.streamflow.ui.channel.ChannelScreen
 import com.streamflow.ui.home.HomeScreen
 import com.streamflow.ui.library.LibraryScreen
 import com.streamflow.ui.player.PlayerScreen
@@ -52,6 +53,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Settings : Screen("settings", "Settings",Icons.Default.Settings)
     object Player   : Screen("player?videoUrl={videoUrl}", "Player", Icons.Default.PlayArrow) {
         fun createRoute(url: String) = "player?videoUrl=${URLEncoder.encode(url, "UTF-8")}"
+    }
+    object Channel  : Screen("channel?channelUrl={channelUrl}", "Channel", Icons.Default.Person) {
+        fun createRoute(url: String) = "channel?channelUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
 }
 
@@ -154,7 +158,10 @@ fun NavGraph(startUrl: String? = null) {
             }
         ) {
             composable(Screen.Home.route) {
-                HomeScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
+                HomeScreen(
+                    onVideoClick  = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { navController.navigate(Screen.Channel.createRoute(it)) }
+                )
             }
             composable(Screen.Search.route) {
                 SearchScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
@@ -176,7 +183,21 @@ fun NavGraph(startUrl: String? = null) {
             ) { back ->
                 val videoUrl = URLDecoder.decode(back.arguments?.getString("videoUrl") ?: "", "UTF-8")
                 PlayerScreen(
-                    videoUrl    = videoUrl,
+                    videoUrl     = videoUrl,
+                    onBack       = { navController.popBackStack() },
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { navController.navigate(Screen.Channel.createRoute(it)) }
+                )
+            }
+            composable(
+                route = Screen.Channel.route,
+                arguments = listOf(navArgument("channelUrl") {
+                    type = NavType.StringType; nullable = true; defaultValue = ""
+                })
+            ) { back ->
+                val channelUrl = URLDecoder.decode(back.arguments?.getString("channelUrl") ?: "", "UTF-8")
+                ChannelScreen(
+                    channelUrl  = channelUrl,
                     onBack      = { navController.popBackStack() },
                     onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) }
                 )

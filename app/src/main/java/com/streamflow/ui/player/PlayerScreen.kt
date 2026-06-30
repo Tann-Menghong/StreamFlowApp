@@ -69,6 +69,7 @@ fun PlayerScreen(
     videoUrl: String,
     onBack: () -> Unit,
     onVideoClick: (String) -> Unit,
+    onChannelClick: ((String) -> Unit)? = null,
     vm: PlayerViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -776,7 +777,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
                 items(details.relatedVideos, key = { it.url }) { video ->
                     Box(Modifier.padding(horizontal = 14.dp)) {
-                        VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                        VideoCard(video = video, onClick = { onVideoClick(video.url) },
+                            onChannelClick = onChannelClick)
                     }
                 }
             }

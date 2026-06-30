@@ -6,7 +6,8 @@ data class VideoItem(
     val thumbnailUrl: String,
     val uploaderName: String,
     val viewCount: Long,
-    val duration: Long
+    val duration: Long,
+    val uploaderUrl: String = ""
 )
 
 data class VideoDetails(

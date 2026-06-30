@@ -51,7 +51,7 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) {
+fun HomeScreen(onVideoClick: (String) -> Unit, onChannelClick: ((String) -> Unit)? = null, vm: HomeViewModel = viewModel()) {
     val state            by vm.uiState.collectAsState()
     val homeLayout       by vm.homeLayout.collectAsState()
     val selectedCategory by vm.selectedCategory.collectAsState()
@@ -348,7 +348,7 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                                     LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
                                     AnimatedVisibility(visible,
                                         enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
-                                        VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                                        VideoCard(video = video, onClick = { onVideoClick(video.url) }, onChannelClick = onChannelClick)
                                     }
                                 }
                             }
@@ -416,7 +416,7 @@ fun HomeScreen(onVideoClick: (String) -> Unit, vm: HomeViewModel = viewModel()) 
                                         enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 6 }
                                     ) {
                                         Box(Modifier.padding(horizontal = 16.dp)) {
-                                            VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                                            VideoCard(video = video, onClick = { onVideoClick(video.url) }, onChannelClick = onChannelClick)
                                         }
                                     }
                                 }

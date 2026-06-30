@@ -137,12 +137,35 @@ class YouTubeRepository {
                 )
         }
 
+    data class ChannelResult(
+        val name: String,
+        val avatarUrl: String,
+        val subscriberCount: Long,
+        val description: String,
+        val videos: List<VideoItem>,
+        val nextPage: Page?
+    )
+
+    suspend fun getChannelVideos(channelUrl: String): ChannelResult = withContext(Dispatchers.IO) {
+        val extractor = youtube.getChannelExtractor(channelUrl)
+        extractor.fetchPage()
+        ChannelResult(
+            name = try { extractor.name } catch (_: Exception) { "Channel" },
+            avatarUrl = try { extractor.avatars.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
+            subscriberCount = try { extractor.subscriberCount } catch (_: Exception) { -1L },
+            description = try { extractor.description ?: "" } catch (_: Exception) { "" },
+            videos = emptyList(),
+            nextPage = null
+        )
+    }
+
     private fun StreamInfoItem.toVideoItem() = VideoItem(
         url = url,
         title = name,
         thumbnailUrl = thumbnails.firstOrNull()?.url ?: "",
         uploaderName = uploaderName ?: "Unknown",
         viewCount = viewCount,
-        duration = duration
+        duration = duration,
+        uploaderUrl = uploaderUrl ?: ""
     )
 }

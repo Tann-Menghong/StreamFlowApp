@@ -4,7 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,7 +50,8 @@ fun VideoCard(
     progressFraction: Float = 0f,
     onAddToWatchLater: (() -> Unit)? = null,
     onAddToFavorites:  (() -> Unit)? = null,
-    remainingLabel: String? = null
+    remainingLabel: String? = null,
+    onChannelClick: ((String) -> Unit)? = null
 ) {
     val context  = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
@@ -149,8 +152,16 @@ fun VideoCard(
                             if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                        color = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                            MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                            Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onChannelClick(video.uploaderUrl) }
+                        else Modifier
                     )
                 }
                 // Three-dot menu anchor
