@@ -108,7 +108,10 @@ private val AD_BLOCK_JS = """
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DonghuaScreen(vm: DonghuaViewModel = viewModel()) {
+fun DonghuaScreen(
+    onFullscreenChange: (Boolean) -> Unit = {},
+    vm: DonghuaViewModel = viewModel()
+) {
     val context = LocalContext.current
     val activity = context as? Activity
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -237,6 +240,7 @@ fun DonghuaScreen(vm: DonghuaViewModel = viewModel()) {
                                 mainHandler.post {
                                     customView = view
                                     customViewCallback = callback
+                                    onFullscreenChange(true)
                                     activity?.let { act ->
                                         act.requestedOrientation =
                                             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -258,6 +262,7 @@ fun DonghuaScreen(vm: DonghuaViewModel = viewModel()) {
                                 mainHandler.post {
                                     customViewCallback = null
                                     customView = null
+                                    onFullscreenChange(false)
                                     activity?.let { act ->
                                         act.requestedOrientation =
                                             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED

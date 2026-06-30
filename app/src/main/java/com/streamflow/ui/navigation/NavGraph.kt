@@ -56,7 +56,8 @@ fun NavGraph(startUrl: String? = null) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
-    val showBottom = bottomItems.any { it.route == currentDest?.route }
+    var isDonghuaFullscreen by remember { mutableStateOf(false) }
+    val showBottom = bottomItems.any { it.route == currentDest?.route } && !isDonghuaFullscreen
 
     LaunchedEffect(startUrl) {
         if (startUrl != null) {
@@ -112,7 +113,7 @@ fun NavGraph(startUrl: String? = null) {
                 SearchScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
             }
             composable(Screen.Donghua.route) {
-                DonghuaScreen()
+                DonghuaScreen(onFullscreenChange = { isDonghuaFullscreen = it })
             }
             composable(Screen.Library.route) {
                 LibraryScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
