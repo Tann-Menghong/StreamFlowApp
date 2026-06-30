@@ -175,6 +175,10 @@ fun PlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var currentSpeed by remember { mutableFloatStateOf(1f) }
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+    // Sync currentSpeed UI label with the saved pref on first composition
+    LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
+    var skipMs by remember { mutableLongStateOf(10_000L) }
+    LaunchedEffect(Unit) { skipMs = (prefs.skipSeconds.first().toLongOrNull() ?: 10L) * 1000L }
 
     var seekFeedback by remember { mutableStateOf("") }
     var showSeekFeedback by remember { mutableStateOf(false) }
@@ -226,23 +230,24 @@ fun PlayerScreen(
     @Composable
     fun DoubleTapZones() {
         val mc = mediaController ?: return
+        val skipSec = skipMs / 1000L
         Row(Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 72.dp)) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
-                    .pointerInput(Unit) {
+                    .pointerInput(skipMs) {
                         detectTapGestures(onDoubleTap = {
-                            mc.seekTo((mc.currentPosition - 10_000).coerceAtLeast(0))
-                            seekFeedback = "- 10s"; showSeekFeedback = true
+                            mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0))
+                            seekFeedback = "- ${skipSec}s"; showSeekFeedback = true
                         })
                     }
             )
             Box(Modifier.weight(0.4f).fillMaxHeight())
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
-                    .pointerInput(Unit) {
+                    .pointerInput(skipMs) {
                         detectTapGestures(onDoubleTap = {
-                            mc.seekTo(mc.currentPosition + 10_000)
-                            seekFeedback = "+ 10s"; showSeekFeedback = true
+                            mc.seekTo(mc.currentPosition + skipMs)
+                            seekFeedback = "+ ${skipSec}s"; showSeekFeedback = true
                         })
                     }
             )

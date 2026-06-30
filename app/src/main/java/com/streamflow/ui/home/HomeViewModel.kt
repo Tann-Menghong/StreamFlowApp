@@ -119,6 +119,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         viewModelScope.launch {
+            _uiState.value = HomeUiState.Loading
             try {
                 if (isSearchMode) {
                     val result = repo.search(currentQuery)

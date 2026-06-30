@@ -128,6 +128,7 @@ class YouTubeRepository {
                     uploaderName = info.uploaderName ?: "Unknown",
                     viewCount = info.viewCount,
                     likeCount = info.likeCount,
+                    duration = info.duration,
                     description = info.description?.content ?: "",
                     streamUrl = streamUrl,
                     audioUrl = audioUrl,

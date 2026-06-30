@@ -50,13 +50,17 @@ class SearchViewModel : ViewModel() {
         if (current.isLoadingMore) return
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
-            val result = repo.searchNextPage(current.query, page)
-            nextPage = result.nextPage
-            _uiState.value = current.copy(
-                videos = current.videos + result.videos,
-                isLoadingMore = false,
-                hasMore = result.nextPage != null
-            )
+            try {
+                val result = repo.searchNextPage(current.query, page)
+                nextPage = result.nextPage
+                _uiState.value = current.copy(
+                    videos        = current.videos + result.videos,
+                    isLoadingMore = false,
+                    hasMore       = result.nextPage != null
+                )
+            } catch (e: Exception) {
+                _uiState.value = current.copy(isLoadingMore = false)
+            }
         }
     }
 }

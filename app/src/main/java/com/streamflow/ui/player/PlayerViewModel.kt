@@ -50,6 +50,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     uploaderName = extractHostFromUrl(videoUrl),
                     viewCount = 0L,
                     likeCount = 0L,
+                    duration = 0L,
                     description = "",
                     streamUrl = videoUrl,
                     audioUrl = null,
@@ -86,7 +87,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     thumbnailUrl = details.thumbnailUrl,
                     uploaderName = details.uploaderName,
                     viewCount = details.viewCount,
-                    duration = 0L
+                    duration = details.duration
                 ))
             }
         }
@@ -107,7 +108,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     thumbnailUrl = details.thumbnailUrl,
                     uploaderName = details.uploaderName,
                     viewCount = details.viewCount,
-                    duration = 0L
+                    duration = details.duration
                 ))
             }
         }
@@ -134,7 +135,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             thumbnailUrl = details.thumbnailUrl,
             uploaderName = details.uploaderName,
             viewCount = details.viewCount,
-            duration = 0L
+            duration = details.duration
         ))
     }
 

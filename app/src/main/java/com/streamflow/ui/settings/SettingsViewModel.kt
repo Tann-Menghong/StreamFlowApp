@@ -58,8 +58,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun checkForUpdate() {
         viewModelScope.launch {
             _update.value = UpdateState(checking = true)
-            val info = updater.checkForUpdate(appVersion)
-            _update.value = UpdateState(info = info)
+            try {
+                val info = updater.checkForUpdate(appVersion)
+                _update.value = UpdateState(info = info)
+            } catch (e: Exception) {
+                _update.value = UpdateState()
+            }
         }
     }
 

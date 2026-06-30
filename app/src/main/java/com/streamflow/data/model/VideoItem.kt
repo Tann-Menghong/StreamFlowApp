@@ -15,6 +15,7 @@ data class VideoDetails(
     val uploaderName: String,
     val viewCount: Long,
     val likeCount: Long,
+    val duration: Long,
     val description: String,
     val streamUrl: String,
     val audioUrl: String?,
