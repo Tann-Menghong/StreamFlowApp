@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -263,6 +266,44 @@ fun PlayerScreen(
     val audioManager = remember { context.getSystemService(AudioManager::class.java) }
     val maxVolume = remember { audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15 }
 
+    // ── Pinch-to-zoom (fullscreen) ───────────────────────────────────────────
+    var zoom by remember { mutableFloatStateOf(1f) }
+    val transformableState = rememberTransformableState { zoomChange, _, _ ->
+        zoom = (zoom * zoomChange).coerceIn(0.8f, 4f)
+    }
+
+    // ── Stats overlay ────────────────────────────────────────────────────────
+    var showStats by remember { mutableStateOf(false) }
+    var bufferPct by remember { mutableIntStateOf(0) }
+    LaunchedEffect(mediaController) {
+        while (true) {
+            delay(1000L)
+            val mc = mediaController ?: continue
+            if (mc.duration > 0L)
+                bufferPct = ((mc.bufferedPosition * 100L) / mc.duration).toInt().coerceIn(0, 100)
+        }
+    }
+
+    // ── Auto-play countdown (when video ends, auto-navigate to next) ─────────
+    var autoPlayCountdown by remember { mutableIntStateOf(0) }
+    var autoPlayTarget by remember { mutableStateOf("") }
+    LaunchedEffect(state, mediaController) {
+        val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
+        val nextUrl = ready.details.relatedVideos.firstOrNull()?.url ?: return@LaunchedEffect
+        autoPlayCountdown = 0; autoPlayTarget = ""
+        while (true) {
+            delay(500L)
+            val mc = mediaController ?: continue
+            if (mc.playbackState == Player.STATE_ENDED && mc.currentPosition > 0L) {
+                autoPlayTarget = nextUrl
+                for (i in 5 downTo 1) { autoPlayCountdown = i; delay(1000L) }
+                autoPlayCountdown = 0
+                if (autoPlayTarget.isNotEmpty()) onVideoClick(autoPlayTarget)
+                break
+            }
+        }
+    }
+
     @Composable
     fun SeekFeedback() {
         if (showSeekFeedback) {
@@ -347,7 +388,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
     // ── Fullscreen player ─────────────────────────────────────────────────────
     if (isFullscreen) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Box(Modifier.fillMaxSize().background(Color.Black).transformable(transformableState)) {
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
@@ -360,7 +401,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     pv.player = mediaController
                     pv.useController = !isLocked
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom }
             )
 
             if (!isLocked) {
@@ -508,6 +549,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         IconButton(onClick = { isLocked = true }) {
                             Icon(Icons.Default.LockOpen, "Lock", tint = Color.White)
                         }
+                        IconButton(onClick = { showStats = !showStats }) {
+                            Icon(Icons.Default.Analytics, "Stats",
+                                tint = if (showStats) MaterialTheme.colorScheme.primary else Color.White)
+                        }
                         IconButton(
                             onClick = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -517,6 +562,41 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                         ) {
                             Icon(Icons.Default.PictureInPicture, "PiP", tint = Color.White)
+                        }
+                    }
+                }
+            }
+
+            // ── Stats overlay ────────────────────────────────────────────
+            if (showStats) {
+                val dur = mediaController?.duration?.takeIf { it > 0 } ?: 1L
+                val pos = mediaController?.currentPosition ?: 0L
+                Box(
+                    Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 80.dp)
+                        .background(Color.Black.copy(0.7f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Column {
+                        Text("Buffer: $bufferPct%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Position: ${pos / 1000}s / ${dur / 1000}s", color = Color.White, fontSize = 11.sp)
+                        Text("Zoom: ${"%.1f".format(zoom)}x", color = Color.White, fontSize = 11.sp)
+                    }
+                }
+            }
+
+            // ── Autoplay countdown overlay ───────────────────────────────
+            if (autoPlayCountdown > 0) {
+                Box(
+                    Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 80.dp)
+                        .background(Color.Black.copy(0.8f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Auto-playing next in", color = Color.White.copy(0.8f), fontSize = 11.sp)
+                        Text("$autoPlayCountdown", color = MaterialTheme.colorScheme.primary,
+                            fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { autoPlayTarget = "" }) {
+                            Text("Cancel", color = Color.White, fontSize = 11.sp)
                         }
                     }
                 }
@@ -558,6 +638,23 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
                 IconButton(onClick = { isFullscreen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                     Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                }
+                if (autoPlayCountdown > 0) {
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).padding(8.dp)
+                            .background(Color.Black.copy(0.8f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Next in $autoPlayCountdown s", color = Color.White, fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold)
+                            TextButton(onClick = { autoPlayTarget = "" },
+                                contentPadding = PaddingValues(0.dp)) {
+                                Text("Cancel", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+                            }
+                        }
+                    }
                 }
             }
         }
