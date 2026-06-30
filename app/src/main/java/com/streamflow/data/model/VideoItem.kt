@@ -7,7 +7,8 @@ data class VideoItem(
     val uploaderName: String,
     val viewCount: Long,
     val duration: Long,
-    val uploaderUrl: String = ""
+    val uploaderUrl: String = "",
+    val uploadedAgo: String = ""
 )
 
 data class SubtitleTrack(val name: String, val url: String, val code: String)

@@ -27,7 +27,9 @@ class YouTubeRepository {
         kiosk.fetchPage()
         val page = kiosk.initialPage
         PagedResult(
-            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            videos = page.items.filterIsInstance<StreamInfoItem>()
+                .filter { it.duration >= 0 }
+                .map { it.toVideoItem() },
             nextPage = page.nextPage
         )
     }
@@ -38,7 +40,9 @@ class YouTubeRepository {
             kiosk.fetchPage()
             val page = kiosk.getPage(nextPage)
             PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                videos = page.items.filterIsInstance<StreamInfoItem>()
+                    .filter { it.duration >= 0 }
+                    .map { it.toVideoItem() },
                 nextPage = page.nextPage
             )
         } catch (e: Exception) {
@@ -152,6 +156,7 @@ class YouTubeRepository {
     data class ChannelResult(
         val name: String,
         val avatarUrl: String,
+        val bannerUrl: String,
         val subscriberCount: Long,
         val description: String,
         val videos: List<VideoItem>,
@@ -161,23 +166,79 @@ class YouTubeRepository {
     suspend fun getChannelVideos(channelUrl: String): ChannelResult = withContext(Dispatchers.IO) {
         val extractor = youtube.getChannelExtractor(channelUrl)
         extractor.fetchPage()
+
+        val name            = try { extractor.name } catch (_: Exception) { "Channel" }
+        val avatarUrl       = try { extractor.avatars.firstOrNull()?.url ?: "" } catch (_: Exception) { "" }
+        val bannerUrl       = try { extractor.banners.firstOrNull()?.url ?: "" } catch (_: Exception) { "" }
+        val subscriberCount = try { extractor.subscriberCount } catch (_: Exception) { -1L }
+        val description     = try { extractor.description ?: "" } catch (_: Exception) { "" }
+
+        var videos: List<VideoItem> = emptyList()
+        var nextPage: Page? = null
+
+        try {
+            val tabs = extractor.tabs
+            // Prefer the "Videos" tab — its content filters contain "videos"
+            val videosTab = tabs.firstOrNull { tab ->
+                try { tab.contentFilters.any { it.equals("videos", ignoreCase = true) } }
+                catch (_: Exception) { false }
+            } ?: tabs.firstOrNull()
+
+            if (videosTab != null) {
+                val tabExtractor = youtube.getChannelTabExtractor(videosTab)
+                tabExtractor.fetchPage()
+                val page = tabExtractor.initialPage
+                videos   = page.items.filterIsInstance<StreamInfoItem>()
+                    .filter { it.duration >= 0 }
+                    .map { it.toVideoItem() }
+                nextPage = page.nextPage
+            }
+        } catch (_: Exception) { /* tab API unavailable — metadata only */ }
+
         ChannelResult(
-            name = try { extractor.name } catch (_: Exception) { "Channel" },
-            avatarUrl = try { extractor.avatars.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
-            subscriberCount = try { extractor.subscriberCount } catch (_: Exception) { -1L },
-            description = try { extractor.description ?: "" } catch (_: Exception) { "" },
-            videos = emptyList(),
-            nextPage = null
+            name            = name,
+            avatarUrl       = avatarUrl,
+            bannerUrl       = bannerUrl,
+            subscriberCount = subscriberCount,
+            description     = description,
+            videos          = videos,
+            nextPage        = nextPage
         )
     }
 
+    suspend fun getChannelNextPage(channelUrl: String, nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
+        try {
+            val extractor = youtube.getChannelExtractor(channelUrl)
+            extractor.fetchPage()
+            val tabs = extractor.tabs
+            val videosTab = tabs.firstOrNull { tab ->
+                try { tab.contentFilters.any { it.equals("videos", ignoreCase = true) } }
+                catch (_: Exception) { false }
+            } ?: tabs.firstOrNull()
+
+            if (videosTab != null) {
+                val tabExtractor = youtube.getChannelTabExtractor(videosTab)
+                tabExtractor.fetchPage()
+                val page = tabExtractor.getPage(nextPage)
+                return@withContext PagedResult(
+                    videos = page.items.filterIsInstance<StreamInfoItem>()
+                        .filter { it.duration >= 0 }
+                        .map { it.toVideoItem() },
+                    nextPage = page.nextPage
+                )
+            }
+        } catch (_: Exception) {}
+        PagedResult(emptyList(), null)
+    }
+
     private fun StreamInfoItem.toVideoItem() = VideoItem(
-        url = url,
-        title = name,
+        url          = url,
+        title        = name,
         thumbnailUrl = thumbnails.firstOrNull()?.url ?: "",
         uploaderName = uploaderName ?: "Unknown",
-        viewCount = viewCount,
-        duration = duration,
-        uploaderUrl = uploaderUrl ?: ""
+        viewCount    = viewCount,
+        duration     = duration,
+        uploaderUrl  = uploaderUrl ?: "",
+        uploadedAgo  = try { textualUploadDate ?: "" } catch (_: Exception) { "" }
     )
 }

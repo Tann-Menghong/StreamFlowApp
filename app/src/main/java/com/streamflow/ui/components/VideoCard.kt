@@ -146,23 +146,32 @@ fun VideoCard(
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(2.dp))
+                    val isChannelLink = onChannelClick != null && video.uploaderUrl.isNotEmpty()
                     Text(
-                        buildString {
-                            append(video.uploaderName)
-                            if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
-                        },
+                        video.uploaderName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isChannelLink) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                        modifier = if (isChannelLink)
                             Modifier.clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) { onChannelClick(video.uploaderUrl) }
+                            ) { onChannelClick?.invoke(video.uploaderUrl) }
                         else Modifier
                     )
+                    if (video.viewCount > 0 || video.uploadedAgo.isNotEmpty()) {
+                        Text(
+                            buildString {
+                                if (video.viewCount > 0) append("${formatViews(video.viewCount)} views")
+                                if (video.viewCount > 0 && video.uploadedAgo.isNotEmpty()) append("  ·  ")
+                                if (video.uploadedAgo.isNotEmpty()) append(video.uploadedAgo)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 // Three-dot menu anchor
                 Box {
