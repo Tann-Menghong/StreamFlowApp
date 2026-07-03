@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -206,6 +207,7 @@ private fun StreamFlowApp(
                             playerState = playerState,
                             onResume = { navController.navigateToVideo(playerState.videoPageUrl) },
                             onTogglePlayPause = { ServiceLocator.playerController.togglePlayPause() },
+                            onSkipNext = { ServiceLocator.playerController.skipToNext() },
                             onClose = { ServiceLocator.playerController.stop() }
                         )
                     }
@@ -248,6 +250,7 @@ private fun MiniPlayer(
     playerState: PlayerUiState,
     onResume: () -> Unit,
     onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
     onClose: () -> Unit
 ) {
     val progress = if (playerState.durationMs > 0) {
@@ -290,6 +293,11 @@ private fun MiniPlayer(
                         if (playerState.isPlaying) R.string.pause else R.string.play
                     )
                 )
+            }
+            if (playerState.hasNextItem) {
+                IconButton(onClick = onSkipNext) {
+                    Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.skip_to_next))
+                }
             }
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_player))

@@ -6,6 +6,7 @@ import com.streamflow.app.data.db.AppDatabase
 import com.streamflow.app.data.db.BookmarkEntity
 import com.streamflow.app.data.db.HistoryEntity
 import com.streamflow.app.data.db.SubscriptionEntity
+import com.streamflow.app.data.db.WatchLaterEntity
 import com.streamflow.app.data.model.VideoItem
 import com.streamflow.app.data.repository.YoutubeRepository
 import com.streamflow.app.ui.components.UiState
@@ -33,6 +34,10 @@ class LibraryViewModel(
         .map { entities -> entities.map { it.toVideoItem() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val watchLater: StateFlow<List<VideoItem>> = database.watchLaterDao().observeAll()
+        .map { entities -> entities.map { it.toVideoItem() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val subscriptions: StateFlow<List<SubscriptionEntity>> = database.subscriptionDao().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -45,6 +50,10 @@ class LibraryViewModel(
 
     fun removeBookmark(url: String) {
         viewModelScope.launch { database.bookmarkDao().deleteByUrl(url) }
+    }
+
+    fun removeFromWatchLater(url: String) {
+        viewModelScope.launch { database.watchLaterDao().deleteByUrl(url) }
     }
 
     fun unsubscribe(channelUrl: String) {
@@ -94,6 +103,19 @@ class LibraryViewModel(
     )
 
     private fun BookmarkEntity.toVideoItem() = VideoItem(
+        url = url,
+        title = title,
+        thumbnailUrl = thumbnailUrl,
+        uploaderName = uploaderName,
+        uploaderUrl = null,
+        uploaderAvatarUrl = null,
+        durationSeconds = durationSeconds,
+        viewCount = -1,
+        textualUploadDate = null,
+        isShort = false
+    )
+
+    private fun WatchLaterEntity.toVideoItem() = VideoItem(
         url = url,
         title = title,
         thumbnailUrl = thumbnailUrl,

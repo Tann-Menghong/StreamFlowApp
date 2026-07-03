@@ -2,15 +2,22 @@ package com.streamflow.app.data.repository
 
 import com.streamflow.app.data.model.ChannelDetails
 import com.streamflow.app.data.model.ChannelItem
+import com.streamflow.app.data.model.ChapterItem
 import com.streamflow.app.data.model.CommentItem
+import com.streamflow.app.data.model.DislikeInfo
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.PlaylistDetails
 import com.streamflow.app.data.model.PlaylistItem
 import com.streamflow.app.data.model.SearchResultItem
+import com.streamflow.app.data.model.SponsorSegment
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.model.VideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
@@ -32,9 +39,12 @@ import org.schabi.newpipe.extractor.stream.VideoStream
  * Wraps NewPipeExtractor: the same extraction approach the NewPipe app uses to read YouTube's
  * public pages directly instead of going through the official (ad-injecting) API/player.
  */
-class YoutubeRepository {
+class YoutubeRepository(private val okHttpClient: OkHttpClient) {
 
     private val service = ServiceList.YouTube
+    private val videoIdRegex = Regex("(?:v=|youtu\\.be/)([A-Za-z0-9_-]{11})")
+
+    fun extractVideoId(url: String): String? = videoIdRegex.find(url)?.groupValues?.get(1)
 
     suspend fun getTrending(): Result<List<VideoItem>> = withContext(Dispatchers.IO) {
         runCatching {
@@ -72,6 +82,14 @@ class YoutubeRepository {
             val playbackOptions = buildPlaybackOptions(muxed, audio)
             val bestAudio = pickBestAudio(audio)
 
+            val chapters = info.streamSegments.orEmpty().map { segment ->
+                ChapterItem(
+                    title = segment.title,
+                    startTimeSeconds = segment.startTimeSeconds,
+                    thumbnailUrl = segment.previewUrl
+                )
+            }
+
             VideoDetails(
                 url = info.url,
                 title = info.name,
@@ -86,8 +104,49 @@ class YoutubeRepository {
                     .filterIsInstance<StreamInfoItem>()
                     .map { it.toVideoItem() },
                 playbackOptions = playbackOptions,
-                bestAudioUrl = bestAudio?.content
+                bestAudioUrl = bestAudio?.content,
+                chapters = chapters
             )
+        }
+    }
+
+    suspend fun getDislikes(videoId: String): Result<DislikeInfo> = withContext(Dispatchers.IO) {
+        runCatching {
+            val response = okHttpClient.newCall(
+                Request.Builder()
+                    .url("https://returnyoutubedislikeapi.com/votes?videoId=$videoId")
+                    .build()
+            ).execute()
+            val body = response.body?.string() ?: throw Exception("Empty response")
+            val json = JSONObject(body)
+            DislikeInfo(
+                likes = json.getLong("likes"),
+                dislikes = json.getLong("dislikes")
+            )
+        }
+    }
+
+    suspend fun getSponsorSegments(videoId: String): Result<List<SponsorSegment>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val categories = "%5B%22sponsor%22%2C%22selfpromo%22%2C%22interaction%22%2C%22intro%22%2C%22outro%22%2C%22preview%22%5D"
+            val response = okHttpClient.newCall(
+                Request.Builder()
+                    .url("https://sponsor.ajay.app/api/skipSegments?videoID=$videoId&categories=$categories")
+                    .build()
+            ).execute()
+            if (response.code == 404) return@runCatching emptyList()
+            if (!response.isSuccessful) return@runCatching emptyList()
+            val body = response.body?.string() ?: return@runCatching emptyList()
+            val arr = JSONArray(body)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                val segment = obj.getJSONArray("segment")
+                SponsorSegment(
+                    startMs = (segment.getDouble(0) * 1000).toLong(),
+                    endMs = (segment.getDouble(1) * 1000).toLong(),
+                    category = obj.getString("category")
+                )
+            }
         }
     }
 

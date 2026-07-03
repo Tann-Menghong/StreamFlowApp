@@ -1,6 +1,7 @@
 package com.streamflow.app.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.room.Room
 import com.streamflow.app.data.db.AppDatabase
 import com.streamflow.app.data.repository.YoutubeRepository
@@ -32,6 +33,9 @@ object ServiceLocator {
     lateinit var updateManager: UpdateManager
         private set
 
+    lateinit var prefs: SharedPreferences
+        private set
+
     fun init(context: Context) {
         if (initialized) return
         synchronized(this) {
@@ -51,9 +55,10 @@ object ServiceLocator {
                 "streamflow.db"
             ).fallbackToDestructiveMigration().build()
 
-            repository = YoutubeRepository()
+            repository = YoutubeRepository(okHttpClient)
             playerController = PlayerController(context.applicationContext)
             updateManager = UpdateManager(okHttpClient)
+            prefs = context.applicationContext.getSharedPreferences("streamflow_prefs", Context.MODE_PRIVATE)
 
             initialized = true
         }

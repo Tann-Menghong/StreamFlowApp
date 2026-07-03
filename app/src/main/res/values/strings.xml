@@ -40,4 +40,22 @@
     <string name="no_comments">No comments available.</string>
     <string name="likes">likes</string>
     <string name="pinned">Pinned</string>
+    <string name="watch_later">Watch Later</string>
+    <string name="empty_watch_later">No videos saved for later.</string>
+    <string name="add_to_watch_later">Save for later</string>
+    <string name="remove_from_watch_later">Remove from Watch Later</string>
+    <string name="add_to_queue">Add to queue</string>
+    <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_timer_off">Off</string>
+    <string name="sleep_timer_minutes">%1$d min</string>
+    <string name="chapters">Chapters</string>
+    <string name="share">Share</string>
+    <string name="dislikes">dislikes</string>
+    <string name="recent_searches">Recent searches</string>
+    <string name="clear_history">Clear history</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+    <string name="skip_to_next">Skip to next</string>
+    <string name="volume">Volume</string>
+    <string name="brightness">Brightness</string>
 </resources>

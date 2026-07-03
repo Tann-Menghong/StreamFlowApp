@@ -1,7 +1,6 @@
 package com.streamflow.app.data.db
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -14,6 +13,12 @@ interface HistoryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: HistoryEntity)
+
+    @Query("SELECT watchedPositionMs FROM history WHERE url = :url")
+    suspend fun getSavedPosition(url: String): Long?
+
+    @Query("UPDATE history SET watchedPositionMs = :positionMs WHERE url = :url")
+    suspend fun updatePosition(url: String, positionMs: Long)
 
     @Query("DELETE FROM history")
     suspend fun clear()
@@ -47,4 +52,34 @@ interface SubscriptionDao {
 
     @Query("DELETE FROM subscriptions WHERE channelUrl = :channelUrl")
     suspend fun deleteByUrl(channelUrl: String)
+}
+
+@Dao
+interface SearchHistoryDao {
+    @Query("SELECT * FROM search_history ORDER BY searchedAt DESC LIMIT 20")
+    fun observeAll(): Flow<List<SearchHistoryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: SearchHistoryEntity)
+
+    @Query("DELETE FROM search_history WHERE query = :query")
+    suspend fun delete(query: String)
+
+    @Query("DELETE FROM search_history")
+    suspend fun clear()
+}
+
+@Dao
+interface WatchLaterDao {
+    @Query("SELECT * FROM watch_later ORDER BY addedAt DESC")
+    fun observeAll(): Flow<List<WatchLaterEntity>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM watch_later WHERE url = :url)")
+    fun observeIsInWatchLater(url: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: WatchLaterEntity)
+
+    @Query("DELETE FROM watch_later WHERE url = :url")
+    suspend fun deleteByUrl(url: String)
 }

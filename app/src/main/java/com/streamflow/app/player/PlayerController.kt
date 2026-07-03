@@ -2,6 +2,7 @@ package com.streamflow.app.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -35,6 +36,7 @@ data class PlayerUiState(
     val durationMs: Long = 0L,
     val qualityLabel: String = "",
     val playbackSpeed: Float = 1f,
+    val hasNextItem: Boolean = false,
     val error: String? = null
 )
 
@@ -72,6 +74,17 @@ class PlayerController(private val appContext: Context) {
         override fun onPlayerError(error: PlaybackException) {
             _state.update { it.copy(error = error.message) }
         }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            _state.update { state ->
+                state.copy(
+                    title = mediaItem?.mediaMetadata?.title?.toString() ?: state.title,
+                    videoPageUrl = mediaItem?.mediaId ?: state.videoPageUrl,
+                    thumbnailUrl = mediaItem?.mediaMetadata?.artworkUri?.toString() ?: state.thumbnailUrl,
+                    hasNextItem = controller?.hasNextMediaItem() == true
+                )
+            }
+        }
     }
 
     fun play(url: String, title: String, qualityLabel: String, videoPageUrl: String, thumbnailUrl: String?) {
@@ -88,12 +101,47 @@ class PlayerController(private val appContext: Context) {
             }
             val mediaItem = MediaItem.Builder()
                 .setUri(url)
-                .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
+                .setMediaId(videoPageUrl)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(title)
+                        .setArtworkUri(thumbnailUrl?.let { Uri.parse(it) })
+                        .build()
+                )
                 .build()
             player.setMediaItem(mediaItem)
             player.prepare()
             player.playWhenReady = true
             player.setPlaybackSpeed(speed)
+        }
+    }
+
+    fun addToQueue(url: String, title: String, qualityLabel: String, videoPageUrl: String, thumbnailUrl: String?) {
+        withController { player ->
+            val mediaItem = MediaItem.Builder()
+                .setUri(url)
+                .setMediaId(videoPageUrl)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(title)
+                        .setArtworkUri(thumbnailUrl?.let { Uri.parse(it) })
+                        .build()
+                )
+                .build()
+            player.addMediaItem(mediaItem)
+            if (!player.isPlaying && player.mediaItemCount == 1) {
+                player.prepare()
+                player.playWhenReady = true
+            }
+            _state.update { it.copy(hasNextItem = player.hasNextMediaItem()) }
+        }
+    }
+
+    fun skipToNext() {
+        withController { player ->
+            if (player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+            }
         }
     }
 
@@ -105,6 +153,13 @@ class PlayerController(private val appContext: Context) {
         withController { player ->
             val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
             player.seekTo((player.currentPosition + deltaMs).coerceIn(0, duration))
+        }
+    }
+
+    fun seekTo(positionMs: Long) {
+        withController { player ->
+            val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+            player.seekTo(positionMs.coerceIn(0, duration))
         }
     }
 
@@ -165,7 +220,8 @@ class PlayerController(private val appContext: Context) {
                     _state.update {
                         it.copy(
                             positionMs = player.currentPosition.coerceAtLeast(0),
-                            durationMs = player.duration.coerceAtLeast(0)
+                            durationMs = player.duration.coerceAtLeast(0),
+                            hasNextItem = player.hasNextMediaItem()
                         )
                     }
                 }

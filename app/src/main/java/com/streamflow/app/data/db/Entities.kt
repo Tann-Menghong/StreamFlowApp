@@ -10,7 +10,8 @@ data class HistoryEntity(
     val thumbnailUrl: String?,
     val uploaderName: String,
     val durationSeconds: Long,
-    val watchedAt: Long
+    val watchedAt: Long,
+    val watchedPositionMs: Long = 0L
 )
 
 @Entity(tableName = "bookmarks")
@@ -29,4 +30,20 @@ data class SubscriptionEntity(
     val name: String,
     val avatarUrl: String?,
     val subscribedAt: Long
+)
+
+@Entity(tableName = "search_history")
+data class SearchHistoryEntity(
+    @PrimaryKey val query: String,
+    val searchedAt: Long
+)
+
+@Entity(tableName = "watch_later")
+data class WatchLaterEntity(
+    @PrimaryKey val url: String,
+    val title: String,
+    val thumbnailUrl: String?,
+    val uploaderName: String,
+    val durationSeconds: Long,
+    val addedAt: Long
 )

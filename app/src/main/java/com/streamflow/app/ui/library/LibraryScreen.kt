@@ -62,12 +62,13 @@ fun LibraryScreen(
     )
     var selectedTab by remember { mutableIntStateOf(0) }
     val bookmarks by viewModel.bookmarks.collectAsState()
+    val watchLater by viewModel.watchLater.collectAsState()
     val history by viewModel.history.collectAsState()
     val subscriptions by viewModel.subscriptions.collectAsState()
     val feedState by viewModel.feedState.collectAsState()
 
     LaunchedEffect(selectedTab) {
-        if (selectedTab == 3) viewModel.loadFeed()
+        if (selectedTab == 4) viewModel.loadFeed()
     }
 
     Scaffold(
@@ -93,16 +94,21 @@ fun LibraryScreen(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.watch_history)) }
+                        text = { Text(stringResource(R.string.watch_later)) }
                     )
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text(stringResource(R.string.subscriptions)) }
+                        text = { Text(stringResource(R.string.watch_history)) }
                     )
                     Tab(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
+                        text = { Text(stringResource(R.string.subscriptions)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 4,
+                        onClick = { selectedTab = 4 },
                         text = { Text(stringResource(R.string.feed)) }
                     )
                 }
@@ -115,12 +121,18 @@ fun LibraryScreen(
                         onChannelClick = onChannelClick
                     )
                     1 -> VideoItemList(
+                        videos = watchLater,
+                        emptyMessage = stringResource(R.string.empty_watch_later),
+                        onVideoClick = onVideoClick,
+                        onChannelClick = onChannelClick
+                    )
+                    2 -> VideoItemList(
                         videos = history,
                         emptyMessage = stringResource(R.string.empty_history),
                         onVideoClick = onVideoClick,
                         onChannelClick = onChannelClick
                     )
-                    2 -> SubscriptionList(
+                    3 -> SubscriptionList(
                         subscriptions = subscriptions,
                         onChannelClick = onChannelClick,
                         onUnsubscribe = viewModel::unsubscribe

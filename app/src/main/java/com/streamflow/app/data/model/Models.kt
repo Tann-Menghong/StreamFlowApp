@@ -20,6 +20,26 @@ sealed class PlaybackSource {
     data class AudioOnly(val url: String, val label: String) : PlaybackSource()
 }
 
+/** A chapter/segment within a video, from NewPipeExtractor's StreamSegment. */
+data class ChapterItem(
+    val title: String,
+    val startTimeSeconds: Int,
+    val thumbnailUrl: String?
+)
+
+/** A SponsorBlock segment to auto-skip. */
+data class SponsorSegment(
+    val startMs: Long,
+    val endMs: Long,
+    val category: String
+)
+
+/** Return YouTube Dislikes API response. */
+data class DislikeInfo(
+    val likes: Long,
+    val dislikes: Long
+)
+
 data class VideoDetails(
     val url: String,
     val title: String,
@@ -32,7 +52,8 @@ data class VideoDetails(
     val description: String,
     val relatedVideos: List<VideoItem>,
     val playbackOptions: List<PlaybackSource>,
-    val bestAudioUrl: String?
+    val bestAudioUrl: String?,
+    val chapters: List<ChapterItem> = emptyList()
 )
 
 /** A YouTube channel's profile info plus its uploaded videos, mapped from NewPipeExtractor's ChannelInfo. */
