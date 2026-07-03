@@ -7,6 +7,7 @@ data class VideoItem(
     val thumbnailUrl: String?,
     val uploaderName: String,
     val uploaderUrl: String?,
+    val uploaderAvatarUrl: String?,
     val durationSeconds: Long,
     val viewCount: Long,
     val textualUploadDate: String?,
@@ -79,3 +80,16 @@ sealed class SearchResultItem {
     data class Video(val video: VideoItem) : SearchResultItem()
     data class Channel(val channel: ChannelItem) : SearchResultItem()
 }
+
+/** A single comment on a YouTube video, mapped from NewPipeExtractor's CommentsInfoItem. */
+data class CommentItem(
+    val commentId: String,
+    val authorName: String,
+    val authorAvatarUrl: String?,
+    val text: String,
+    val likeCount: Int,
+    val textualLikeCount: String,
+    val publishedDate: String?,
+    val isPinned: Boolean,
+    val isHeartedByUploader: Boolean
+)

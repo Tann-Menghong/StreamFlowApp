@@ -5,9 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +39,7 @@ fun VideoListItem(
             .clickable(onClick = onClick)
             .padding(bottom = 12.dp)
     ) {
+        // Thumbnail with duration badge
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -45,7 +50,7 @@ fun VideoListItem(
                 model = video.thumbnailUrl,
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxSize()
             )
             Text(
                 text = formatDuration(video.durationSeconds),
@@ -59,14 +64,39 @@ fun VideoListItem(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 8.dp)) {
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 4.dp)) {
+        // YouTube-style metadata row: channel avatar + info column
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .let { m ->
+                        val url = video.uploaderUrl
+                        if (onUploaderClick != null && url != null)
+                            m.clickable { onUploaderClick(url) }
+                        else m
+                    }
+            ) {
+                AsyncImage(
+                    model = video.uploaderAvatarUrl,
+                    contentDescription = video.uploaderName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
                 val uploaderUrl = video.uploaderUrl
                 Text(
                     text = video.uploaderName,

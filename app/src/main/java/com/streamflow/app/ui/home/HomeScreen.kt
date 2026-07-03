@@ -1,14 +1,22 @@
 package com.streamflow.app.ui.home
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -23,16 +31,36 @@ fun HomeScreen(onVideoClick: (VideoItem) -> Unit, onChannelClick: (String) -> Un
         factory = viewModelFactory { initializer { HomeViewModel(ServiceLocator.repository) } }
     )
     val state by viewModel.state.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
 
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("StreamFlow") }) }
     ) { padding ->
-        VideoListContent(
-            state = state,
-            onVideoClick = onVideoClick,
-            onRetry = viewModel::load,
-            onChannelClick = onChannelClick,
-            modifier = Modifier.padding(padding)
-        )
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(vertical = 6.dp)
+            ) {
+                items(HomeViewModel.CATEGORIES) { category ->
+                    FilterChip(
+                        selected = category == selectedCategory,
+                        onClick = { viewModel.selectCategory(category) },
+                        label = { Text(category) }
+                    )
+                }
+            }
+            VideoListContent(
+                state = state,
+                onVideoClick = onVideoClick,
+                onRetry = viewModel::load,
+                onChannelClick = onChannelClick,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }

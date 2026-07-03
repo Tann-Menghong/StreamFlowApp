@@ -2,6 +2,7 @@ package com.streamflow.app.data.repository
 
 import com.streamflow.app.data.model.ChannelDetails
 import com.streamflow.app.data.model.ChannelItem
+import com.streamflow.app.data.model.CommentItem
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.PlaylistDetails
 import com.streamflow.app.data.model.PlaylistItem
@@ -17,6 +18,8 @@ import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
+import org.schabi.newpipe.extractor.comments.CommentsInfo
+import org.schabi.newpipe.extractor.comments.CommentsInfoItem
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
@@ -159,12 +162,20 @@ class YoutubeRepository {
     private fun bestThumbnail(thumbnails: List<Image>?): String? =
         thumbnails?.maxByOrNull { it.height }?.url
 
+    suspend fun getComments(videoUrl: String): Result<List<CommentItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val info = CommentsInfo.getInfo(service, videoUrl)
+            info.relatedItems.map { it.toCommentItem() }
+        }
+    }
+
     private fun StreamInfoItem.toVideoItem(): VideoItem = VideoItem(
         url = url,
         title = name,
         thumbnailUrl = bestThumbnail(thumbnails),
         uploaderName = uploaderName ?: "",
         uploaderUrl = uploaderUrl,
+        uploaderAvatarUrl = bestThumbnail(uploaderAvatars),
         durationSeconds = duration,
         viewCount = viewCount,
         textualUploadDate = textualUploadDate,
@@ -185,5 +196,17 @@ class YoutubeRepository {
         thumbnailUrl = bestThumbnail(thumbnails),
         subscriberCount = subscriberCount,
         description = description.orEmpty()
+    )
+
+    private fun CommentsInfoItem.toCommentItem(): CommentItem = CommentItem(
+        commentId = commentId ?: "",
+        authorName = uploaderName ?: "",
+        authorAvatarUrl = bestThumbnail(uploaderAvatars),
+        text = commentText?.content ?: "",
+        likeCount = likeCount,
+        textualLikeCount = textualLikeCount.orEmpty(),
+        publishedDate = textualUploadDate,
+        isPinned = isPinned,
+        isHeartedByUploader = isHeartedByUploader
     )
 }

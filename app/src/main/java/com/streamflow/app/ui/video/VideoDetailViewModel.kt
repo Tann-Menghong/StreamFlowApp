@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.app.data.db.AppDatabase
 import com.streamflow.app.data.db.BookmarkEntity
 import com.streamflow.app.data.db.HistoryEntity
+import com.streamflow.app.data.model.CommentItem
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.repository.YoutubeRepository
@@ -31,6 +32,12 @@ class VideoDetailViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val playerState = playerController.state
+
+    private val _commentsState = MutableStateFlow<UiState<List<CommentItem>>>(UiState.Success(emptyList()))
+    val commentsState: StateFlow<UiState<List<CommentItem>>> = _commentsState.asStateFlow()
+
+    private val _showComments = MutableStateFlow(false)
+    val showComments: StateFlow<Boolean> = _showComments.asStateFlow()
 
     init {
         load()
@@ -66,6 +73,18 @@ class VideoDetailViewModel(
 
     fun seekBy(deltaMs: Long) {
         playerController.seekBy(deltaMs)
+    }
+
+    fun loadComments() {
+        _showComments.value = true
+        if (_commentsState.value is UiState.Loading) return
+        _commentsState.value = UiState.Loading
+        viewModelScope.launch {
+            repository.getComments(videoUrl).fold(
+                onSuccess = { _commentsState.value = UiState.Success(it) },
+                onFailure = { _commentsState.value = UiState.Error(it.message ?: "Failed to load comments") }
+            )
+        }
     }
 
     fun toggleBookmark(details: VideoDetails) {

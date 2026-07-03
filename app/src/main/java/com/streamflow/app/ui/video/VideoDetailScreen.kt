@@ -5,6 +5,7 @@ package com.streamflow.app.ui.video
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -18,10 +19,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,9 +33,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -46,8 +51,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,7 +62,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
 import com.streamflow.app.R
+import com.streamflow.app.data.model.CommentItem
 import com.streamflow.app.data.model.PlaybackSource
 import com.streamflow.app.data.model.VideoDetails
 import com.streamflow.app.data.model.VideoItem
@@ -88,6 +97,8 @@ fun VideoDetailScreen(
     val state by viewModel.state.collectAsState()
     val isBookmarked by viewModel.isBookmarked.collectAsState()
     val playerState by viewModel.playerState.collectAsState()
+    val commentsState by viewModel.commentsState.collectAsState()
+    val showComments by viewModel.showComments.collectAsState()
 
     if (isInPictureInPictureMode) {
         PlayerSurface(
@@ -120,10 +131,13 @@ fun VideoDetailScreen(
                     details = current.data,
                     isBookmarked = isBookmarked,
                     playbackSpeed = playerState.playbackSpeed,
+                    commentsState = commentsState,
+                    showComments = showComments,
                     onToggleBookmark = { viewModel.toggleBookmark(current.data) },
                     onSelectSource = { source -> viewModel.selectPlaybackSource(source, current.data.title) },
                     onSelectSpeed = viewModel::setPlaybackSpeed,
                     onSeek = viewModel::seekBy,
+                    onLoadComments = viewModel::loadComments,
                     onVideoClick = onVideoClick,
                     onChannelClick = onChannelClick
                 )
@@ -137,10 +151,13 @@ private fun VideoDetailBody(
     details: VideoDetails,
     isBookmarked: Boolean,
     playbackSpeed: Float,
+    commentsState: UiState<List<CommentItem>>,
+    showComments: Boolean,
     onToggleBookmark: () -> Unit,
     onSelectSource: (PlaybackSource) -> Unit,
     onSelectSpeed: (Float) -> Unit,
     onSeek: (Long) -> Unit,
+    onLoadComments: () -> Unit,
     onVideoClick: (VideoItem) -> Unit,
     onChannelClick: (String) -> Unit
 ) {
@@ -223,8 +240,71 @@ private fun VideoDetailBody(
             }
         }
 
+        // Comments section
+        item {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            if (!showComments) {
+                OutlinedButton(
+                    onClick = onLoadComments,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Comment,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(18.dp)
+                    )
+                    Text(stringResource(R.string.show_comments))
+                }
+            } else {
+                Text(
+                    text = stringResource(R.string.comments),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+            }
+        }
+
+        if (showComments) {
+            when (commentsState) {
+                is UiState.Loading -> item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+                }
+                is UiState.Error -> item {
+                    Text(
+                        text = commentsState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                is UiState.Success -> {
+                    if (commentsState.data.isEmpty()) {
+                        item {
+                            Text(
+                                text = stringResource(R.string.no_comments),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    } else {
+                        items(commentsState.data, key = { it.commentId.ifBlank { it.text } }) { comment ->
+                            CommentListItem(comment = comment)
+                        }
+                    }
+                }
+            }
+        }
+
         if (details.relatedVideos.isNotEmpty()) {
             item {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 Text(
                     text = stringResource(R.string.related_videos),
                     style = MaterialTheme.typography.titleSmall,
@@ -237,6 +317,75 @@ private fun VideoDetailBody(
                     onClick = { onVideoClick(video) },
                     onUploaderClick = onChannelClick,
                     modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentListItem(comment: CommentItem, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            AsyncImage(
+                model = comment.authorAvatarUrl,
+                contentDescription = comment.authorName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = comment.authorName,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                if (comment.isPinned) {
+                    Text(
+                        text = stringResource(R.string.pinned),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (comment.publishedDate != null) {
+                    Text(
+                        text = comment.publishedDate,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+            if (comment.text.isNotBlank()) {
+                Text(
+                    text = comment.text,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            val likeText = when {
+                comment.textualLikeCount.isNotBlank() -> "${comment.textualLikeCount} ${stringResource(R.string.likes)}"
+                comment.likeCount > 0 -> "${comment.likeCount} ${stringResource(R.string.likes)}"
+                else -> null
+            }
+            if (likeText != null) {
+                Text(
+                    text = likeText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }
