@@ -88,8 +88,10 @@ dependencies {
     implementation 'androidx.media3:media3-datasource-okhttp:1.3.1'
     implementation 'androidx.media3:media3-session:1.3.1'
 
-    // NewPipe Extractor — always latest to stay compatible with YouTube
-    implementation 'com.github.TeamNewPipe:NewPipeExtractor:master-SNAPSHOT'
+    // NewPipe Extractor — pinned to a stable release for reproducible builds.
+    // v0.26.3 includes the SABR-enforcement workaround + playlist/date extraction fixes
+    // that keep YouTube playback working. Bump this deliberately when a newer tag ships.
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.26.3'
 
     // Image loading
     implementation 'io.coil-kt:coil-compose:2.6.0'

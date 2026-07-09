@@ -12,6 +12,13 @@
 -dontwarn java.beans.**
 -dontwarn javax.script.**
 -dontwarn org.mozilla.javascript.**
+# Keep Rhino itself so YouTube JS signature deobfuscation survives R8 in release builds
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.** { *; }
+
+# protobuf-javalite (transitive from NewPipe v0.26.x — used for YouTube innertube params)
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
 
 # Media3 session
 -keep class androidx.media3.session.** { *; }
