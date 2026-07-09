@@ -34,19 +34,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.ContinueWatchingCard
 import com.streamflow.ui.components.HeroVideoCard
 import com.streamflow.ui.components.ShimmerList
 import com.streamflow.ui.components.VideoCard
+import com.streamflow.ui.components.formatDuration
+import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -376,49 +384,40 @@ fun HomeScreen(
                                 // ── Section label ──────────────────────────────
                                 item {
                                     val label = when {
-                                        activeSearch.isNotEmpty() -> "Results for \"$activeSearch\""
+                                        activeSearch.isNotEmpty() -> "Results for \"${activeSearch}\""
                                         selectedCategory != "All" -> selectedCategory
                                         else -> "Trending"
                                     }
                                     Text(
                                         label,
-                                        style    = MaterialTheme.typography.labelMedium.copy(
+                                        style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight    = FontWeight.Bold,
                                             letterSpacing = 1.2.sp,
                                             color         = MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
-                                        modifier = Modifier.padding(start = 16.dp, bottom = 10.dp, top = 8.dp)
+                                        modifier = Modifier.padding(start = 16.dp, bottom = 6.dp, top = 8.dp)
                                     )
                                 }
 
-                                // ── Hero first card (only on trending, not search) ──
-                                if (showHero && s.videos.isNotEmpty() && activeSearch.isEmpty() && selectedCategory == "All") {
-                                    item(key = "hero_${s.videos.first().url}") {
-                                        var visible by remember { mutableStateOf(false) }
-                                        LaunchedEffect(Unit) { visible = true }
-                                        AnimatedVisibility(visible,
-                                            enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 8 }
-                                        ) {
-                                            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                                HeroVideoCard(
-                                                    video   = s.videos.first(),
-                                                    onClick = { onVideoClick(s.videos.first().url) }
-                                                )
-                                            }
-                                        }
+                                // ── Featured horizontal row (top 5 trending) ────
+                                if (showHero && s.videos.size >= 3 && activeSearch.isEmpty() && selectedCategory == "All") {
+                                    item(key = "featured_row") {
+                                        FeaturedVideoRow(
+                                            videos = s.videos.take(5),
+                                            onVideoClick = onVideoClick
+                                        )
                                     }
                                 }
 
-                                // ── Video list ─────────────────────────────────
-                                val startIndex = if (showHero && activeSearch.isEmpty() && selectedCategory == "All") 1 else 0
+                                // ── Full video list ─────────────────────────────
                                 itemsIndexed(
-                                    s.videos.drop(startIndex),
-                                    key = { _, v -> v.url }
+                                    s.videos,
+                                    key = { _, v -> "list_${v.url}" }
                                 ) { index, video ->
                                     var visible by remember { mutableStateOf(false) }
-                                    LaunchedEffect(Unit) { delay((index * 30L).coerceAtMost(250L)); visible = true }
+                                    LaunchedEffect(Unit) { delay((index * 25L).coerceAtMost(200L)); visible = true }
                                     AnimatedVisibility(visible,
-                                        enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 6 }
+                                        enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 6 }
                                     ) {
                                         Box(Modifier.padding(horizontal = 16.dp)) {
                                             VideoCard(video = video, onClick = { onVideoClick(video.url) },
@@ -524,6 +523,87 @@ private fun ContinueWatchingSection(
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp),
             color    = MaterialTheme.colorScheme.outline.copy(0.2f)
+        )
+    }
+}
+
+@Composable
+private fun FeaturedVideoRow(
+    videos: List<VideoItem>,
+    onVideoClick: (String) -> Unit
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Featured", style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                color = MaterialTheme.colorScheme.primary))
+            Text("See all ›", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
+        ) {
+            items(videos, key = { "feat_${it.url}" }) { video ->
+                FeaturedCard(video = video, onClick = { onVideoClick(video.url) })
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.outline.copy(0.15f)
+        )
+    }
+}
+
+@Composable
+private fun FeaturedCard(video: VideoItem, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(180.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+        ) {
+            AsyncImage(
+                model = video.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            if (video.duration > 0) {
+                Box(
+                    Modifier.align(Alignment.BottomEnd).padding(5.dp)
+                        .background(Color.Black.copy(0.78f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Text(formatDuration(video.duration), color = Color.White,
+                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(video.title, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground, lineHeight = 16.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            buildString {
+                append(video.uploaderName)
+                if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
+            },
+            fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
 }

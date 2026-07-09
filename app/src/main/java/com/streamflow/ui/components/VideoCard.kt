@@ -130,11 +130,7 @@ fun VideoCard(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val avatarColor = avatarColorFor(video.uploaderName)
                 Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(avatarColor)
-                        .then(if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
-                            Modifier.pointerInput(Unit) {
-                                detectTapGestures(onTap = { onChannelClick(video.uploaderUrl) })
-                            } else Modifier),
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(avatarColor),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -148,14 +144,28 @@ fun VideoCard(
                     Text(video.title, style = MaterialTheme.typography.titleSmall,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        video.uploaderName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures(onTap = { onChannelClick(video.uploaderUrl) })
+                            } else Modifier
+                    )
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         buildString {
-                            append(video.uploaderName)
-                            if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
+                            if (video.viewCount > 0) append("${formatViews(video.viewCount)} views")
+                            if (video.viewCount > 0 && video.uploadedAgo.isNotEmpty()) append("  ·  ")
+                            if (video.uploadedAgo.isNotEmpty()) append(video.uploadedAgo)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                         maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }

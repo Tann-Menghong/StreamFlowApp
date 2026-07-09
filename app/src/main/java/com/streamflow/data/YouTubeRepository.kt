@@ -46,9 +46,7 @@ class YouTubeRepository {
         kiosk.fetchPage()
         val page = kiosk.initialPage
         PagedResult(
-            videos = page.items.filterIsInstance<StreamInfoItem>()
-                .filter { it.duration >= 0 }
-                .map { it.toVideoItem() },
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
             nextPage = page.nextPage
         )
     }
@@ -59,9 +57,7 @@ class YouTubeRepository {
             kiosk.fetchPage()
             val page = kiosk.getPage(nextPage)
             PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>()
-                    .filter { it.duration >= 0 }
-                    .map { it.toVideoItem() },
+                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
                 nextPage = page.nextPage
             )
         } catch (e: Exception) {
