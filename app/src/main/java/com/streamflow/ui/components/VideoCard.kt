@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 
@@ -48,6 +49,7 @@ fun VideoCard(
     progressFraction: Float = 0f,
     onAddToWatchLater: (() -> Unit)? = null,
     onAddToFavorites:  (() -> Unit)? = null,
+    onChannelClick: ((String) -> Unit)? = null,
     remainingLabel: String? = null
 ) {
     val context  = LocalContext.current
@@ -128,7 +130,11 @@ fun VideoCard(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val avatarColor = avatarColorFor(video.uploaderName)
                 Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(avatarColor),
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(avatarColor)
+                        .then(if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures(onTap = { onChannelClick(video.uploaderUrl) })
+                            } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -194,6 +200,11 @@ fun VideoCard(
                                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.url))) }
                                 showMenu = false
                             }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Add to queue") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, null, modifier = Modifier.size(18.dp)) },
+                            onClick = { PlaybackQueue.add(video); showMenu = false }
                         )
                     }
                 }

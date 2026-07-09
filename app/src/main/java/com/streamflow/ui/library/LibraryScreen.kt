@@ -284,6 +284,6 @@ private fun VideoListWithSearch(
     }
 }
 
-private fun FavoriteEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
-private fun HistoryEntity.toVideoItem()  = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
-private fun WatchLaterEntity.toVideoItem() = VideoItem(url, title, thumbnailUrl, uploaderName, viewCount, duration)
+private fun FavoriteEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
+private fun HistoryEntity.toVideoItem()  = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
+private fun WatchLaterEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)

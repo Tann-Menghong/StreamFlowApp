@@ -16,9 +16,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,9 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -55,6 +59,7 @@ import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
 import com.streamflow.MainActivity
 import com.streamflow.PlaybackService
+import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.components.MiniPlayerData
 import com.streamflow.ui.components.MiniPlayerState
@@ -64,11 +69,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     videoUrl: String,
     onBack: () -> Unit,
     onVideoClick: (String) -> Unit,
+    onChannelClick: ((String) -> Unit)? = null,
     vm: PlayerViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -222,6 +229,31 @@ fun PlayerScreen(
         LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
     }
 
+    // ── Horizontal scrub (fullscreen) ────────────────────────────────────────
+    var isScrubbing    by remember { mutableStateOf(false) }
+    var scrubTargetMs  by remember { mutableLongStateOf(0L) }
+    var scrubStartMs   by remember { mutableLongStateOf(0L) }
+
+    // ── Comments ─────────────────────────────────────────────────────────────
+    val comments         by vm.comments.collectAsState()
+    val commentsLoading  by vm.commentsLoading.collectAsState()
+    var showComments     by remember { mutableStateOf(false) }
+
+    // ── Queue ─────────────────────────────────────────────────────────────────
+    val queue           by vm.queue.collectAsState()
+    var showQueueSheet  by remember { mutableStateOf(false) }
+
+    // ── SponsorBlock ──────────────────────────────────────────────────────────
+    val sponsorSegments  by vm.sponsorSegments.collectAsState()
+    var showSkipBanner   by remember { mutableStateOf(false) }
+    var skipBannerLabel  by remember { mutableStateOf("") }
+
+    // ── Audio-only ────────────────────────────────────────────────────────────
+    val audioOnly        by vm.audioOnly.collectAsState()
+
+    // ── Current chapter ───────────────────────────────────────────────────────
+    var currentChapterTitle by remember { mutableStateOf("") }
+
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
@@ -236,6 +268,42 @@ fun PlayerScreen(
             }
         }
     }
+
+    // ── Load sponsor segments on video load ───────────────────────────────────
+    LaunchedEffect(videoUrl) { vm.loadSponsorSegments(videoUrl) }
+
+    // ── SponsorBlock auto-skip ────────────────────────────────────────────────
+    LaunchedEffect(sponsorSegments) {
+        if (sponsorSegments.isEmpty()) return@LaunchedEffect
+        while (true) {
+            delay(300L)
+            val mc  = mediaController ?: continue
+            val pos = mc.currentPosition
+            val seg = sponsorSegments.firstOrNull { pos >= it.startMs && pos < it.endMs }
+            if (seg != null) {
+                mc.seekTo(seg.endMs)
+                skipBannerLabel = seg.label
+                showSkipBanner  = true
+                delay(2000L)
+                showSkipBanner  = false
+            }
+        }
+    }
+
+    // ── Chapter tracking ──────────────────────────────────────────────────────
+    LaunchedEffect(state) {
+        val chs = (state as? PlayerUiState.Ready)?.details?.chapters ?: return@LaunchedEffect
+        if (chs.isEmpty()) return@LaunchedEffect
+        while (true) {
+            delay(500L)
+            val pos = mediaController?.currentPosition ?: 0L
+            currentChapterTitle = chs.lastOrNull { pos >= it.startMs }?.title ?: ""
+        }
+    }
+
+    // ── Subtitle state ───────────────────────────────────────────────────────
+    var showSubMenu by remember { mutableStateOf(false) }
+    var selectedSubUrl by remember { mutableStateOf("") }
 
     // ── Lock state ───────────────────────────────────────────────────────────
     var isLocked by remember { mutableStateOf(false) }
@@ -295,6 +363,10 @@ fun PlayerScreen(
             delay(500L)
             val mc = mediaController ?: continue
             if (mc.playbackState == Player.STATE_ENDED && mc.currentPosition > 0L) {
+                // Queue takes priority over related video auto-play
+                if (PlaybackQueue.hasNext()) {
+                    PlaybackQueue.popNext()?.let { onVideoClick(it.url) }; break
+                }
                 autoPlayTarget = nextUrl
                 for (i in 5 downTo 1) { autoPlayCountdown = i; delay(1000L) }
                 autoPlayCountdown = 0
@@ -332,7 +404,22 @@ fun PlayerScreen(
                         })
                     }
             )
-            Box(Modifier.weight(0.4f).fillMaxHeight())
+            Box(Modifier.weight(0.4f).fillMaxHeight()
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            scrubStartMs  = mc.currentPosition
+                            scrubTargetMs = scrubStartMs
+                            isScrubbing   = true
+                        },
+                        onHorizontalDrag = { _, dx ->
+                            val dur = mc.duration.coerceAtLeast(1L)
+                            scrubTargetMs = (scrubStartMs + (dx / 700f * dur).toLong()).coerceIn(0L, dur)
+                        },
+                        onDragEnd    = { mc.seekTo(scrubTargetMs); isScrubbing = false },
+                        onDragCancel = { isScrubbing = false }
+                    )
+                })
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
@@ -584,6 +671,40 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
+            // ── Scrub preview ────────────────────────────────────────────
+            if (isScrubbing) {
+                Box(Modifier.align(Alignment.Center)
+                    .background(Color.Black.copy(0.7f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    val h = scrubTargetMs / 3_600_000
+                    val m = (scrubTargetMs % 3_600_000) / 60_000
+                    val s = (scrubTargetMs % 60_000) / 1_000
+                    Text(if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s),
+                        color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // ── Skip sponsor banner ──────────────────────────────────────
+            if (showSkipBanner) {
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 48.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text("Skipping $skipBannerLabel",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            // ── Chapter name ─────────────────────────────────────────────
+            if (currentChapterTitle.isNotEmpty() && !isLocked) {
+                Text(currentChapterTitle,
+                    color = Color.White, fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.BottomStart)
+                        .padding(start = 8.dp, bottom = 72.dp)
+                        .background(Color.Black.copy(0.5f), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp))
+            }
+
             // ── Autoplay countdown overlay ───────────────────────────────
             if (autoPlayCountdown > 0) {
                 Box(
@@ -625,12 +746,43 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
                     is PlayerUiState.Ready -> {
                         AndroidView(
-                            factory = { ctx -> PlayerView(ctx).apply { player = mediaController; useController = true; keepScreenOn = true } },
-                            update = { pv -> pv.player = mediaController },
+                            factory = { ctx -> PlayerView(ctx).apply { player = mediaController; useController = !audioOnly; keepScreenOn = !audioOnly } },
+                            update  = { pv -> pv.player = mediaController; pv.useController = !audioOnly },
                             modifier = Modifier.fillMaxSize()
                         )
-                        DoubleTapZones()
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SeekFeedback() }
+                        if (audioOnly) {
+                            // Audio-only overlay
+                            Box(Modifier.fillMaxSize().background(Color(0xFF0D0D0D)),
+                                contentAlignment = Alignment.Center) {
+                                coil.compose.AsyncImage(
+                                    model = (state as PlayerUiState.Ready).details.thumbnailUrl,
+                                    contentDescription = null,
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                    alpha = 0.3f
+                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.MusicNote, null, tint = Color.White,
+                                        modifier = Modifier.size(64.dp))
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Audio Only", color = Color.White,
+                                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                }
+                            }
+                        }
+                        if (!audioOnly) {
+                            DoubleTapZones()
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SeekFeedback() }
+                        }
+                        // Skip sponsor banner (portrait)
+                        if (showSkipBanner) {
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                                .padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                Text("Skipping $skipBannerLabel",
+                                    color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
                 IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
@@ -742,6 +894,46 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                            // Audio-only toggle
+                            IconButton(onClick = { vm.toggleAudioOnly() }) {
+                                Icon(Icons.Default.MusicNote, "Audio only",
+                                    tint = if (audioOnly) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                                    modifier = Modifier.size(20.dp))
+                            }
+                            // Queue button
+                            Box {
+                                IconButton(onClick = { showQueueSheet = true }) {
+                                    Icon(Icons.Default.QueueMusic, "Queue",
+                                        tint = if (queue.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                                        modifier = Modifier.size(20.dp))
+                                }
+                                if (queue.isNotEmpty()) {
+                                    Badge(Modifier.align(Alignment.TopEnd)) { Text("${queue.size}") }
+                                }
+                            }
+                            // Subtitle (CC)
+                            if (details.subtitles.isNotEmpty()) {
+                                Box {
+                                    IconButton(onClick = { showSubMenu = true }) {
+                                        Icon(Icons.Default.ClosedCaption, "Subtitles",
+                                            tint = if (selectedSubUrl.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                                            modifier = Modifier.size(20.dp))
+                                    }
+                                    DropdownMenu(expanded = showSubMenu, onDismissRequest = { showSubMenu = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text("Off", fontWeight = if (selectedSubUrl.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = { selectedSubUrl = ""; showSubMenu = false })
+                                        details.subtitles.forEach { sub ->
+                                            DropdownMenuItem(
+                                                text = { Text(sub.name, fontWeight = if (selectedSubUrl == sub.url) FontWeight.Bold else FontWeight.Normal) },
+                                                onClick = { selectedSubUrl = sub.url; showSubMenu = false })
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         if (details.description.isNotBlank()) {
@@ -765,6 +957,151 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
+            // ── Chapters ──────────────────────────────────────────────────────
+            if (details.chapters.isNotEmpty()) {
+                item(key = "chapters_header") {
+                    var chapExpanded by remember { mutableStateOf(false) }
+                    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth().clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { chapExpanded = !chapExpanded }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.List, null,
+                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Text("Chapters  (${details.chapters.size})",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onBackground)
+                                }
+                                Icon(if (chapExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (chapExpanded) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
+                                details.chapters.forEach { ch ->
+                                    val h = ch.startMs / 3_600_000; val m = (ch.startMs % 3_600_000) / 60_000; val s = (ch.startMs % 60_000) / 1_000
+                                    val timeLabel = if (h > 0) "%d:%02d:%02d".format(h,m,s) else "%d:%02d".format(m,s)
+                                    Row(
+                                        Modifier.fillMaxWidth()
+                                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                                                mediaController?.seekTo(ch.startMs)
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Text(timeLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(48.dp))
+                                        Text(ch.title, fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onBackground)
+                                    }
+                                    HorizontalDivider(Modifier.padding(horizontal = 16.dp),
+                                        color = MaterialTheme.colorScheme.outline.copy(0.1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Comments ──────────────────────────────────────────────────────
+            item(key = "comments_header") {
+                Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                if (!showComments) vm.loadComments(videoUrl)
+                                showComments = !showComments
+                            }.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Comment, null,
+                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Text(
+                                    if (comments.isEmpty()) "Comments" else "Comments  (${comments.size})",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            if (commentsLoading) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(if (showComments) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showComments) {
+                items(comments.take(30), key = { "c_${it.author}_${it.text.take(20)}" }) { comment ->
+                    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                Modifier.size(32.dp).clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (comment.avatarUrl.isNotEmpty()) {
+                                    coil.compose.AsyncImage(comment.avatarUrl, null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize())
+                                } else {
+                                    Text(comment.author.firstOrNull()?.uppercase() ?: "?",
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Text(comment.author, fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                                        color = if (comment.isOwnerComment) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onBackground)
+                                    if (comment.publishedTime.isNotEmpty()) {
+                                        Text(comment.publishedTime, fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(comment.text, fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onBackground, lineHeight = 18.sp)
+                                if (comment.likeCount > 0) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Icon(Icons.Default.ThumbUp, null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(12.dp))
+                                        Text(formatViews(comment.likeCount), fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(0.1f))
+                    }
+                }
+            }
+
             if (details.relatedVideos.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(4.dp))
@@ -776,7 +1113,70 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
                 items(details.relatedVideos, key = { it.url }) { video ->
                     Box(Modifier.padding(horizontal = 14.dp)) {
-                        VideoCard(video = video, onClick = { onVideoClick(video.url) })
+                        VideoCard(video = video, onClick = { onVideoClick(video.url) },
+                            onChannelClick = onChannelClick?.let { cb -> { url: String -> cb(url) } })
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Queue bottom sheet ────────────────────────────────────────────────────
+    if (showQueueSheet) {
+        ModalBottomSheet(onDismissRequest = { showQueueSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Queue  (${queue.size})", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold)
+                    if (queue.isNotEmpty()) {
+                        TextButton(onClick = { PlaybackQueue.clear() }) { Text("Clear all") }
+                    }
+                }
+                HorizontalDivider()
+                if (queue.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        Text("Queue is empty — long-press a video and tap 'Add to queue'",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp))
+                    }
+                } else {
+                    queue.forEachIndexed { idx, video ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("${idx + 1}", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(20.dp))
+                            coil.compose.AsyncImage(
+                                model = video.thumbnailUrl, contentDescription = null,
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.size(width = 80.dp, height = 45.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(video.title, fontSize = 13.sp, maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onBackground)
+                                Text(video.uploaderName, fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { PlaybackQueue.remove(idx) },
+                                modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Close, null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(0.1f))
                     }
                 }
             }

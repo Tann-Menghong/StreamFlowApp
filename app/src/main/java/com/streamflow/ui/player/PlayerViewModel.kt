@@ -4,10 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
+import com.streamflow.data.model.Comment
+import com.streamflow.data.model.SponsorSegment
 import com.streamflow.data.model.VideoDetails
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -38,12 +41,34 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     val autoPlay: Flow<Boolean> = prefs.autoPlay
 
+    // ── Comments ──────────────────────────────────────────────────────────────
+    private val _comments = MutableStateFlow<List<Comment>>(emptyList())
+    val comments: StateFlow<List<Comment>> = _comments
+
+    private val _commentsLoading = MutableStateFlow(false)
+    val commentsLoading: StateFlow<Boolean> = _commentsLoading
+
+    private var commentsLoadedFor = ""
+
+    // ── SponsorBlock ──────────────────────────────────────────────────────────
+    private val _sponsorSegments = MutableStateFlow<List<SponsorSegment>>(emptyList())
+    val sponsorSegments: StateFlow<List<SponsorSegment>> = _sponsorSegments
+
+    // ── Audio-only ────────────────────────────────────────────────────────────
+    private val _audioOnly = MutableStateFlow(false)
+    val audioOnly: StateFlow<Boolean> = _audioOnly
+
+    // ── Playback queue ────────────────────────────────────────────────────────
+    val queue = PlaybackQueue.queue
+
     fun loadVideo(videoUrl: String) {
         _currentUrl.value = videoUrl
+        _comments.value = emptyList()
+        commentsLoadedFor = ""
+        _sponsorSegments.value = emptyList()
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
             if (isDirectStream(videoUrl)) {
-                // Raw HLS/MP4 stream (e.g. from Donghua tab) — play directly
                 val details = VideoDetails(
                     url = videoUrl,
                     title = extractTitleFromUrl(videoUrl),
@@ -59,7 +84,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = PlayerUiState.Ready(details)
                 recordHistory(details, videoUrl)
             } else {
-                // YouTube URL — use NewPipe extractor
                 try {
                     val quality = prefs.quality.first()
                     val details = repo.getVideoDetails(videoUrl, quality)
@@ -70,6 +94,35 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    fun loadComments(videoUrl: String) {
+        if (commentsLoadedFor == videoUrl) return
+        commentsLoadedFor = videoUrl
+        viewModelScope.launch {
+            _commentsLoading.value = true
+            try {
+                _comments.value = repo.getComments(videoUrl)
+            } catch (_: Exception) {
+                _comments.value = emptyList()
+            } finally {
+                _commentsLoading.value = false
+            }
+        }
+    }
+
+    fun loadSponsorSegments(videoUrl: String) {
+        viewModelScope.launch {
+            try {
+                _sponsorSegments.value = repo.getSponsorSegments(videoUrl)
+            } catch (_: Exception) {
+                _sponsorSegments.value = emptyList()
+            }
+        }
+    }
+
+    fun toggleAudioOnly() {
+        _audioOnly.value = !_audioOnly.value
     }
 
     fun toggleFavorite() {
