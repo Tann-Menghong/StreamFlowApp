@@ -94,6 +94,9 @@ class YouTubeRepository {
         maxHeightOverride: Int? = null
     ): VideoDetails =
         withContext(Dispatchers.IO) {
+            val cacheKey = VideoDetailsCache.key(videoUrl, qualityPref, maxHeightOverride)
+            VideoDetailsCache.get(cacheKey)?.let { return@withContext it }
+
             val info = StreamInfo.getInfo(youtube, videoUrl)
 
             val related = info.relatedItems
@@ -180,7 +183,7 @@ class YouTubeRepository {
                 }
             } catch (_: Exception) { emptyList() }
 
-            VideoDetails(
+            val details = VideoDetails(
                 url = videoUrl,
                 title = info.name,
                 uploaderName = info.uploaderName ?: "Unknown",
@@ -198,6 +201,8 @@ class YouTubeRepository {
                 availableQualities = availableQualities,
                 currentQuality = currentQuality
             )
+            VideoDetailsCache.put(cacheKey, details)
+            details
         }
 
     suspend fun getChannelInfo(channelUrl: String): ChannelResult = withContext(Dispatchers.IO) {

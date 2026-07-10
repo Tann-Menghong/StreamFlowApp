@@ -14,6 +14,7 @@ import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.Comment
 import com.streamflow.data.model.SponsorSegment
 import com.streamflow.data.model.VideoDetails
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -123,10 +124,26 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     val details = repo.getVideoDetails(videoUrl, quality)
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
+                    prefetchNext(details, quality)
                 } catch (e: Exception) {
                     _uiState.value = PlayerUiState.Error(friendlyError(e))
                 }
             }
+        }
+    }
+
+    // Warm the details cache for the most likely next video (queue head, else first
+    // related) so tapping next / autoplay starts instantly. Delayed so it never
+    // competes with the current video's startup.
+    private fun prefetchNext(details: com.streamflow.data.model.VideoDetails, quality: String) {
+        val currentUrl = details.url
+        viewModelScope.launch {
+            delay(3_000L)
+            if ((_uiState.value as? PlayerUiState.Ready)?.details?.url != currentUrl) return@launch
+            val nextUrl = PlaybackQueue.queue.value.firstOrNull()?.url
+                ?: details.relatedVideos.firstOrNull()?.url
+                ?: return@launch
+            try { repo.getVideoDetails(nextUrl, quality) } catch (_: Exception) {}
         }
     }
 
