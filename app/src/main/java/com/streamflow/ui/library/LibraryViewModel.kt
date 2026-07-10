@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val watchLater: StateFlow<List<WatchLaterEntity>> = db.watchLaterDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val subscriptions: StateFlow<List<SubscriptionEntity>> = db.subscriptionDao().getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun unsubscribe(channelUrl: String) = viewModelScope.launch { db.subscriptionDao().delete(channelUrl) }
     fun removeFavorite(url: String) = viewModelScope.launch { db.favoriteDao().delete(url) }
     fun removeHistory(url: String) = viewModelScope.launch { db.historyDao().delete(url) }
     fun removeWatchLater(url: String) = viewModelScope.launch { db.watchLaterDao().delete(url) }

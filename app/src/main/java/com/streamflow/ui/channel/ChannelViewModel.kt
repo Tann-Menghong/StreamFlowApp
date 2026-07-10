@@ -6,9 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
+import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
@@ -26,13 +32,34 @@ data class ChannelData(
 
 class ChannelViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = YouTubeRepository()
+    private val db = (app as StreamFlowApp).database
 
     private val _channel = MutableStateFlow(ChannelData())
     val channel: StateFlow<ChannelData> = _channel
 
+    private val _currentUrl = MutableStateFlow("")
+    val isSubscribed: StateFlow<Boolean> = _currentUrl
+        .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.subscriptionDao().isSubscribed(url) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun toggleSubscribe() {
+        val url = _currentUrl.value
+        val data = _channel.value
+        if (url.isEmpty() || data.name.isEmpty()) return
+        viewModelScope.launch {
+            val dao = db.subscriptionDao()
+            if (dao.isSubscribed(url).first()) {
+                dao.delete(url)
+            } else {
+                dao.insert(SubscriptionEntity(channelUrl = url, name = data.name, avatarUrl = data.avatarUrl))
+            }
+        }
+    }
+
     private var loadedUrl = ""
 
     fun loadChannel(url: String) {
+        _currentUrl.value = url
         if (loadedUrl == url && _channel.value.name.isNotEmpty()) return
         loadedUrl = url
         viewModelScope.launch {

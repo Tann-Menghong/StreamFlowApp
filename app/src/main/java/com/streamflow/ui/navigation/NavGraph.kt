@@ -172,7 +172,12 @@ fun NavGraph(startUrl: String? = null) {
                 DonghuaScreen(onFullscreenChange = { isDonghuaFullscreen = it })
             }
             composable(Screen.Library.route) {
-                LibraryScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
+                LibraryScreen(
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
+                    }
+                )
             }
             composable(Screen.Settings.route) { SettingsScreen() }
             composable(

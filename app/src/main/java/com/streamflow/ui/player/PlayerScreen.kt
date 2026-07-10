@@ -18,9 +18,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.PressGestureScope
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,6 +75,7 @@ import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +90,7 @@ fun PlayerScreen(
     val state by vm.uiState.collectAsState()
     val isFavorite by vm.isFavorite.collectAsState(initial = false)
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
+    val isSubscribed by vm.isSubscribed.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -342,6 +347,12 @@ fun PlayerScreen(
     var showQualityMenu   by remember { mutableStateOf(false) }
     var showFsQualityMenu by remember { mutableStateOf(false) }
 
+    // ── Hold-for-2x speed boost ──────────────────────────────────────────────
+    var speedBoost by remember { mutableStateOf(false) }
+
+    // ── Swipe-down-to-minimize (portrait) ────────────────────────────────────
+    var minimizeDrag by remember { mutableFloatStateOf(0f) }
+
     // ── Subtitle state ───────────────────────────────────────────────────────
     var showSubMenu by remember { mutableStateOf(false) }
     var selectedSubUrl by remember { mutableStateOf("") }
@@ -456,11 +467,30 @@ fun PlayerScreen(
         val mc = mediaController ?: return
         val skipSec = skipMs / 1000L
         val haptic = LocalHapticFeedback.current
+        val scope = rememberCoroutineScope()
+
+        // YouTube-style: press & hold anywhere on the video for 2x speed
+        val holdBoost: suspend PressGestureScope.(Offset) -> Unit = {
+            val job = scope.launch {
+                delay(500L)
+                mc.setPlaybackSpeed(2f)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                speedBoost = true
+            }
+            tryAwaitRelease()
+            job.cancel()
+            if (speedBoost) {
+                mc.setPlaybackSpeed(currentSpeed)
+                speedBoost = false
+            }
+        }
+
         Row(Modifier.fillMaxWidth().fillMaxHeight()) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
                         detectTapGestures(
+                            onPress = holdBoost,
                             onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },
                             onDoubleTap = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -486,12 +516,15 @@ fun PlayerScreen(
                     )
                 }
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() })
+                    detectTapGestures(
+                        onPress = holdBoost,
+                        onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() })
                 })
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
                         detectTapGestures(
+                            onPress = holdBoost,
                             onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },
                             onDoubleTap = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -755,6 +788,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                     showFsQualityMenu = false
                                                     if (h != fsDetails.currentQuality) {
                                                         vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                        vm.rememberQuality(h)
                                                         vm.changeQuality(videoUrl, h)
                                                     }
                                                 }
@@ -855,6 +889,18 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     Text("Skipping $skipBannerLabel",
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            // ── 2x speed boost indicator ─────────────────────────────────
+            if (speedBoost) {
+                Row(Modifier.align(Alignment.TopCenter).padding(top = 12.dp)
+                    .background(Color.Black.copy(0.65f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Default.FastForward, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text("2x", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -965,6 +1011,27 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
+                    // Swipe down on the video to minimize into the mini player
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dy ->
+                                if (dy > 0f || minimizeDrag > 0f)
+                                    minimizeDrag = (minimizeDrag + dy).coerceAtLeast(0f)
+                            },
+                            onDragEnd = {
+                                if (minimizeDrag > 260f) { minimizeDrag = 0f; onBack() }
+                                else minimizeDrag = 0f
+                            },
+                            onDragCancel = { minimizeDrag = 0f }
+                        )
+                    }
+                    .graphicsLayer {
+                        translationY = minimizeDrag * 0.35f
+                        val f = (minimizeDrag / 900f).coerceIn(0f, 0.25f)
+                        scaleX = 1f - f
+                        scaleY = 1f - f
+                        alpha = 1f - f
+                    }
             ) {
                 when (val s = state) {
                     is PlayerUiState.Loading -> CircularProgressIndicator(
@@ -1020,6 +1087,17 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 .padding(horizontal = 12.dp, vertical = 4.dp)) {
                                 Text("Skipping $skipBannerLabel",
                                     color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp)
+                            }
+                        }
+                        // 2x speed boost indicator (portrait)
+                        if (speedBoost) {
+                            Row(Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+                                .background(Color.Black.copy(0.65f), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.FastForward, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Text("2x", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1161,6 +1239,22 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 }
                                 if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            if (details.uploaderUrl.isNotEmpty()) {
+                                Button(
+                                    onClick = { vm.toggleSubscribe() },
+                                    colors = if (isSubscribed)
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    else ButtonDefaults.buttonColors(),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(30.dp).padding(end = 4.dp)
+                                ) {
+                                    Text(if (isSubscribed) "Subscribed" else "Subscribe",
+                                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (details.likeCount > 0) {
                                     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
@@ -1232,6 +1326,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                     showQualityMenu = false
                                                     if (h != details.currentQuality) {
                                                         vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                        vm.rememberQuality(h)
                                                         vm.changeQuality(videoUrl, h)
                                                     }
                                                 }

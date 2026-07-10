@@ -37,6 +37,7 @@ fun ChannelScreen(
     LaunchedEffect(channelUrl) { vm.loadChannel(channelUrl) }
 
     val data by vm.channel.collectAsState()
+    val isSubscribed by vm.isSubscribed.collectAsState()
     val listState = rememberLazyListState()
 
     val shouldLoadMore by remember {
@@ -121,7 +122,7 @@ fun ChannelScreen(
                                     modifier = Modifier.size(32.dp))
                             }
                         }
-                        Column {
+                        Column(Modifier.weight(1f)) {
                             Text(data.name, fontWeight = FontWeight.Bold, fontSize = 18.sp,
                                 color = MaterialTheme.colorScheme.onBackground)
                             if (data.subscriberCount > 0) {
@@ -129,6 +130,19 @@ fun ChannelScreen(
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                        }
+                        Button(
+                            onClick = { vm.toggleSubscribe() },
+                            colors = if (isSubscribed)
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            else ButtonDefaults.buttonColors(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Text(if (isSubscribed) "Subscribed" else "Subscribe",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))

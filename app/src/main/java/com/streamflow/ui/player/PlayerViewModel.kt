@@ -9,6 +9,7 @@ import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.Comment
 import com.streamflow.data.model.SponsorSegment
@@ -41,6 +42,38 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val autoPlay: Flow<Boolean> = prefs.autoPlay
+
+    // ── Subscription (keyed on the current video's channel) ───────────────────
+    val isSubscribed: StateFlow<Boolean> = _uiState
+        .flatMapLatest { s ->
+            val url = (s as? PlayerUiState.Ready)?.details?.uploaderUrl ?: ""
+            if (url.isEmpty()) flowOf(false) else db.subscriptionDao().isSubscribed(url)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun toggleSubscribe() {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        if (d.uploaderUrl.isEmpty()) return
+        viewModelScope.launch {
+            val dao = db.subscriptionDao()
+            if (dao.isSubscribed(d.uploaderUrl).first()) {
+                dao.delete(d.uploaderUrl)
+            } else {
+                dao.insert(SubscriptionEntity(channelUrl = d.uploaderUrl, name = d.uploaderName, avatarUrl = ""))
+            }
+        }
+    }
+
+    // Persist the user's in-player quality pick as the default for future videos
+    fun rememberQuality(height: Int) {
+        val pref = when {
+            height >= 1080 -> "1080P"
+            height >= 720  -> "720P"
+            height >= 480  -> "480P"
+            else           -> "360P"
+        }
+        viewModelScope.launch { prefs.setQuality(pref) }
+    }
 
     // ── Comments ──────────────────────────────────────────────────────────────
     private val _comments = MutableStateFlow<List<Comment>>(emptyList())
