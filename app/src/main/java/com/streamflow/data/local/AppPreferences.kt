@@ -29,6 +29,7 @@ class AppPreferences(private val context: Context) {
         val GRID_COLUMNS_KEY           = stringPreferencesKey("grid_columns")
         val HOME_CARD_STYLE_KEY        = stringPreferencesKey("home_card_style")
         val HOME_CATEGORIES_KEY        = stringPreferencesKey("home_categories")
+        val HIDE_WATCHED_KEY           = booleanPreferencesKey("hide_watched")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         // Search
@@ -57,6 +58,7 @@ class AppPreferences(private val context: Context) {
         it[HOME_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() }
             ?: listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
     }
+    val hideWatched         : Flow<Boolean> = context.dataStore.data.map { it[HIDE_WATCHED_KEY] ?: false }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     // Search
@@ -78,6 +80,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setGridColumns(v: String)           = context.dataStore.edit { it[GRID_COLUMNS_KEY]           = v }
     suspend fun setHomeCardStyle(v: String)         = context.dataStore.edit { it[HOME_CARD_STYLE_KEY]        = v }
     suspend fun setHomeCategories(v: List<String>)  = context.dataStore.edit { it[HOME_CATEGORIES_KEY]        = v.joinToString(",") }
+    suspend fun setHideWatched(v: Boolean)          = context.dataStore.edit { it[HIDE_WATCHED_KEY]           = v }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     // Search

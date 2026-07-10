@@ -1361,7 +1361,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 IconButton(onClick = {
-                                    val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, videoUrl) }
+                                    // Share at the current position (YouTube-style ?t= link)
+                                    val posSec = playerPosition / 1000
+                                    val shareUrl = if (!details.isLive && posSec > 5)
+                                        videoUrl + (if (videoUrl.contains("?")) "&t=${posSec}s" else "?t=${posSec}s")
+                                    else videoUrl
+                                    val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareUrl) }
                                     context.startActivity(Intent.createChooser(i, "Share video"))
                                 }) { Icon(Icons.Default.Share, "Share", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)) }
                                 IconButton(onClick = { vm.toggleWatchLater() }) {

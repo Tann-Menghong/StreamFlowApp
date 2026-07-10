@@ -46,6 +46,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val historyCount   = db.historyDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    val blockedCount   = db.blockedDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val appVersion: String     = BuildConfig.VERSION_NAME
     val githubReleasesUrl: String = BuildConfig.GITHUB_RELEASES_URL
@@ -94,4 +95,5 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setSkipSeconds(v: String)    = viewModelScope.launch { prefs.setSkipSeconds(v) }
     fun clearHistory()   = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
+    fun clearBlocked()   = viewModelScope.launch { db.blockedDao().clearAll() }
 }

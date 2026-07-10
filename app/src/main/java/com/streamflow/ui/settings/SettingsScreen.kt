@@ -72,6 +72,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val skipSeconds          by vm.skipSeconds.collectAsState()
     val favCount             by vm.favoritesCount.collectAsState()
     val histCount            by vm.historyCount.collectAsState()
+    val blockedCount         by vm.blockedCount.collectAsState()
     val update               by vm.update.collectAsState()
     val context              = LocalContext.current
 
@@ -84,6 +85,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showSkipDialog     by remember { mutableStateOf(false) }
     var showClearHist      by remember { mutableStateOf(false) }
     var showClearFav       by remember { mutableStateOf(false) }
+    var showClearBlocked   by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -216,6 +218,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.History, "Clear watch history",
                     "$histCount entries"
                 ) { if (histCount > 0) showClearHist = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.VisibilityOff, "Hidden videos & channels",
+                    if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
+                ) { if (blockedCount > 0) showClearBlocked = true }
             }
 
             // ── About ────────────────────────────────────────────────────
@@ -282,6 +288,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     if (showClearFav) {
         ConfirmDialog("Clear favorites", "Remove all $favCount favorites?",
             { vm.clearFavorites(); showClearFav = false }, { showClearFav = false })
+    }
+    if (showClearBlocked) {
+        ConfirmDialog("Unhide all", "Show the $blockedCount hidden videos/channels in your feed again?",
+            { vm.clearBlocked(); showClearBlocked = false }, { showClearBlocked = false })
     }
 }
 

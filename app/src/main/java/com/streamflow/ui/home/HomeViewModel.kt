@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
+import com.streamflow.data.local.entity.BlockedItemEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.async
@@ -32,7 +33,38 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var nextPage: Page? = null
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
-    val uiState: StateFlow<HomeUiState> = _uiState
+
+    // Displayed feed = raw feed minus "not interested" videos/channels and
+    // (optionally) already-watched videos. Live: hiding a video removes it instantly.
+    val uiState: StateFlow<HomeUiState> = combine(
+        _uiState,
+        db.blockedDao().getAll(),
+        prefs.hideWatched,
+        db.historyDao().getAll()
+    ) { state, blocked, hideWatched, history ->
+        if (state !is HomeUiState.Success) return@combine state
+        val blockedVideos   = blocked.asSequence().filter { it.type == "VIDEO" }.mapTo(HashSet()) { it.itemKey }
+        val blockedChannels = blocked.asSequence().filter { it.type == "CHANNEL" }.mapTo(HashSet()) { it.itemKey }
+        val watched = if (hideWatched) history.mapTo(HashSet()) { it.url } else emptySet<String>()
+        state.copy(videos = state.videos.filter { v ->
+            v.url !in blockedVideos &&
+            (v.uploaderUrl.isEmpty() || v.uploaderUrl !in blockedChannels) &&
+            v.url !in watched
+        })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState.Loading)
+
+    val hideWatched = prefs.hideWatched.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun setHideWatched(v: Boolean) = viewModelScope.launch { prefs.setHideWatched(v) }
+
+    fun blockVideo(v: VideoItem) = viewModelScope.launch {
+        db.blockedDao().insert(BlockedItemEntity(itemKey = v.url, type = "VIDEO", name = v.title))
+    }
+
+    fun blockChannel(v: VideoItem) = viewModelScope.launch {
+        if (v.uploaderUrl.isNotEmpty()) {
+            db.blockedDao().insert(BlockedItemEntity(itemKey = v.uploaderUrl, type = "CHANNEL", name = v.uploaderName))
+        }
+    }
 
     // Persisted layout/display prefs
     val homeLayout           = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")

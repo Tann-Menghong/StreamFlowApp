@@ -86,6 +86,8 @@ fun VideoCard(
     onAddToWatchLater: (() -> Unit)? = null,
     onAddToFavorites:  (() -> Unit)? = null,
     onChannelClick: ((String) -> Unit)? = null,
+    onNotInterested: (() -> Unit)? = null,
+    onBlockChannel: (() -> Unit)? = null,
     remainingLabel: String? = null
 ) {
     val context  = LocalContext.current
@@ -223,6 +225,20 @@ fun VideoCard(
                                 text = { Text("Add to favorites") },
                                 leadingIcon = { Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
                                 onClick = { onAddToFavorites(); showMenu = false }
+                            )
+                        }
+                        if (onNotInterested != null) {
+                            DropdownMenuItem(
+                                text = { Text("Not interested") },
+                                leadingIcon = { Icon(Icons.Default.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                                onClick = { onNotInterested(); showMenu = false }
+                            )
+                        }
+                        if (onBlockChannel != null) {
+                            DropdownMenuItem(
+                                text = { Text("Don't recommend channel") },
+                                leadingIcon = { Icon(Icons.Default.Block, null, modifier = Modifier.size(18.dp)) },
+                                onClick = { onBlockChannel(); showMenu = false }
                             )
                         }
                         DropdownMenuItem(
@@ -384,7 +400,9 @@ fun CompactVideoCard(
     onClick: () -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
     onAddToWatchLater: (() -> Unit)? = null,
-    onAddToFavorites:  (() -> Unit)? = null
+    onAddToFavorites:  (() -> Unit)? = null,
+    onNotInterested: (() -> Unit)? = null,
+    onBlockChannel: (() -> Unit)? = null
 ) {
     val context  = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
@@ -482,6 +500,20 @@ fun CompactVideoCard(
                         text = { Text("Add to favorites") },
                         leadingIcon = { Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
                         onClick = { onAddToFavorites(); showMenu = false }
+                    )
+                }
+                if (onNotInterested != null) {
+                    DropdownMenuItem(
+                        text = { Text("Not interested") },
+                        leadingIcon = { Icon(Icons.Default.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                        onClick = { onNotInterested(); showMenu = false }
+                    )
+                }
+                if (onBlockChannel != null) {
+                    DropdownMenuItem(
+                        text = { Text("Don't recommend channel") },
+                        leadingIcon = { Icon(Icons.Default.Block, null, modifier = Modifier.size(18.dp)) },
+                        onClick = { onBlockChannel(); showMenu = false }
                     )
                 }
                 DropdownMenuItem(

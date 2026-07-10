@@ -1,6 +1,9 @@
 package com.streamflow.ui.home
 
+import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -64,7 +67,7 @@ import com.streamflow.ui.components.formatDuration
 import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
@@ -84,9 +87,20 @@ fun HomeScreen(
     val selectedCats     by vm.selectedCategories.collectAsState()
     val recentSearches   by vm.recentSearches.collectAsState()
     val currentCountry   by vm.currentCountry.collectAsState()
+    val hideWatched      by vm.hideWatched.collectAsState()
     val listState        = rememberLazyListState()
+    val context          = LocalContext.current
     var showCountryPicker by remember { mutableStateOf(false) }
     var showCustomizeSheet by remember { mutableStateOf(false) }
+
+    val hideVideo: (VideoItem) -> Unit = { v ->
+        vm.blockVideo(v)
+        Toast.makeText(context, "Hidden — you won't see this video again", Toast.LENGTH_SHORT).show()
+    }
+    val hideChannel: (VideoItem) -> Unit = { v ->
+        vm.blockChannel(v)
+        Toast.makeText(context, "Channel hidden from your feed", Toast.LENGTH_SHORT).show()
+    }
 
     // Search bar state
     var searchExpanded by remember { mutableStateOf(false) }
@@ -388,9 +402,13 @@ fun HomeScreen(
                                     var visible by remember { mutableStateOf(false) }
                                     LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
                                     AnimatedVisibility(visible,
+                                        modifier = Modifier.animateItemPlacement(),
                                         enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
                                         VideoCard(video = video, onClick = { onVideoClick(video.url) },
-                                            onChannelClick = onChannelClick)
+                                            onChannelClick = onChannelClick,
+                                            onNotInterested = { hideVideo(video) },
+                                            onBlockChannel = if (video.uploaderUrl.isNotEmpty())
+                                                ({ hideChannel(video) }) else null)
                                     }
                                 }
                                 if (s.isLoadingMore) {
@@ -458,15 +476,22 @@ fun HomeScreen(
                                     var visible by remember { mutableStateOf(false) }
                                     LaunchedEffect(Unit) { delay((index * 25L).coerceAtMost(200L)); visible = true }
                                     AnimatedVisibility(visible,
+                                        modifier = Modifier.animateItemPlacement(),
                                         enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 6 }
                                     ) {
                                         Box(Modifier.padding(horizontal = 16.dp)) {
                                             if (cardStyle == "COMPACT") {
                                                 CompactVideoCard(video = video, onClick = { onVideoClick(video.url) },
-                                                    onChannelClick = onChannelClick)
+                                                    onChannelClick = onChannelClick,
+                                                    onNotInterested = { hideVideo(video) },
+                                                    onBlockChannel = if (video.uploaderUrl.isNotEmpty())
+                                                        ({ hideChannel(video) }) else null)
                                             } else {
                                                 VideoCard(video = video, onClick = { onVideoClick(video.url) },
-                                                    onChannelClick = onChannelClick)
+                                                    onChannelClick = onChannelClick,
+                                                    onNotInterested = { hideVideo(video) },
+                                                    onBlockChannel = if (video.uploaderUrl.isNotEmpty())
+                                                        ({ hideChannel(video) }) else null)
                                             }
                                         }
                                     }
@@ -505,6 +530,7 @@ fun HomeScreen(
                 cardStyle          = cardStyle,
                 showCW             = showCW,
                 showHero           = showHero,
+                hideWatched        = hideWatched,
                 selectedCategories = selectedCats,
                 categoryPool       = vm.categoryPool,
                 onLayout           = vm::setLayout,
@@ -512,6 +538,7 @@ fun HomeScreen(
                 onCardStyle        = vm::setCardStyle,
                 onShowCW           = vm::setShowCW,
                 onShowHero         = vm::setShowFeatured,
+                onHideWatched      = vm::setHideWatched,
                 onToggleCategory   = vm::toggleCategory,
                 onResetCategories  = vm::resetCategories,
                 onDismiss          = { showCustomizeSheet = false }
@@ -597,6 +624,7 @@ private fun CustomizeHomeSheet(
     cardStyle: String,
     showCW: Boolean,
     showHero: Boolean,
+    hideWatched: Boolean,
     selectedCategories: List<String>,
     categoryPool: List<String>,
     onLayout: (String) -> Unit,
@@ -604,6 +632,7 @@ private fun CustomizeHomeSheet(
     onCardStyle: (String) -> Unit,
     onShowCW: (Boolean) -> Unit,
     onShowHero: (Boolean) -> Unit,
+    onHideWatched: (Boolean) -> Unit,
     onToggleCategory: (String) -> Unit,
     onResetCategories: () -> Unit,
     onDismiss: () -> Unit
@@ -659,6 +688,7 @@ private fun CustomizeHomeSheet(
             SheetSectionLabel("SECTIONS")
             SheetSwitchRow("Continue Watching", "Resume videos you started", showCW, onShowCW)
             SheetSwitchRow("Featured row", "Horizontal top-trending strip", showHero, onShowHero)
+            SheetSwitchRow("Hide watched videos", "Skip videos already in your history", hideWatched, onHideWatched)
 
             Spacer(Modifier.height(20.dp))
 
