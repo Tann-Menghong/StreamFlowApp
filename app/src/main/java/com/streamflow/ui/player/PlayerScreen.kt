@@ -11,8 +11,11 @@ import android.os.Bundle
 import android.util.Rational
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -35,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -254,6 +258,17 @@ fun PlayerScreen(
     // ── Current chapter ───────────────────────────────────────────────────────
     var currentChapterTitle by remember { mutableStateOf("") }
 
+    // ── Portrait progress controls ────────────────────────────────────────────
+    var playerPosition by remember { mutableLongStateOf(0L) }
+    var playerDuration by remember { mutableLongStateOf(0L) }
+    var playerIsPlaying by remember { mutableStateOf(false) }
+    var isSeekingPortrait by remember { mutableStateOf(false) }
+    var seekTargetPortrait by remember { mutableLongStateOf(0L) }
+
+    // ── Fullscreen controls overlay ───────────────────────────────────────────
+    var showFsControls by remember { mutableStateOf(true) }
+    var fsTapTimestamp by remember { mutableLongStateOf(0L) }
+
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
@@ -301,9 +316,47 @@ fun PlayerScreen(
         }
     }
 
+    // ── Position / playback state polling ─────────────────────────────────────
+    LaunchedEffect(mediaController) {
+        while (true) {
+            delay(250L)
+            val mc = mediaController ?: continue
+            if (!isSeekingPortrait) playerPosition = mc.currentPosition.coerceAtLeast(0L)
+            playerDuration = mc.duration.coerceAtLeast(0L)
+            playerIsPlaying = mc.isPlaying
+        }
+    }
+
+    // ── Fullscreen controls auto-hide (3 s after last interaction) ────────────
+    LaunchedEffect(fsTapTimestamp) {
+        if (fsTapTimestamp == 0L) return@LaunchedEffect
+        delay(3000L)
+        showFsControls = false
+    }
+
     // ── Subtitle state ───────────────────────────────────────────────────────
     var showSubMenu by remember { mutableStateOf(false) }
     var selectedSubUrl by remember { mutableStateOf("") }
+    var subUrlSeenByEffect by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(selectedSubUrl, mediaController) {
+        if (subUrlSeenByEffect == null) { subUrlSeenByEffect = selectedSubUrl; return@LaunchedEffect }
+        if (selectedSubUrl == subUrlSeenByEffect) return@LaunchedEffect
+        subUrlSeenByEffect = selectedSubUrl
+        val mc = mediaController ?: return@LaunchedEffect
+        val item = mc.currentMediaItem ?: return@LaunchedEffect
+        val pos = mc.currentPosition
+        val newItem = if (selectedSubUrl.isEmpty()) {
+            item.buildUpon().setSubtitleConfigurations(emptyList()).build()
+        } else {
+            item.buildUpon().setSubtitleConfigurations(listOf(
+                MediaItem.SubtitleConfiguration.Builder(selectedSubUrl.toUri())
+                    .setMimeType("text/vtt").build()
+            )).build()
+        }
+        mc.setMediaItem(newItem, pos)
+        mc.prepare()
+        mc.play()
+    }
 
     // ── Lock state ───────────────────────────────────────────────────────────
     var isLocked by remember { mutableStateOf(false) }
@@ -393,15 +446,17 @@ fun PlayerScreen(
         val mc = mediaController ?: return
         val skipSec = skipMs / 1000L
         val haptic = LocalHapticFeedback.current
-        Row(Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 72.dp)) {
+        Row(Modifier.fillMaxWidth().fillMaxHeight()) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
-                        detectTapGestures(onDoubleTap = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0))
-                            seekFeedback = "- ${skipSec}s"; showSeekFeedback = true
-                        })
+                        detectTapGestures(
+                            onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },
+                            onDoubleTap = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0))
+                                seekFeedback = "- ${skipSec}s"; showSeekFeedback = true
+                            })
                     }
             )
             Box(Modifier.weight(0.4f).fillMaxHeight()
@@ -419,15 +474,20 @@ fun PlayerScreen(
                         onDragEnd    = { mc.seekTo(scrubTargetMs); isScrubbing = false },
                         onDragCancel = { isScrubbing = false }
                     )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() })
                 })
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(skipMs) {
-                        detectTapGestures(onDoubleTap = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            mc.seekTo(mc.currentPosition + skipMs)
-                            seekFeedback = "+ ${skipSec}s"; showSeekFeedback = true
-                        })
+                        detectTapGestures(
+                            onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },
+                            onDoubleTap = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                mc.seekTo(mc.currentPosition + skipMs)
+                                seekFeedback = "+ ${skipSec}s"; showSeekFeedback = true
+                            })
                     }
             )
         }
@@ -480,13 +540,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = mediaController
-                        useController = !isLocked
+                        useController = false
                         keepScreenOn = true
                     }
                 },
                 update = { pv ->
                     pv.player = mediaController
-                    pv.useController = !isLocked
+                    pv.useController = false
                 },
                 modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom }
             )
@@ -594,61 +654,77 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
-            // ── Top bar buttons ──────────────────────────────────────────
-            if (!isLocked) {
-                Row(
-                    modifier = Modifier.align(Alignment.TopStart).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            // ── Top bar ──────────────────────────────────────────────────
+            AnimatedVisibility(
+                visible = showFsControls && !isLocked,
+                enter = fadeIn(), exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+            ) {
+                Box(
+                    Modifier.fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Black.copy(0.8f), Color.Transparent)))
+                        .padding(bottom = 24.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { isFullscreen = false }) {
-                            Icon(Icons.Default.FullscreenExit, null, tint = Color.White)
-                        }
-                        if (sleepRemaining > 0L) {
-                            val mm = sleepRemaining / 60
-                            val ss = sleepRemaining % 60
-                            Text(
-                                "Sleep: %02d:%02d".format(mm, ss),
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .background(Color.Black.copy(0.5f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box {
-                            IconButton(onClick = { showSleepMenu = true }) {
-                                Icon(Icons.Default.Bedtime, "Sleep timer", tint = if (sleepMinutes > 0) MaterialTheme.colorScheme.primary else Color.White)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            IconButton(onClick = { isFullscreen = false }) {
+                                Icon(Icons.Default.FullscreenExit, null, tint = Color.White)
                             }
-                            DropdownMenu(expanded = showSleepMenu, onDismissRequest = { showSleepMenu = false }) {
-                                listOf(0 to "Off", 15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "60 min").forEach { (mins, label) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label, fontWeight = if (sleepMinutes == mins) FontWeight.Bold else FontWeight.Normal) },
-                                        onClick = { sleepMinutes = mins; showSleepMenu = false }
-                                    )
+                            val fsTitle = (state as? PlayerUiState.Ready)?.details?.title ?: ""
+                            if (fsTitle.isNotEmpty()) {
+                                Text(
+                                    fsTitle, color = Color.White, fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold, maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                            }
+                            if (sleepRemaining > 0L) {
+                                val mm = sleepRemaining / 60
+                                val ss = sleepRemaining % 60
+                                Text(
+                                    "Sleep: %02d:%02d".format(mm, ss),
+                                    color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .background(Color.Black.copy(0.5f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                IconButton(onClick = { showSleepMenu = true }) {
+                                    Icon(Icons.Default.Bedtime, "Sleep timer",
+                                        tint = if (sleepMinutes > 0) MaterialTheme.colorScheme.primary else Color.White)
+                                }
+                                DropdownMenu(expanded = showSleepMenu, onDismissRequest = { showSleepMenu = false }) {
+                                    listOf(0 to "Off", 15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "60 min").forEach { (mins, label) ->
+                                        DropdownMenuItem(
+                                            text = { Text(label, fontWeight = if (sleepMinutes == mins) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = { sleepMinutes = mins; showSleepMenu = false }
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        IconButton(onClick = { isLocked = true }) {
-                            Icon(Icons.Default.LockOpen, "Lock", tint = Color.White)
-                        }
-                        IconButton(onClick = { showStats = !showStats }) {
-                            Icon(Icons.Default.Analytics, "Stats",
-                                tint = if (showStats) MaterialTheme.colorScheme.primary else Color.White)
-                        }
-                        IconButton(
-                            onClick = {
+                            IconButton(onClick = { isLocked = true }) {
+                                Icon(Icons.Default.LockOpen, "Lock", tint = Color.White)
+                            }
+                            IconButton(onClick = { showStats = !showStats }) {
+                                Icon(Icons.Default.Analytics, "Stats",
+                                    tint = if (showStats) MaterialTheme.colorScheme.primary else Color.White)
+                            }
+                            IconButton(onClick = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
                                     activity?.enterPictureInPictureMode(params)
                                 }
+                            }) {
+                                Icon(Icons.Default.PictureInPicture, "PiP", tint = Color.White)
                             }
-                        ) {
-                            Icon(Icons.Default.PictureInPicture, "PiP", tint = Color.White)
                         }
                     }
                 }
@@ -659,7 +735,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 val dur = mediaController?.duration?.takeIf { it > 0 } ?: 1L
                 val pos = mediaController?.currentPosition ?: 0L
                 Box(
-                    Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 80.dp)
+                    Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 130.dp)
                         .background(Color.Black.copy(0.7f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
                 ) {
@@ -700,7 +776,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 Text(currentChapterTitle,
                     color = Color.White, fontSize = 11.sp,
                     modifier = Modifier.align(Alignment.BottomStart)
-                        .padding(start = 8.dp, bottom = 72.dp)
+                        .padding(start = 8.dp, bottom = 120.dp)
                         .background(Color.Black.copy(0.5f), RoundedCornerShape(5.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp))
             }
@@ -708,7 +784,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // ── Autoplay countdown overlay ───────────────────────────────
             if (autoPlayCountdown > 0) {
                 Box(
-                    Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 80.dp)
+                    Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 110.dp)
                         .background(Color.Black.copy(0.8f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
@@ -718,6 +794,59 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             fontSize = 28.sp, fontWeight = FontWeight.Bold)
                         TextButton(onClick = { autoPlayTarget = "" }) {
                             Text("Cancel", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            // ── Fullscreen bottom control bar ────────────────────────────
+            AnimatedVisibility(
+                visible = showFsControls && !isLocked,
+                enter = fadeIn(), exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            ) {
+                Box(
+                    Modifier.fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.9f))))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth()) {
+                        if (playerDuration > 0L) {
+                            Slider(
+                                value = (if (isScrubbing) scrubTargetMs else playerPosition).toFloat(),
+                                onValueChange = { v ->
+                                    scrubTargetMs = v.toLong(); isScrubbing = true
+                                },
+                                onValueChangeFinished = {
+                                    mediaController?.seekTo(scrubTargetMs); isScrubbing = false
+                                },
+                                valueRange = 0f..playerDuration.toFloat(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = Color.White.copy(0.35f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = {
+                                val mc = mediaController ?: return@IconButton
+                                if (mc.isPlaying) mc.pause() else mc.play()
+                            }) {
+                                Icon(
+                                    if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    null, tint = Color.White, modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
+                                color = Color.White, fontSize = 12.sp
+                            )
                         }
                     }
                 }
@@ -746,8 +875,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
                     is PlayerUiState.Ready -> {
                         AndroidView(
-                            factory = { ctx -> PlayerView(ctx).apply { player = mediaController; useController = !audioOnly; keepScreenOn = !audioOnly } },
-                            update  = { pv -> pv.player = mediaController; pv.useController = !audioOnly },
+                            factory = { ctx -> PlayerView(ctx).apply { player = mediaController; useController = false; keepScreenOn = !audioOnly } },
+                            update  = { pv -> pv.player = mediaController; pv.useController = false },
                             modifier = Modifier.fillMaxSize()
                         )
                         if (audioOnly) {
@@ -813,6 +942,58 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
         if (state is PlayerUiState.Ready) {
             val details = (state as PlayerUiState.Ready).details
+
+            // ── Portrait control bar ──────────────────────────────────────────
+            item {
+                Box(Modifier.fillMaxWidth().background(Color(0xFF0A0A0A))) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+                        if (playerDuration > 0L) {
+                            Slider(
+                                value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
+                                onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
+                                onValueChangeFinished = {
+                                    mediaController?.seekTo(seekTargetPortrait); isSeekingPortrait = false
+                                },
+                                valueRange = 0f..playerDuration.toFloat(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = Color.White.copy(0.25f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() } },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        null, tint = Color.White, modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
+                                    color = Color.White.copy(0.85f), fontSize = 12.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = { isFullscreen = true },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                }
+            }
 
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
@@ -1182,4 +1363,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             }
         }
     }
+}
+
+private fun fmtMs(ms: Long): String {
+    val s = ms / 1000L; val h = s / 3600; val m = (s % 3600) / 60; val sec = s % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
 }
