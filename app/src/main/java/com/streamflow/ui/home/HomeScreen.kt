@@ -101,15 +101,22 @@ fun HomeScreen(
         if (activeSearch.isEmpty() && searchText.isNotEmpty()) searchText = ""
     }
 
-    // Load more when near end of list
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val last  = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val total = listState.layoutInfo.totalItemsCount
-            total > 0 && last >= total - 3
-        }
+    // Load more when near the end — snapshotFlow re-arms after each append
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 5
+        }.collect { if (it) vm.loadMore() }
     }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.loadMore() }
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 6
+        }.collect { if (it) vm.loadMore() }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     Scaffold(
@@ -368,6 +375,7 @@ fun HomeScreen(
                         if (homeLayout == "GRID") {
                             LazyVerticalGrid(
                                 columns               = GridCells.Fixed(cols),
+                                state                 = gridState,
                                 modifier              = Modifier.fillMaxSize(),
                                 contentPadding        = PaddingValues(8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -380,6 +388,18 @@ fun HomeScreen(
                                         enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
                                         VideoCard(video = video, onClick = { onVideoClick(video.url) },
                                             onChannelClick = onChannelClick)
+                                    }
+                                }
+                                if (s.isLoadingMore) {
+                                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                        Box(Modifier.fillMaxWidth().padding(16.dp),
+                                            contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(
+                                                Modifier.size(24.dp),
+                                                color       = MaterialTheme.colorScheme.primary,
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -404,7 +424,7 @@ fun HomeScreen(
                                     val label = when {
                                         activeSearch.isNotEmpty() -> "Results for \"${activeSearch}\""
                                         selectedCategory != "All" -> selectedCategory
-                                        else -> "Trending"
+                                        else -> "For You"
                                     }
                                     Text(
                                         label,

@@ -8,6 +8,8 @@ import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
@@ -82,6 +84,40 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var isSearchMode = false
     private var currentQuery = ""
 
+    // Endless "For You" feed: seed queries built from watch history, recent
+    // searches, and the user's picked categories. Trending alone is a single
+    // fixed page with no pagination, so seeds are what make the feed infinite
+    // and make every refresh surface new videos.
+    private var feedSeeds: List<String> = emptyList()
+    private var seedIndex = 0
+    private val seenUrls = HashSet<String>()
+
+    private suspend fun buildSeeds(): List<String> {
+        val history = try { db.historyDao().getAll().first() } catch (_: Exception) { emptyList() }
+        val channelSeeds = history.asSequence()
+            .map { it.uploaderName }
+            .filter { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
+            .distinct().take(10).toList().shuffled().take(5)
+        val searchSeeds = try { prefs.recentSearches.first().take(4) } catch (_: Exception) { emptyList() }
+        val categorySeeds = try { prefs.homeCategories.first() } catch (_: Exception) { emptyList() }
+        val evergreen = listOf(
+            "popular this week", "new music video", "viral videos",
+            "highlights today", "best of 2026", "documentary"
+        )
+        return ((channelSeeds + searchSeeds).shuffled() + (categorySeeds + evergreen).shuffled()).distinct()
+    }
+
+    // Blocks of 3 trending + 2 fresh picks so a refresh visibly brings new videos
+    private fun interleave(a: List<VideoItem>, b: List<VideoItem>): List<VideoItem> {
+        val out = ArrayList<VideoItem>(a.size + b.size)
+        var i = 0; var j = 0
+        while (i < a.size || j < b.size) {
+            repeat(3) { if (i < a.size) out.add(a[i++]) }
+            repeat(2) { if (j < b.size) out.add(b[j++]) }
+        }
+        return out
+    }
+
     init { loadTrending() }
 
     fun loadTrending() {
@@ -94,9 +130,31 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             nextPage = null
             try {
                 val country = prefs.country.first()
-                val result  = repo.getTrending(country)
-                nextPage    = result.nextPage
-                _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
+                feedSeeds = buildSeeds()
+                seedIndex = 0
+                seenUrls.clear()
+
+                // Trending + one personalized chunk in parallel; shuffle trending
+                // so every refresh has a different order
+                var trendingErr: Exception? = null
+                val (trendingRes, seedChunk) = coroutineScope {
+                    val t = async {
+                        try { repo.getTrending(country) } catch (e: Exception) { trendingErr = e; null }
+                    }
+                    val s = async {
+                        val seed = feedSeeds.firstOrNull() ?: return@async emptyList<VideoItem>()
+                        seedIndex = 1
+                        try { repo.search(seed).videos } catch (_: Exception) { emptyList() }
+                    }
+                    t.await() to s.await()
+                }
+                val trendingVideos = trendingRes?.videos?.shuffled() ?: emptyList()
+                if (trendingVideos.isEmpty() && seedChunk.isEmpty()) {
+                    throw (trendingErr ?: Exception("No videos found"))
+                }
+                nextPage = trendingRes?.nextPage
+                val mixed = interleave(trendingVideos, seedChunk).filter { seenUrls.add(it.url) }
+                _uiState.value = HomeUiState.Success(mixed, hasMore = true)
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(friendlyError(e))
             }
@@ -150,19 +208,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
+        if (!isSearchMode) {
+            // Full reload: new shuffle, new seeds, fresh recommendations
+            loadTrending()
+            return
+        }
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                if (isSearchMode) {
-                    val result = repo.search(currentQuery)
-                    nextPage   = result.nextPage
-                    _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
-                } else {
-                    val country = prefs.country.first()
-                    val result  = repo.getTrending(country)
-                    nextPage    = result.nextPage
-                    _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
-                }
+                val result = repo.search(currentQuery)
+                nextPage   = result.nextPage
+                _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(friendlyError(e))
             }
@@ -171,24 +227,46 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadMore() {
         val current = _uiState.value as? HomeUiState.Success ?: return
-        val page    = nextPage ?: return
-        if (current.isLoadingMore) return
+        if (current.isLoadingMore || !current.hasMore) return
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
-            val result = try {
-                if (isSearchMode) repo.searchNextPage(currentQuery, page)
-                else              repo.getTrendingNextPage(page)
-            } catch (e: Exception) {
-                _uiState.value = current.copy(isLoadingMore = false)
-                return@launch
-            }
-            nextPage = result.nextPage
-            _uiState.value = current.copy(
-                videos        = current.videos + result.videos,
+            val fresh = try { fetchMoreVideos() } catch (_: Exception) { emptyList() }
+            val base = _uiState.value as? HomeUiState.Success ?: return@launch
+            _uiState.value = base.copy(
+                videos        = base.videos + fresh,
                 isLoadingMore = false,
-                hasMore       = result.nextPage != null
+                hasMore       = if (isSearchMode) nextPage != null else fresh.isNotEmpty()
             )
         }
+    }
+
+    private suspend fun fetchMoreVideos(): List<VideoItem> {
+        // Search / category mode: normal pagination
+        if (isSearchMode) {
+            val page = nextPage ?: return emptyList()
+            val r = repo.searchNextPage(currentQuery, page)
+            nextPage = r.nextPage
+            return r.videos
+        }
+        // Home feed: trending pagination first (usually absent) …
+        nextPage?.let { p ->
+            val r = try { repo.getTrendingNextPage(p) } catch (_: Exception) { null }
+            nextPage = r?.nextPage
+            val fresh = r?.videos?.filter { seenUrls.add(it.url) } ?: emptyList()
+            if (fresh.isNotEmpty()) return fresh
+        }
+        // … then endless seed chunks: each scroll pulls the next topic,
+        // skipping videos already in the feed
+        repeat(feedSeeds.size) {
+            if (feedSeeds.isEmpty()) return emptyList()
+            val seed = feedSeeds[seedIndex % feedSeeds.size]
+            seedIndex++
+            val fresh = try {
+                repo.search(seed).videos.filter { seenUrls.add(it.url) }
+            } catch (_: Exception) { emptyList() }
+            if (fresh.isNotEmpty()) return fresh
+        }
+        return emptyList()
     }
 
     fun toggleLayout() {
