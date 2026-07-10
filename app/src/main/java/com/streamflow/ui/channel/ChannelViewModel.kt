@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.friendlyError
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +48,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                     nextPage = result.nextPage
                 )
             } catch (e: Exception) {
-                _channel.value = ChannelData(error = e.message)
+                _channel.value = ChannelData(error = friendlyError(e))
             }
         }
     }

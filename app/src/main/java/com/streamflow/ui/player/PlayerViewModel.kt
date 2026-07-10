@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.friendlyError
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
@@ -90,7 +91,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
                 } catch (e: Exception) {
-                    _uiState.value = PlayerUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                    _uiState.value = PlayerUiState.Error(friendlyError(e))
                 }
             }
         }

@@ -3,6 +3,7 @@ package com.streamflow.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.friendlyError
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,7 @@ class SearchViewModel : ViewModel() {
                 nextPage = result.nextPage
                 _uiState.value = SearchUiState.Success(query, result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
-                _uiState.value = SearchUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                _uiState.value = SearchUiState.Error(friendlyError(e))
             }
         }
     }

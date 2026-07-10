@@ -834,13 +834,31 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = {
+                                mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
+                                fsTapTimestamp = System.currentTimeMillis()
+                            }) {
+                                Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                            }
+                            IconButton(onClick = {
                                 val mc = mediaController ?: return@IconButton
                                 if (mc.isPlaying) mc.pause() else mc.play()
+                                fsTapTimestamp = System.currentTimeMillis()
                             }) {
                                 Icon(
                                     if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     null, tint = Color.White, modifier = Modifier.size(28.dp)
                                 )
+                            }
+                            IconButton(onClick = {
+                                mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
+                                fsTapTimestamp = System.currentTimeMillis()
+                            }) {
+                                Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                            }
+                            if (queue.isNotEmpty()) {
+                                IconButton(onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } }) {
+                                    Icon(Icons.Default.SkipNext, "Next in queue", tint = Color.White, modifier = Modifier.size(26.dp))
+                                }
                             }
                             Spacer(Modifier.width(6.dp))
                             Text(
@@ -970,6 +988,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
+                                    onClick = { mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) } },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                                }
+                                IconButton(
                                     onClick = { mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() } },
                                     modifier = Modifier.size(40.dp)
                                 ) {
@@ -977,6 +1001,20 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                         null, tint = Color.White, modifier = Modifier.size(26.dp)
                                     )
+                                }
+                                IconButton(
+                                    onClick = { mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) } },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                                }
+                                if (queue.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.SkipNext, "Next in queue", tint = Color.White, modifier = Modifier.size(24.dp))
+                                    }
                                 }
                                 Spacer(Modifier.width(6.dp))
                                 Text(

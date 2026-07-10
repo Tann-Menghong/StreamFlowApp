@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.friendlyError
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.flow.*
@@ -82,7 +83,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 nextPage    = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }
     }
@@ -103,7 +104,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 nextPage   = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }
     }
@@ -127,7 +128,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     nextPage   = result.nextPage
                     _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
                 } catch (e: Exception) {
-                    _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                    _uiState.value = HomeUiState.Error(friendlyError(e))
                 }
             }
         }
@@ -148,7 +149,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
                 }
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error("${e.javaClass.simpleName}: ${e.message}")
+                _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }
     }

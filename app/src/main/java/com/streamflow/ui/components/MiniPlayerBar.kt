@@ -7,7 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 
 @Composable
 fun MiniPlayerBar(
@@ -26,15 +27,37 @@ fun MiniPlayerBar(
     onNavigateToPlayer: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var isPlaying by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(mediaController) {
+        while (true) {
+            val mc = mediaController
+            if (mc != null) {
+                isPlaying = mc.isPlaying
+                progress = if (mc.duration > 0L)
+                    (mc.currentPosition.toFloat() / mc.duration).coerceIn(0f, 1f) else 0f
+            }
+            delay(500L)
+        }
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 8.dp,
         shadowElevation = 4.dp
     ) {
+        Column {
+        // Thin playback progress line across the top
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth().height(2.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outline.copy(0.2f)
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp)
+                .height(68.dp)
                 .clickable { onNavigateToPlayer(data.url) }
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -77,10 +100,11 @@ fun MiniPlayerBar(
                 onClick = {
                     val mc = mediaController ?: return@IconButton
                     if (mc.isPlaying) mc.pause() else mc.play()
+                    isPlaying = mc.isPlaying
                 }
             ) {
                 Icon(
-                    if (mediaController?.isPlaying == true) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = "Play/Pause",
                     tint = MaterialTheme.colorScheme.onSurface
                 )
@@ -98,6 +122,7 @@ fun MiniPlayerBar(
                     modifier = Modifier.size(18.dp)
                 )
             }
+        }
         }
     }
 }

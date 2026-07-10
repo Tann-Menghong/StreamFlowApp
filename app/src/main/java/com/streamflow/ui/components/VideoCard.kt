@@ -2,6 +2,7 @@ package com.streamflow.ui.components
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -214,7 +215,11 @@ fun VideoCard(
                         DropdownMenuItem(
                             text = { Text("Add to queue") },
                             leadingIcon = { Icon(Icons.Default.QueueMusic, null, modifier = Modifier.size(18.dp)) },
-                            onClick = { PlaybackQueue.add(video); showMenu = false }
+                            onClick = {
+                                PlaybackQueue.add(video)
+                                Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+                                showMenu = false
+                            }
                         )
                     }
                 }
