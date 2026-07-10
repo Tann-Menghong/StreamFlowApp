@@ -55,6 +55,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -328,8 +329,10 @@ fun PlayerScreen(
     }
 
     // ── Fullscreen controls auto-hide (3 s after last interaction) ────────────
-    LaunchedEffect(fsTapTimestamp) {
+    // Stays visible while paused or scrubbing; timer restarts on every interaction.
+    LaunchedEffect(fsTapTimestamp, playerIsPlaying, isScrubbing) {
         if (fsTapTimestamp == 0L) return@LaunchedEffect
+        if (!playerIsPlaying || isScrubbing) return@LaunchedEffect
         delay(3000L)
         showFsControls = false
     }
@@ -350,7 +353,9 @@ fun PlayerScreen(
         } else {
             item.buildUpon().setSubtitleConfigurations(listOf(
                 MediaItem.SubtitleConfiguration.Builder(selectedSubUrl.toUri())
-                    .setMimeType("text/vtt").build()
+                    .setMimeType("text/vtt")
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .build()
             )).build()
         }
         mc.setMediaItem(newItem, pos)
@@ -542,6 +547,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         player = mediaController
                         useController = false
                         keepScreenOn = true
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                     }
                 },
                 update = { pv ->
@@ -551,7 +557,33 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom }
             )
 
-            if (!isLocked) {
+            // Loading / error state (video starts in fullscreen, so these must show here too)
+            when (val s = state) {
+                is PlayerUiState.Loading -> CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center).size(44.dp),
+                    color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp
+                )
+                is PlayerUiState.Error -> Column(
+                    Modifier.align(Alignment.Center).padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.ErrorOutline, null, tint = Color.White.copy(0.7f),
+                        modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text(s.message, color = Color.White, fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Spacer(Modifier.height(14.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { isFullscreen = false; onBack() }) {
+                            Text("Go back", color = Color.White)
+                        }
+                        Button(onClick = { vm.loadVideo(videoUrl) }) { Text("Retry") }
+                    }
+                }
+                else -> {}
+            }
+
+            if (!isLocked && state is PlayerUiState.Ready) {
                 DoubleTapZones()
             }
 
@@ -747,6 +779,26 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
+            // ── Center play/pause ────────────────────────────────────────
+            AnimatedVisibility(
+                visible = showFsControls && !isLocked && !isScrubbing && state is PlayerUiState.Ready,
+                enter = fadeIn(), exit = fadeOut(),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                IconButton(
+                    onClick = {
+                        mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
+                        fsTapTimestamp = System.currentTimeMillis()
+                    },
+                    modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), CircleShape)
+                ) {
+                    Icon(
+                        if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        null, tint = Color.White, modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+
             // ── Scrub preview ────────────────────────────────────────────
             if (isScrubbing) {
                 Box(Modifier.align(Alignment.Center)
@@ -893,7 +945,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
                     is PlayerUiState.Ready -> {
                         AndroidView(
-                            factory = { ctx -> PlayerView(ctx).apply { player = mediaController; useController = false; keepScreenOn = !audioOnly } },
+                            factory = { ctx -> PlayerView(ctx).apply {
+                                player = mediaController
+                                useController = false
+                                keepScreenOn = !audioOnly
+                                setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                            } },
                             update  = { pv -> pv.player = mediaController; pv.useController = false },
                             modifier = Modifier.fillMaxSize()
                         )

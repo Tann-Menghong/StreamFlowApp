@@ -10,6 +10,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import okhttp3.OkHttpClient
@@ -47,7 +48,13 @@ class PlaybackService : MediaSessionService() {
                     val video = ProgressiveMediaSource.Factory(dsf).createMediaSource(mediaItem)
                     val audio = ProgressiveMediaSource.Factory(dsf)
                         .createMediaSource(MediaItem.fromUri(audioUrl))
-                    MergingMediaSource(video, audio)
+                    // ProgressiveMediaSource ignores subtitle configs, so merge them explicitly
+                    val sources = mutableListOf<androidx.media3.exoplayer.source.MediaSource>(video, audio)
+                    mediaItem.localConfiguration?.subtitleConfigurations?.forEach { sub ->
+                        sources.add(SingleSampleMediaSource.Factory(dsf)
+                            .createMediaSource(sub, C.TIME_UNSET))
+                    }
+                    MergingMediaSource(*sources.toTypedArray())
                 } else {
                     defaultMsf.createMediaSource(mediaItem)
                 }
