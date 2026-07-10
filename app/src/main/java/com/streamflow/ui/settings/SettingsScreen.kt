@@ -104,6 +104,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontDialog     by remember { mutableStateOf(false) }
     var showStartTabDialog by remember { mutableStateOf(false) }
+    var showWhatsNewDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -291,6 +292,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             SettingsCard {
                 SettingsItem(Icons.Default.Info, "App version", "v${vm.appVersion}")
                 SettingsDivider()
+                SettingsItem(Icons.Default.NewReleases, "What's new",
+                    "See what changed in v${com.streamflow.data.Changelog.VERSION_NAME}"
+                ) { showWhatsNewDialog = true }
+                SettingsDivider()
                 SettingsItem(Icons.Default.SystemUpdate, "Check for updates",
                     if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
                 ) { vm.checkForUpdate() }
@@ -378,6 +383,37 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Start screen", tabOpts.map { it.second },
             tabOpts.indexOfFirst { it.first == startTab }.coerceAtLeast(0),
             { vm.setStartTab(tabOpts[it].first); showStartTabDialog = false }, { showStartTabDialog = false })
+    }
+    if (showWhatsNewDialog) {
+        AlertDialog(
+            onDismissRequest = { showWhatsNewDialog = false },
+            title = {
+                Column {
+                    Text("What's new", fontWeight = FontWeight.Bold)
+                    Text("Version ${com.streamflow.data.Changelog.VERSION_NAME}",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            text = {
+                Column(
+                    Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    com.streamflow.data.Changelog.notes.forEach { note ->
+                        Row(Modifier.padding(vertical = 5.dp)) {
+                            Text("•  ", color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold)
+                            Text(note, fontSize = 13.sp, lineHeight = 18.sp,
+                                color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWhatsNewDialog = false }) { Text("Got it") }
+            }
+        )
     }
 }
 

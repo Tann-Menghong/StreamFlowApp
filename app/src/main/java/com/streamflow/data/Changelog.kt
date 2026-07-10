@@ -3,9 +3,10 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "2.50.0"
+    const val VERSION_NAME = "2.50.1"
 
     val notes = listOf(
+        "\"What's new\" can now be reopened anytime from Settings > About",
         "Watch stats — see videos watched today, this week and total watch time in Library > History",
         "Queue upgrades — Play next, reorder, shuffle, and your queue now survives app restarts",
         "Watch-progress bar on video thumbnails, just like YouTube",
