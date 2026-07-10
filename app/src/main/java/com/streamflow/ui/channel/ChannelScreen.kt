@@ -68,9 +68,13 @@ fun ChannelScreen(
                 CircularProgressIndicator()
             }
             data.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Failed to load channel", color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(Modifier.height(8.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                    Text("Failed to load channel", fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(4.dp))
+                    Text(data.error ?: "", fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
                     Button(onClick = { vm.loadChannel(channelUrl) }) { Text("Retry") }
                 }
             }

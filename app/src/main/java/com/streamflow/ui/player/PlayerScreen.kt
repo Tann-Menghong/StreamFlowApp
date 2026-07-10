@@ -95,7 +95,8 @@ fun PlayerScreen(
         lower.contains(".m3u8") || lower.contains(".mp4") || lower.contains(".webm") ||
         lower.contains("/hls/") || lower.contains("/stream/")
     }
-    var isFullscreen by remember { mutableStateOf(true) }
+    // Like YouTube: open in portrait; fullscreen only when the user asks
+    var isFullscreen by remember { mutableStateOf(false) }
 
     // ── MediaController ──────────────────────────────────────────────────────
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
@@ -336,6 +337,10 @@ fun PlayerScreen(
         delay(3000L)
         showFsControls = false
     }
+
+    // ── Quality menu state ───────────────────────────────────────────────────
+    var showQualityMenu   by remember { mutableStateOf(false) }
+    var showFsQualityMenu by remember { mutableStateOf(false) }
 
     // ── Subtitle state ───────────────────────────────────────────────────────
     var showSubMenu by remember { mutableStateOf(false) }
@@ -728,6 +733,36 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Quality selector (fullscreen)
+                            val fsDetails = (state as? PlayerUiState.Ready)?.details
+                            if (fsDetails != null && fsDetails.availableQualities.isNotEmpty()) {
+                                Box {
+                                    TextButton(onClick = { showFsQualityMenu = true; fsTapTimestamp = System.currentTimeMillis() }) {
+                                        Text(
+                                            if (fsDetails.currentQuality > 0) "${fsDetails.currentQuality}p" else "Auto",
+                                            fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White
+                                        )
+                                    }
+                                    DropdownMenu(expanded = showFsQualityMenu, onDismissRequest = { showFsQualityMenu = false }) {
+                                        fsDetails.availableQualities.forEach { h ->
+                                            DropdownMenuItem(
+                                                text = { Text("${h}p", fontWeight = if (h == fsDetails.currentQuality) FontWeight.Bold else FontWeight.Normal) },
+                                                trailingIcon = {
+                                                    if (h == fsDetails.currentQuality)
+                                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                },
+                                                onClick = {
+                                                    showFsQualityMenu = false
+                                                    if (h != fsDetails.currentQuality) {
+                                                        vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                        vm.changeQuality(videoUrl, h)
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             Box {
                                 IconButton(onClick = { showSleepMenu = true }) {
                                     Icon(Icons.Default.Bedtime, "Sleep timer",
@@ -1104,8 +1139,26 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(details.uploaderName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                            Column(
+                                Modifier.weight(1f).then(
+                                    if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
+                                        Modifier.clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) { onChannelClick(details.uploaderUrl) }
+                                    else Modifier
+                                )
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(details.uploaderName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                                        color = if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
+                                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
+                                    if (onChannelClick != null && details.uploaderUrl.isNotEmpty()) {
+                                        Icon(Icons.Default.ChevronRight, null,
+                                            tint = MaterialTheme.colorScheme.primary.copy(0.7f),
+                                            modifier = Modifier.size(16.dp))
+                                    }
+                                }
                                 if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1157,7 +1210,37 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     }
                                 }
                             }
-                            Spacer(Modifier.width(8.dp))
+                            // Quality selector
+                            if (details.availableQualities.isNotEmpty()) {
+                                Box {
+                                    TextButton(onClick = { showQualityMenu = true }) {
+                                        Text(
+                                            if (details.currentQuality > 0) "${details.currentQuality}p" else "Auto",
+                                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    DropdownMenu(expanded = showQualityMenu, onDismissRequest = { showQualityMenu = false }) {
+                                        details.availableQualities.forEach { h ->
+                                            DropdownMenuItem(
+                                                text = { Text("${h}p", fontWeight = if (h == details.currentQuality) FontWeight.Bold else FontWeight.Normal) },
+                                                trailingIcon = {
+                                                    if (h == details.currentQuality)
+                                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                },
+                                                onClick = {
+                                                    showQualityMenu = false
+                                                    if (h != details.currentQuality) {
+                                                        vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                        vm.changeQuality(videoUrl, h)
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(4.dp))
                             // Repeat button
                             IconButton(onClick = {
                                 repeatMode = if (repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF

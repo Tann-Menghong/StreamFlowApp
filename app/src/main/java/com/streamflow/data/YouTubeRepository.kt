@@ -14,6 +14,8 @@ import org.json.JSONArray
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.comments.CommentsInfo
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem
 import org.schabi.newpipe.extractor.localization.ContentCountry
@@ -86,16 +88,19 @@ class YouTubeRepository {
         )
     }
 
-    suspend fun getVideoDetails(videoUrl: String, qualityPref: String = "AUTO"): VideoDetails =
+    suspend fun getVideoDetails(
+        videoUrl: String,
+        qualityPref: String = "AUTO",
+        maxHeightOverride: Int? = null
+    ): VideoDetails =
         withContext(Dispatchers.IO) {
             val info = StreamInfo.getInfo(youtube, videoUrl)
 
             val related = info.relatedItems
                 .filterIsInstance<StreamInfoItem>()
-                .filter { it.duration >= 0 }
                 .map { it.toVideoItem() }
 
-            val maxHeight = when (qualityPref) {
+            val maxHeight = maxHeightOverride ?: when (qualityPref) {
                 "1080P" -> 1080
                 "720P"  -> 720
                 "480P"  -> 480
@@ -105,6 +110,12 @@ class YouTubeRepository {
 
             val streamUrl: String
             val audioUrl: String?
+
+            // All heights available across muxed + video-only streams (for the quality menu)
+            val availableQualities = (
+                info.videoStreams.mapNotNull { s -> s.height.takeIf { it > 0 && !s.content.isNullOrEmpty() } } +
+                info.videoOnlyStreams.mapNotNull { s -> s.height.takeIf { it > 0 && !s.content.isNullOrEmpty() } }
+            ).distinct().sortedDescending()
 
             val muxedStream = info.videoStreams
                 .filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
@@ -120,22 +131,33 @@ class YouTubeRepository {
 
             val hlsUrl = info.hlsUrl
 
+            val currentQuality: Int
             when {
+                videoOnlyStream != null && audioStream != null &&
+                    videoOnlyStream.height > (muxedStream?.height ?: 0) -> {
+                    streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
+                    audioUrl = audioStream.content
+                    currentQuality = videoOnlyStream.height
+                }
                 muxedStream != null -> {
                     streamUrl = muxedStream.content ?: throw Exception("Muxed stream URL is null")
                     audioUrl = null
+                    currentQuality = muxedStream.height
                 }
                 videoOnlyStream != null && audioStream != null -> {
                     streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
                     audioUrl = audioStream.content
+                    currentQuality = videoOnlyStream.height
                 }
                 !hlsUrl.isNullOrEmpty() -> {
                     streamUrl = hlsUrl!!
                     audioUrl = null
+                    currentQuality = 0
                 }
                 audioStream != null -> {
                     streamUrl = audioStream.content ?: throw Exception("Audio stream URL is null")
                     audioUrl = null
+                    currentQuality = 0
                 }
                 else -> throw Exception("No playable stream found for: $videoUrl")
             }
@@ -172,41 +194,38 @@ class YouTubeRepository {
                 thumbnailUrl = info.thumbnails.firstOrNull()?.url ?: "",
                 relatedVideos = related,
                 chapters = chapters,
-                subtitles = subtitles
+                subtitles = subtitles,
+                availableQualities = availableQualities,
+                currentQuality = currentQuality
             )
         }
 
     suspend fun getChannelInfo(channelUrl: String): ChannelResult = withContext(Dispatchers.IO) {
-        val extractor = youtube.getChannelExtractor(channelUrl)
-        extractor.fetchPage()
+        val info = ChannelInfo.getInfo(youtube, channelUrl)
 
-        val name = try { extractor.name ?: "" } catch (_: Exception) { "" }
-        val subscriberCount = try { extractor.subscriberCount } catch (_: Exception) { -1L }
+        val avatarUrl = try { info.avatars.lastOrNull()?.url ?: "" } catch (_: Exception) { "" }
+        val bannerUrl = try { info.banners.lastOrNull()?.url ?: "" } catch (_: Exception) { "" }
+        val subscriberCount = try { info.subscriberCount } catch (_: Exception) { -1L }
 
         var videos = emptyList<VideoItem>()
         var nextPage: Page? = null
 
         try {
-            val tabs = extractor.tabs
-            val videoTab = tabs.firstOrNull { tab ->
+            val videoTab = info.tabs.firstOrNull { tab ->
                 tab.contentFilters.any { it.contains("videos", ignoreCase = true) }
-            } ?: tabs.firstOrNull()
+            } ?: info.tabs.firstOrNull()
 
             if (videoTab != null) {
-                val tabExt = youtube.getChannelTabExtractor(videoTab)
-                tabExt.fetchPage()
-                val page = tabExt.initialPage
-                videos = page.items.filterIsInstance<StreamInfoItem>()
-                    .filter { it.duration >= 0 }
-                    .map { it.toVideoItem() }
-                nextPage = page.nextPage
+                val tabInfo = ChannelTabInfo.getInfo(youtube, videoTab)
+                videos = tabInfo.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }
+                nextPage = tabInfo.nextPage
             }
         } catch (_: Exception) {}
 
         ChannelResult(
-            name = name,
-            avatarUrl = "",
-            bannerUrl = "",
+            name = info.name ?: "",
+            avatarUrl = avatarUrl,
+            bannerUrl = bannerUrl,
             subscriberCount = subscriberCount,
             videos = videos,
             nextPage = nextPage
@@ -215,26 +234,16 @@ class YouTubeRepository {
 
     suspend fun getChannelNextPage(channelUrl: String, nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
         try {
-            val extractor = youtube.getChannelExtractor(channelUrl)
-            extractor.fetchPage()
-            val tabs = try { extractor.tabs } catch (_: Exception) { null }
-            if (tabs != null) {
-                val videoTab = tabs.firstOrNull { tab ->
-                    tab.contentFilters.any { it.contains("videos", ignoreCase = true) }
-                } ?: tabs.firstOrNull()
-                if (videoTab != null) {
-                    val tabExt = youtube.getChannelTabExtractor(videoTab)
-                    tabExt.fetchPage()
-                    val page = tabExt.getPage(nextPage)
-                    return@withContext PagedResult(
-                        videos = page.items.filterIsInstance<StreamInfoItem>()
-                            .filter { it.duration >= 0 }
-                            .map { it.toVideoItem() },
-                        nextPage = page.nextPage
-                    )
-                }
-            }
-            PagedResult(emptyList(), null)
+            val info = ChannelInfo.getInfo(youtube, channelUrl)
+            val videoTab = info.tabs.firstOrNull { tab ->
+                tab.contentFilters.any { it.contains("videos", ignoreCase = true) }
+            } ?: info.tabs.firstOrNull() ?: return@withContext PagedResult(emptyList(), null)
+
+            val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
+            PagedResult(
+                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                nextPage = page.nextPage
+            )
         } catch (e: Exception) {
             e.printStackTrace()
             PagedResult(emptyList(), null)

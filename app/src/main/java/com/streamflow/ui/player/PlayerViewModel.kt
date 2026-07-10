@@ -97,6 +97,21 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Reload the same video at a specific resolution; keeps comments/sponsor data.
+    fun changeQuality(videoUrl: String, height: Int) {
+        val current = _uiState.value as? PlayerUiState.Ready ?: return
+        viewModelScope.launch {
+            _uiState.value = PlayerUiState.Loading
+            try {
+                val details = repo.getVideoDetails(videoUrl, "AUTO", maxHeightOverride = height)
+                _uiState.value = PlayerUiState.Ready(details)
+            } catch (_: Exception) {
+                // Revert to the working stream rather than showing an error
+                _uiState.value = PlayerUiState.Ready(current.details)
+            }
+        }
+    }
+
     fun loadComments(videoUrl: String) {
         if (commentsLoadedFor == videoUrl) return
         commentsLoadedFor = videoUrl
