@@ -238,7 +238,12 @@ fun VideoCard(
                             text = { Text("Open in browser") },
                             leadingIcon = { Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
-                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.url))) }
+                                // Chooser needed: StreamFlow itself handles YouTube links now,
+                                // so a plain ACTION_VIEW would just reopen the app
+                                runCatching {
+                                    context.startActivity(Intent.createChooser(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(video.url)), "Open with"))
+                                }
                                 showMenu = false
                             }
                         )

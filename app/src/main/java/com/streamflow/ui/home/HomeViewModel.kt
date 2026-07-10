@@ -92,6 +92,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var seedIndex = 0
     private val seenUrls = HashSet<String>()
 
+    // Bumped whenever the feed is replaced (reload/search/category) so an
+    // in-flight loadMore can't append stale results into the new feed
+    private var feedGeneration = 0
+
     private suspend fun buildSeeds(): List<String> {
         val history = try { db.historyDao().getAll().first() } catch (_: Exception) { emptyList() }
         val channelSeeds = history.asSequence()
@@ -125,6 +129,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         currentQuery = ""
         _selectedCategory.value = "All"
         _activeSearchQuery.value = ""
+        feedGeneration++
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             nextPage = null
@@ -168,6 +173,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         currentQuery = query
         _selectedCategory.value = "All"
         _activeSearchQuery.value = query
+        feedGeneration++
         viewModelScope.launch {
             prefs.addRecentSearch(query)
             _uiState.value = HomeUiState.Loading
@@ -193,6 +199,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             isSearchMode = true
             currentQuery = cat
+            feedGeneration++
             viewModelScope.launch {
                 _uiState.value = HomeUiState.Loading
                 nextPage = null
@@ -213,6 +220,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             loadTrending()
             return
         }
+        feedGeneration++
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
@@ -228,12 +236,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun loadMore() {
         val current = _uiState.value as? HomeUiState.Success ?: return
         if (current.isLoadingMore || !current.hasMore) return
+        val gen = feedGeneration
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
             val fresh = try { fetchMoreVideos() } catch (_: Exception) { emptyList() }
+            if (gen != feedGeneration) return@launch // feed was replaced mid-load
             val base = _uiState.value as? HomeUiState.Success ?: return@launch
+            // Final dedupe at append time — duplicate LazyColumn keys crash the app
+            val existing = base.videos.mapTo(HashSet()) { it.url }
             _uiState.value = base.copy(
-                videos        = base.videos + fresh,
+                videos        = base.videos + fresh.filter { it.url !in existing },
                 isLoadingMore = false,
                 hasMore       = if (isSearchMode) nextPage != null else fresh.isNotEmpty()
             )

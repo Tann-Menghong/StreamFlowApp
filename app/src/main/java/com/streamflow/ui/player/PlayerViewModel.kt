@@ -140,12 +140,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private fun prefetchNext(details: com.streamflow.data.model.VideoDetails, quality: String) {
         val currentUrl = details.url
         viewModelScope.launch {
-            delay(3_000L)
+            delay(2_000L)
             if ((_uiState.value as? PlayerUiState.Ready)?.details?.url != currentUrl) return@launch
-            val nextUrl = PlaybackQueue.queue.value.firstOrNull()?.url
-                ?: details.relatedVideos.firstOrNull()?.url
-                ?: return@launch
-            try { repo.getVideoDetails(nextUrl, quality) } catch (_: Exception) {}
+            // Warm up to 2 likely-next videos, one at a time so playback bandwidth wins
+            val candidates = buildList {
+                PlaybackQueue.queue.value.firstOrNull()?.url?.let { add(it) }
+                details.relatedVideos.take(2).forEach { add(it.url) }
+            }.distinct().filter { it != currentUrl }.take(2)
+            for (url in candidates) {
+                if ((_uiState.value as? PlayerUiState.Ready)?.details?.url != currentUrl) return@launch
+                try { repo.getVideoDetails(url, quality) } catch (_: Exception) {}
+            }
         }
     }
 

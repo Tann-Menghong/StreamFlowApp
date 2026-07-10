@@ -1,5 +1,7 @@
 package com.streamflow.data
 
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
@@ -10,9 +12,14 @@ import java.util.concurrent.TimeUnit
 
 class OkHttpDownloader private constructor() : Downloader() {
 
-    private val client = OkHttpClient.Builder()
-        .readTimeout(30, TimeUnit.SECONDS)
-        .connectTimeout(30, TimeUnit.SECONDS)
+    // Shared app-wide client: warm connection pool + high per-host parallelism.
+    // NewPipe extraction fires several requests at the same hosts per video, so
+    // connection reuse is the biggest lever on video load time.
+    val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
+        .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()

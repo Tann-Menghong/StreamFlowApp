@@ -8,7 +8,6 @@ import com.streamflow.data.model.VideoDetails
 import com.streamflow.data.model.VideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.schabi.newpipe.extractor.NewPipe
@@ -27,7 +26,7 @@ import java.net.URLEncoder
 class YouTubeRepository {
 
     private val youtube get() = NewPipe.getService(ServiceList.YouTube.serviceId)
-    private val httpClient = OkHttpClient()
+    private val httpClient = OkHttpDownloader.instance.client
 
     data class PagedResult(
         val videos: List<VideoItem>,

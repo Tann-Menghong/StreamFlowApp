@@ -14,7 +14,6 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import okhttp3.OkHttpClient
 
 class PlaybackService : MediaSessionService() {
 
@@ -23,19 +22,9 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        val httpClient = OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                val req = chain.request().newBuilder()
-                    .header(
-                        "User-Agent",
-                        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
-                        "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-                    )
-                    .header("Accept-Language", "en-US,en;q=0.9")
-                    .build()
-                chain.proceed(req)
-            }
-            .build()
+        // Reuse the app-wide client (same UA headers) so media requests share the
+        // warm connection pool instead of opening cold connections
+        val httpClient = com.streamflow.data.OkHttpDownloader.instance.client
         val dsf = OkHttpDataSource.Factory(httpClient)
 
         val defaultMsf = DefaultMediaSourceFactory(dsf)
