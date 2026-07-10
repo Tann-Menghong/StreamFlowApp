@@ -1746,8 +1746,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     )
                 }
                 items(details.relatedVideos, key = { it.url }) { video ->
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        VideoCard(video = video, onClick = { onVideoClick(video.url) },
+                    Box(Modifier.padding(horizontal = 16.dp)) {
+                        com.streamflow.ui.components.CompactVideoCard(
+                            video = video, onClick = { onVideoClick(video.url) },
                             onChannelClick = onChannelClick?.let { cb -> { url: String -> cb(url) } })
                     }
                 }

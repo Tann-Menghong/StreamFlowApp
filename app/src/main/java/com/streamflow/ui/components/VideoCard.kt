@@ -19,9 +19,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -91,6 +93,7 @@ fun VideoCard(
     remainingLabel: String? = null
 ) {
     val context  = LocalContext.current
+    val haptic   = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
     var pressed  by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -107,7 +110,10 @@ fun VideoCard(
                     detectTapGestures(
                         onPress = { pressed = true; tryAwaitRelease(); pressed = false },
                         onTap   = { onClick() },
-                        onLongPress = { showMenu = true }
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showMenu = true
+                        }
                     )
                 }
         ) {
@@ -405,6 +411,7 @@ fun CompactVideoCard(
     onBlockChannel: (() -> Unit)? = null
 ) {
     val context  = LocalContext.current
+    val haptic   = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
     var pressed  by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -422,7 +429,10 @@ fun CompactVideoCard(
                 detectTapGestures(
                     onPress     = { pressed = true; tryAwaitRelease(); pressed = false },
                     onTap       = { onClick() },
-                    onLongPress = { showMenu = true }
+                    onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showMenu = true
+                    }
                 )
             },
         horizontalArrangement = Arrangement.spacedBy(10.dp)

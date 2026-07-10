@@ -58,7 +58,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeStr by prefs.theme.collectAsState(initial = "DARK")
             val accentStr by prefs.accentColor.collectAsState(initial = "RED")
-            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr) {
+            val fontScaleStr by prefs.fontScale.collectAsState(initial = "DEFAULT")
+            val fontScale = when (fontScaleStr) {
+                "SMALL" -> 0.9f
+                "LARGE" -> 1.12f
+                else -> 1f
+            }
+            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr, fontScale = fontScale) {
                 NavGraph(startUrl = sharedUrl)
             }
         }

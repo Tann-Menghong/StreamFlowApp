@@ -47,6 +47,7 @@ import com.streamflow.ui.settings.SettingsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import android.content.ComponentName
+import kotlinx.coroutines.flow.first
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home     : Screen("home",     "Home",    Icons.Default.Home)
@@ -69,8 +70,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     }
 }
 
-private val bottomItems = listOf(
-    Screen.Home, Screen.Donghua, Screen.Library, Screen.Settings
+private val allBottomRoutes = listOf(
+    Screen.Home.route, Screen.Donghua.route, Screen.Library.route, Screen.Settings.route
 )
 
 @Composable
@@ -79,7 +80,7 @@ fun NavGraph(startUrl: String? = null) {
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
     var isDonghuaFullscreen by remember { mutableStateOf(false) }
-    val showBottom = bottomItems.any { it.route == currentDest?.route } && !isDonghuaFullscreen
+    val showBottom = allBottomRoutes.any { it == currentDest?.route } && !isDonghuaFullscreen
 
     val miniState by MiniPlayerState.data.collectAsState()
     val isOnPlayerScreen = currentDest?.route?.startsWith("player") == true
@@ -89,6 +90,11 @@ fun NavGraph(startUrl: String? = null) {
     val context = LocalContext.current
     val appPrefs = remember { com.streamflow.data.local.AppPreferences.get(context) }
     val uiLang by appPrefs.language.collectAsState(initial = "EN")
+    val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
+    val bottomItems = remember(showDonghua) {
+        if (showDonghua) listOf(Screen.Home, Screen.Donghua, Screen.Library, Screen.Settings)
+        else listOf(Screen.Home, Screen.Library, Screen.Settings)
+    }
     var miniMediaController by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(context) {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
@@ -110,6 +116,12 @@ fun NavGraph(startUrl: String? = null) {
                 navController.navigate(Screen.YtPlaylist.createRoute(startUrl))
             } else {
                 navController.navigate(Screen.Player.createRoute(startUrl))
+            }
+        } else {
+            // User-chosen start screen (Home stays the back-stack root)
+            val tab = appPrefs.startTab.first()
+            if (tab != "home" && allBottomRoutes.contains(tab)) {
+                navController.navigate(tab) { launchSingleTop = true }
             }
         }
     }

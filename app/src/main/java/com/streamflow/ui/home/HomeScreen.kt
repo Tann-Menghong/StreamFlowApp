@@ -96,13 +96,28 @@ fun HomeScreen(
     var showCountryPicker by remember { mutableStateOf(false) }
     var showCustomizeSheet by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackScope = rememberCoroutineScope()
+
     val hideVideo: (VideoItem) -> Unit = { v ->
         vm.blockVideo(v)
-        Toast.makeText(context, "Hidden — you won't see this video again", Toast.LENGTH_SHORT).show()
+        snackScope.launch {
+            val r = snackbarHostState.showSnackbar(
+                message = "Video hidden", actionLabel = "Undo",
+                duration = SnackbarDuration.Short
+            )
+            if (r == SnackbarResult.ActionPerformed) vm.unblock(v.url)
+        }
     }
     val hideChannel: (VideoItem) -> Unit = { v ->
         vm.blockChannel(v)
-        Toast.makeText(context, "Channel hidden from your feed", Toast.LENGTH_SHORT).show()
+        snackScope.launch {
+            val r = snackbarHostState.showSnackbar(
+                message = "Channel hidden from feed", actionLabel = "Undo",
+                duration = SnackbarDuration.Short
+            )
+            if (r == SnackbarResult.ActionPerformed) vm.unblock(v.uploaderUrl)
+        }
     }
 
     // Search bar state
@@ -137,6 +152,7 @@ fun HomeScreen(
 
     val coroutineScope = rememberCoroutineScope()
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             AnimatedVisibility(
                 visible = showFab,

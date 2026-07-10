@@ -45,6 +45,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val volumeBoost = prefs.volumeBoost.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
     val notifyNewVideos = prefs.notifyNewVideos.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val language = prefs.language.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "EN")
+    val fontScale = prefs.fontScale.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
+    val showDonghua = prefs.showDonghua.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val startTab = prefs.startTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "home")
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -102,6 +105,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setVolumeBoost(v: String)        = viewModelScope.launch { prefs.setVolumeBoost(v) }
     fun setNotifyNewVideos(v: Boolean)   = viewModelScope.launch { prefs.setNotifyNewVideos(v) }
     fun setLanguage(v: String)           = viewModelScope.launch { prefs.setLanguage(v) }
+    fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
+    fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }
+    fun setStartTab(v: String)           = viewModelScope.launch { prefs.setStartTab(v) }
 
     // ── Backup & restore (JSON via Storage Access Framework) ──────
     fun exportBackup(uri: android.net.Uri) {

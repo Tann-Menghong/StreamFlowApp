@@ -19,18 +19,19 @@ fun String.toAppTheme(): AppTheme = when (this) {
     else     -> AppTheme.DARK
 }
 
-private val AppTypography = Typography(
-    displaySmall = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 28.sp, lineHeight = 34.sp),
-    headlineMedium= TextStyle(fontWeight = FontWeight.Bold,    fontSize = 22.sp, lineHeight = 28.sp),
-    titleLarge   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 20.sp, lineHeight = 26.sp),
-    titleMedium  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
-    titleSmall   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
-    bodyLarge    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 13.sp, lineHeight = 19.sp),
-    bodySmall    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp, lineHeight = 16.sp),
-    labelLarge   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.1.sp),
-    labelMedium  = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp, letterSpacing = 0.3.sp),
-    labelSmall   = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 10.sp, letterSpacing = 0.5.sp),
+// Typography scaled by the user's font-size preference
+private fun appTypography(s: Float) = Typography(
+    displaySmall = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s),
+    headlineMedium= TextStyle(fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s),
+    titleLarge   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s),
+    titleMedium  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s),
+    titleSmall   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s),
+    bodyLarge    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 15.sp * s, lineHeight = 22.sp * s),
+    bodyMedium   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 13.sp * s, lineHeight = 19.sp * s),
+    bodySmall    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp * s, lineHeight = 16.sp * s),
+    labelLarge   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp * s, letterSpacing = 0.1.sp),
+    labelMedium  = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp * s, letterSpacing = 0.3.sp),
+    labelSmall   = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 10.sp * s, letterSpacing = 0.5.sp),
 )
 
 private data class AccentPalette(
@@ -48,6 +49,8 @@ private val accentPalettes: Map<String, AccentPalette> = mapOf(
     "PINK"   to AccentPalette(Color(0xFFF472B6), Color(0xFFBE185D), Color(0xFF2A0818), Color(0xFFFFC0E0), Color(0xFFC2185B), Color(0xFFFCE4EC), Color(0xFF7A0040)),
     "TEAL"   to AccentPalette(Color(0xFF2DD4BF), Color(0xFF0D9488), Color(0xFF082520), Color(0xFF80ECD8), Color(0xFF00695C), Color(0xFFE0F2F1), Color(0xFF003B35)),
     "YELLOW" to AccentPalette(Color(0xFFFACC15), Color(0xFFB45309), Color(0xFF1A1500), Color(0xFFFFF0A0), Color(0xFFF59E0B), Color(0xFFFFFDE7), Color(0xFF7A4500)),
+    "INDIGO" to AccentPalette(Color(0xFF818CF8), Color(0xFF4338CA), Color(0xFF121038), Color(0xFFC0C4FF), Color(0xFF4F46E5), Color(0xFFEEF2FF), Color(0xFF1E1B6E)),
+    "CYAN"   to AccentPalette(Color(0xFF22D3EE), Color(0xFF0E7490), Color(0xFF06222A), Color(0xFF9AEBF8), Color(0xFF0891B2), Color(0xFFECFEFF), Color(0xFF064E5E)),
 )
 
 private fun buildDarkColors(p: AccentPalette) = darkColorScheme(
@@ -99,7 +102,12 @@ private fun buildLightColors(p: AccentPalette) = lightColorScheme(
 )
 
 @Composable
-fun StreamFlowTheme(theme: AppTheme = AppTheme.DARK, accent: String = "RED", content: @Composable () -> Unit) {
+fun StreamFlowTheme(
+    theme: AppTheme = AppTheme.DARK,
+    accent: String = "RED",
+    fontScale: Float = 1f,
+    content: @Composable () -> Unit
+) {
     val isDark   = when (theme) {
         AppTheme.LIGHT -> false
         AppTheme.SYSTEM -> isSystemInDarkTheme()
@@ -119,7 +127,7 @@ fun StreamFlowTheme(theme: AppTheme = AppTheme.DARK, accent: String = "RED", con
     }
     MaterialTheme(
         colorScheme = colors,
-        typography  = AppTypography,
+        typography  = appTypography(fontScale),
         content     = content
     )
 }

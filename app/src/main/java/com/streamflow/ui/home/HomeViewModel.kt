@@ -114,6 +114,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun unblock(key: String) = viewModelScope.launch {
+        if (key.isNotEmpty()) db.blockedDao().delete(key)
+    }
+
     // Persisted layout/display prefs
     val homeLayout           = prefs.homeLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIST")
     val showContinueWatching = prefs.showContinueWatching.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)

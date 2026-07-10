@@ -76,6 +76,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val volumeBoost          by vm.volumeBoost.collectAsState()
     val notifyNewVideos      by vm.notifyNewVideos.collectAsState()
     val language             by vm.language.collectAsState()
+    val fontScale            by vm.fontScale.collectAsState()
+    val showDonghua          by vm.showDonghua.collectAsState()
+    val startTab             by vm.startTab.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -98,6 +101,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showClearBlocked   by remember { mutableStateOf(false) }
     var showBoostDialog    by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showFontDialog     by remember { mutableStateOf(false) }
+    var showStartTabDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -174,6 +179,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.Translate, "Language / ភាសា",
                     if (language == "KM") "ភាសាខ្មែរ" else "English"
                 ) { showLanguageDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.FormatSize, "Font size",
+                    when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
+                ) { showFontDialog = true }
             }
 
             // ── Notifications ────────────────────────────────────────────
@@ -202,6 +211,14 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsSwitchItem(Icons.Default.Stars, "Hero featured card",
                     "Show first trending video as a large banner", showHeroCard
                 ) { vm.setShowHeroCard(it) }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.LiveTv, "Show Donghua tab",
+                    "Hide it from the bottom bar if you don't use it", showDonghua
+                ) { vm.setShowDonghua(it) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Start, "Start screen",
+                    when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
+                ) { showStartTabDialog = true }
             }
 
             // ── Playback ─────────────────────────────────────────────────
@@ -345,6 +362,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             langOpts.indexOfFirst { it.first == language }.coerceAtLeast(0),
             { vm.setLanguage(langOpts[it].first); showLanguageDialog = false }, { showLanguageDialog = false })
     }
+    if (showFontDialog) {
+        val fontOpts = listOf("SMALL" to "Small", "DEFAULT" to "Default", "LARGE" to "Large")
+        PickerDialog("Font size", fontOpts.map { it.second },
+            fontOpts.indexOfFirst { it.first == fontScale }.coerceAtLeast(0),
+            { vm.setFontScale(fontOpts[it].first); showFontDialog = false }, { showFontDialog = false })
+    }
+    if (showStartTabDialog) {
+        val tabOpts = listOf("home" to "Home", "donghua" to "Donghua", "library" to "Library")
+        PickerDialog("Start screen", tabOpts.map { it.second },
+            tabOpts.indexOfFirst { it.first == startTab }.coerceAtLeast(0),
+            { vm.setStartTab(tabOpts[it].first); showStartTabDialog = false }, { showStartTabDialog = false })
+    }
 }
 
 // ── Reusable components ───────────────────────────────────────────────────────
@@ -487,6 +516,8 @@ private val accentCircleColors = listOf(
     "PINK"   to Color(0xFFF472B6),
     "TEAL"   to Color(0xFF2DD4BF),
     "YELLOW" to Color(0xFFFACC15),
+    "INDIGO" to Color(0xFF818CF8),
+    "CYAN"   to Color(0xFF22D3EE),
 )
 
 @Composable
