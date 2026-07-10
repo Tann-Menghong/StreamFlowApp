@@ -36,6 +36,7 @@ import com.streamflow.ui.components.MiniPlayerBar
 import com.streamflow.ui.components.MiniPlayerState
 import com.streamflow.ui.channel.ChannelScreen
 import com.streamflow.ui.donghua.DonghuaScreen
+import com.streamflow.ui.feed.FeedScreen
 import com.streamflow.ui.home.HomeScreen
 import com.streamflow.ui.library.LibraryScreen
 import com.streamflow.ui.player.PlayerScreen
@@ -57,6 +58,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Channel  : Screen("channel?channelUrl={channelUrl}", "Channel", Icons.Default.AccountCircle) {
         fun createRoute(url: String) = "channel?channelUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
+    object Feed     : Screen("feed", "Feed", Icons.Default.Subscriptions)
 }
 
 private val bottomItems = listOf(
@@ -173,6 +175,16 @@ fun NavGraph(startUrl: String? = null) {
             }
             composable(Screen.Library.route) {
                 LibraryScreen(
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
+                    },
+                    onFeedClick = { navController.navigate(Screen.Feed.route) }
+                )
+            }
+            composable(Screen.Feed.route) {
+                FeedScreen(
+                    onBack = { navController.popBackStack() },
                     onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
                     onChannelClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))

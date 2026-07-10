@@ -37,6 +37,7 @@ import com.streamflow.ui.components.formatDuration
 fun LibraryScreen(
     onVideoClick: (String) -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
+    onFeedClick: (() -> Unit)? = null,
     vm: LibraryViewModel = viewModel()
 ) {
     val favorites     by vm.favorites.collectAsState()
@@ -161,7 +162,8 @@ fun LibraryScreen(
                     else -> SubscriptionList(
                             subscriptions = subscriptions,
                             onChannelClick = onChannelClick,
-                            onUnsubscribe = vm::unsubscribe
+                            onUnsubscribe = vm::unsubscribe,
+                            onFeedClick = onFeedClick
                         )
                 }
             }
@@ -302,7 +304,8 @@ private fun VideoListWithSearch(
 private fun SubscriptionList(
     subscriptions: List<SubscriptionEntity>,
     onChannelClick: ((String) -> Unit)?,
-    onUnsubscribe: (String) -> Unit
+    onUnsubscribe: (String) -> Unit,
+    onFeedClick: (() -> Unit)? = null
 ) {
     if (subscriptions.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -324,6 +327,18 @@ private fun SubscriptionList(
         return
     }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+        if (onFeedClick != null) {
+            item {
+                Button(
+                    onClick = onFeedClick,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Icon(Icons.Default.Subscriptions, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("New videos from your channels", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
         items(subscriptions, key = { it.channelUrl }) { sub ->
             Row(
                 Modifier

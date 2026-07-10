@@ -8,7 +8,8 @@ data class VideoItem(
     val uploaderUrl: String = "",
     val viewCount: Long,
     val duration: Long,
-    val uploadedAgo: String = ""
+    val uploadedAgo: String = "",
+    val uploadedEpoch: Long = 0L
 )
 
 data class VideoChapter(

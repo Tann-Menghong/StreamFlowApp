@@ -161,9 +161,14 @@ fun PlayerScreen(
 
     LaunchedEffect(videoUrl) { vm.loadVideo(videoUrl) }
 
+    // ── Controls overlay visibility (portrait + fullscreen) ──────────────────
+    var showFsControls by remember { mutableStateOf(true) }
+    var fsTapTimestamp by remember { mutableLongStateOf(0L) }
+
     // ── Update MiniPlayerState when ready ────────────────────────────────────
     LaunchedEffect(state) {
         val r = state as? PlayerUiState.Ready ?: return@LaunchedEffect
+        fsTapTimestamp = System.currentTimeMillis() // start the controls auto-hide timer
         MiniPlayerState.update(MiniPlayerData(
             url = videoUrl,
             title = r.details.title,
@@ -272,10 +277,6 @@ fun PlayerScreen(
     var isSeekingPortrait by remember { mutableStateOf(false) }
     var seekTargetPortrait by remember { mutableLongStateOf(0L) }
 
-    // ── Fullscreen controls overlay ───────────────────────────────────────────
-    var showFsControls by remember { mutableStateOf(true) }
-    var fsTapTimestamp by remember { mutableLongStateOf(0L) }
-
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
@@ -336,9 +337,9 @@ fun PlayerScreen(
 
     // ── Fullscreen controls auto-hide (3 s after last interaction) ────────────
     // Stays visible while paused or scrubbing; timer restarts on every interaction.
-    LaunchedEffect(fsTapTimestamp, playerIsPlaying, isScrubbing) {
+    LaunchedEffect(fsTapTimestamp, playerIsPlaying, isScrubbing, isSeekingPortrait) {
         if (fsTapTimestamp == 0L) return@LaunchedEffect
-        if (!playerIsPlaying || isScrubbing) return@LaunchedEffect
+        if (!playerIsPlaying || isScrubbing || isSeekingPortrait) return@LaunchedEffect
         delay(3000L)
         showFsControls = false
     }
@@ -848,23 +849,38 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
-            // ── Center play/pause ────────────────────────────────────────
+            // ── Center transport controls ────────────────────────────────
             AnimatedVisibility(
                 visible = showFsControls && !isLocked && !isScrubbing && state is PlayerUiState.Ready,
                 enter = fadeIn(), exit = fadeOut(),
                 modifier = Modifier.align(Alignment.Center)
             ) {
-                IconButton(
-                    onClick = {
-                        mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(36.dp)) {
+                    IconButton(onClick = {
+                        mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                         fsTapTimestamp = System.currentTimeMillis()
-                    },
-                    modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), CircleShape)
-                ) {
-                    Icon(
-                        if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        null, tint = Color.White, modifier = Modifier.size(40.dp)
-                    )
+                    }) {
+                        Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
+                            fsTapTimestamp = System.currentTimeMillis()
+                        },
+                        modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), CircleShape)
+                    ) {
+                        Icon(
+                            if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            null, tint = Color.White, modifier = Modifier.size(40.dp)
+                        )
+                    }
+                    IconButton(onClick = {
+                        mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
+                        fsTapTimestamp = System.currentTimeMillis()
+                    }) {
+                        Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
                 }
             }
 
@@ -1079,6 +1095,98 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         if (!audioOnly) {
                             DoubleTapZones()
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SeekFeedback() }
+
+                            // ── YouTube-style controls overlay (tap video to toggle) ──
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = showFsControls,
+                                enter = fadeIn(), exit = fadeOut(),
+                                modifier = Modifier.matchParentSize()
+                            ) {
+                                Box(
+                                    Modifier.fillMaxSize()
+                                        .background(Color.Black.copy(0.38f))
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(onTap = { showFsControls = false })
+                                        }
+                                ) {
+                                    // Center transport controls
+                                    Row(
+                                        Modifier.align(Alignment.Center),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(28.dp)
+                                    ) {
+                                        IconButton(onClick = {
+                                            mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
+                                            fsTapTimestamp = System.currentTimeMillis()
+                                        }) {
+                                            Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
+                                                fsTapTimestamp = System.currentTimeMillis()
+                                            },
+                                            modifier = Modifier.size(64.dp).background(Color.Black.copy(0.35f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                null, tint = Color.White, modifier = Modifier.size(44.dp)
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
+                                            fsTapTimestamp = System.currentTimeMillis()
+                                        }) {
+                                            Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                        }
+                                    }
+
+                                    // Bottom: time · queue-next · fullscreen, then seek bar
+                                    Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
+                                                color = Color.White, fontSize = 11.sp
+                                            )
+                                            Spacer(Modifier.weight(1f))
+                                            if (queue.isNotEmpty()) {
+                                                IconButton(
+                                                    onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.SkipNext, "Next in queue",
+                                                        tint = Color.White, modifier = Modifier.size(22.dp))
+                                                }
+                                            }
+                                            IconButton(
+                                                onClick = { isFullscreen = true },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(Icons.Default.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                            }
+                                        }
+                                        if (playerDuration > 0L) {
+                                            Slider(
+                                                value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
+                                                onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
+                                                onValueChangeFinished = {
+                                                    mediaController?.seekTo(seekTargetPortrait); isSeekingPortrait = false
+                                                },
+                                                valueRange = 0f..playerDuration.toFloat(),
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                                    inactiveTrackColor = Color.White.copy(0.3f)
+                                                ),
+                                                modifier = Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                         // Skip sponsor banner (portrait)
                         if (showSkipBanner) {
@@ -1102,11 +1210,14 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         }
                     }
                 }
-                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
-                    Icon(Icons.Default.ArrowBack, null, tint = Color.White)
-                }
-                IconButton(onClick = { isFullscreen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                    Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                AnimatedVisibility(
+                    visible = showFsControls || state !is PlayerUiState.Ready,
+                    enter = fadeIn(), exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.padding(4.dp)) {
+                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
+                    }
                 }
                 if (autoPlayCountdown > 0) {
                     Box(
@@ -1130,78 +1241,6 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
         if (state is PlayerUiState.Ready) {
             val details = (state as PlayerUiState.Ready).details
-
-            // ── Portrait control bar ──────────────────────────────────────────
-            item {
-                Box(Modifier.fillMaxWidth().background(Color(0xFF0A0A0A))) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
-                        if (playerDuration > 0L) {
-                            Slider(
-                                value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
-                                onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
-                                onValueChangeFinished = {
-                                    mediaController?.seekTo(seekTargetPortrait); isSeekingPortrait = false
-                                },
-                                valueRange = 0f..playerDuration.toFloat(),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = Color.White.copy(0.25f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = { mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) } },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                }
-                                IconButton(
-                                    onClick = { mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() } },
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Icon(
-                                        if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        null, tint = Color.White, modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) } },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                }
-                                if (queue.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.SkipNext, "Next in queue", tint = Color.White, modifier = Modifier.size(24.dp))
-                                    }
-                                }
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
-                                    color = Color.White.copy(0.85f), fontSize = 12.sp
-                                )
-                            }
-                            IconButton(
-                                onClick = { isFullscreen = true },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(Icons.Default.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                }
-            }
 
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {

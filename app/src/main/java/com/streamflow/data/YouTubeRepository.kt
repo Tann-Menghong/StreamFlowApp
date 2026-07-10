@@ -311,6 +311,9 @@ class YouTubeRepository {
         uploaderUrl = try { uploaderUrl ?: "" } catch (_: Exception) { "" },
         viewCount = viewCount,
         duration = duration,
-        uploadedAgo = try { textualUploadDate ?: "" } catch (_: Exception) { "" }
+        uploadedAgo = try { textualUploadDate ?: "" } catch (_: Exception) { "" },
+        uploadedEpoch = try {
+            uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli() ?: 0L
+        } catch (_: Exception) { 0L }
     )
 }
