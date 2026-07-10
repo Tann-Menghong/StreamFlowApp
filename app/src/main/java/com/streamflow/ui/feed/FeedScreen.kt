@@ -1,6 +1,8 @@
 package com.streamflow.ui.feed
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +31,8 @@ fun FeedScreen(
 ) {
     LaunchedEffect(Unit) { vm.load() }
     val state by vm.uiState.collectAsState()
+    val groups by vm.groups.collectAsState()
+    val groupFilter by vm.groupFilter.collectAsState()
 
     Scaffold(
         topBar = {
@@ -49,7 +53,25 @@ fun FeedScreen(
             )
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) {
+        Column(Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) {
+            // Channel-group filter chips
+            if (groups.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (listOf("All") + groups).forEach { g ->
+                        FilterChip(
+                            selected = groupFilter == g,
+                            onClick  = { vm.setGroupFilter(g) },
+                            label    = { Text(g) }
+                        )
+                    }
+                }
+            }
+            Box(Modifier.fillMaxSize()) {
             when (val s = state) {
                 is FeedUiState.Loading -> ShimmerList()
                 is FeedUiState.NoSubscriptions -> Column(
@@ -90,6 +112,7 @@ fun FeedScreen(
                         )
                     }
                 }
+            }
             }
         }
     }

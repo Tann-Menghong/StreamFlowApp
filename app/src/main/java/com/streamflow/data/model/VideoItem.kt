@@ -24,6 +24,18 @@ data class SubtitleTrack(
     val mimeType: String = "text/vtt"
 )
 
+// Seek-preview sprite sheets (YouTube storyboards): each url is a grid page of
+// frames laid out framesPerPageX × framesPerPageY, one frame per durationPerFrameMs
+data class Storyboard(
+    val urls: List<String>,
+    val frameWidth: Int,
+    val frameHeight: Int,
+    val totalCount: Int,
+    val framesPerPageX: Int,
+    val framesPerPageY: Int,
+    val durationPerFrameMs: Int
+)
+
 data class VideoDetails(
     val url: String,
     val title: String,
@@ -42,5 +54,7 @@ data class VideoDetails(
     val subtitles: List<SubtitleTrack> = emptyList(),
     val availableQualities: List<Int> = emptyList(),
     val currentQuality: Int = 0,
-    val isLive: Boolean = false
+    val isLive: Boolean = false,
+    val videoCodec: String = "",
+    val storyboard: Storyboard? = null
 )

@@ -30,7 +30,30 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow<FeedUiState>(FeedUiState.Loading)
     val uiState: StateFlow<FeedUiState> = _uiState
 
+    // Channel groups for the filter chips; videos tagged by source channel
+    private val _groups = MutableStateFlow<List<String>>(emptyList())
+    val groups: StateFlow<List<String>> = _groups
+
+    private val _groupFilter = MutableStateFlow("All")
+    val groupFilter: StateFlow<String> = _groupFilter
+
+    private var videosByChannel: List<Pair<String, VideoItem>> = emptyList()
+    private var channelGroups: Map<String, String> = emptyMap()
+
     private var loaded = false
+
+    fun setGroupFilter(group: String) {
+        _groupFilter.value = group
+        applyFilter()
+    }
+
+    private fun applyFilter() {
+        if (videosByChannel.isEmpty()) return
+        val g = _groupFilter.value
+        val videos = if (g == "All") videosByChannel.map { it.second }
+                     else videosByChannel.filter { channelGroups[it.first] == g }.map { it.second }
+        _uiState.value = FeedUiState.Success(videos.sortedByDescending { it.uploadedEpoch })
+    }
 
     fun load(force: Boolean = false) {
         if (loaded && !force && _uiState.value is FeedUiState.Success) return
@@ -42,22 +65,30 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.value = FeedUiState.NoSubscriptions
                     return@launch
                 }
-                // Fetch each channel's latest uploads in parallel (cap channels + per-channel count)
-                val videos = coroutineScope {
+                channelGroups = subs.associate { it.channelUrl to it.groupName }
+                _groups.value = subs.mapNotNull { it.groupName.ifBlank { null } }.distinct().sorted()
+
+                // Fetch each channel's latest uploads in parallel (cap channels + per-channel count),
+                // keeping which channel each video came from so group filtering works
+                videosByChannel = coroutineScope {
                     subs.take(12).map { sub ->
                         async {
-                            try { repo.getChannelInfo(sub.channelUrl).videos.take(5) }
-                            catch (_: Exception) { emptyList() }
+                            try {
+                                repo.getChannelInfo(sub.channelUrl).videos.take(5)
+                                    .map { sub.channelUrl to it }
+                            } catch (_: Exception) { emptyList() }
                         }
                     }.awaitAll().flatten()
                 }
-                if (videos.isEmpty()) {
+                if (videosByChannel.isEmpty()) {
                     _uiState.value = FeedUiState.Error("Couldn't load any videos from your channels.")
                     return@launch
                 }
-                // Newest first; videos with unknown dates go last (keep channel order there)
-                val sorted = videos.sortedByDescending { it.uploadedEpoch }
-                _uiState.value = FeedUiState.Success(sorted)
+                // If the previously selected group no longer exists, fall back to All
+                if (_groupFilter.value != "All" && _groupFilter.value !in _groups.value) {
+                    _groupFilter.value = "All"
+                }
+                applyFilter()
                 loaded = true
             } catch (e: Exception) {
                 _uiState.value = FeedUiState.Error(friendlyError(e))

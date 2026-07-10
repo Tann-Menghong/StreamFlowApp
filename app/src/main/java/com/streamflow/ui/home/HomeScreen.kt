@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -92,6 +93,8 @@ fun HomeScreen(
     val hideShorts       by vm.hideShorts.collectAsState()
     val suggestions      by vm.suggestions.collectAsState()
     val sortMode         by vm.sortMode.collectAsState()
+    val historyProgress  by vm.historyProgress.collectAsState()
+    val incognitoOn      by vm.incognito.collectAsState()
     val listState        = rememberLazyListState()
     val context          = LocalContext.current
     var showCountryPicker by remember { mutableStateOf(false) }
@@ -267,12 +270,32 @@ fun HomeScreen(
                                     delay(80); focusRequester.requestFocus()
                                 }
                             } else {
-                                Text(
-                                    "StreamFlow",
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize   = 22.sp,
-                                    color      = MaterialTheme.colorScheme.primary
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        "StreamFlow",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize   = 22.sp,
+                                        color      = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (incognitoOn) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                            modifier = Modifier
+                                                .background(MaterialTheme.colorScheme.surfaceVariant,
+                                                    RoundedCornerShape(10.dp))
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                        ) {
+                                            Icon(Icons.Default.VisibilityOff, null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(12.dp))
+                                            Text("Incognito", fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
@@ -522,6 +545,7 @@ fun HomeScreen(
                                         modifier = Modifier.animateItemPlacement(),
                                         enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
                                         VideoCard(video = video, onClick = { onVideoClick(video.url) },
+                                            progressFraction = historyProgress[video.url] ?: 0f,
                                             onChannelClick = onChannelClick,
                                             onNotInterested = { hideVideo(video) },
                                             onBlockChannel = if (video.uploaderUrl.isNotEmpty())
@@ -599,12 +623,14 @@ fun HomeScreen(
                                         Box(Modifier.padding(horizontal = 16.dp)) {
                                             if (cardStyle == "COMPACT") {
                                                 CompactVideoCard(video = video, onClick = { onVideoClick(video.url) },
+                                                    progressFraction = historyProgress[video.url] ?: 0f,
                                                     onChannelClick = onChannelClick,
                                                     onNotInterested = { hideVideo(video) },
                                                     onBlockChannel = if (video.uploaderUrl.isNotEmpty())
                                                         ({ hideChannel(video) }) else null)
                                             } else {
                                                 VideoCard(video = video, onClick = { onVideoClick(video.url) },
+                                                    progressFraction = historyProgress[video.url] ?: 0f,
                                                     onChannelClick = onChannelClick,
                                                     onNotInterested = { hideVideo(video) },
                                                     onBlockChannel = if (video.uploaderUrl.isNotEmpty())

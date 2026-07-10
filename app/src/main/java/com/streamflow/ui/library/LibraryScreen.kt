@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -160,7 +162,8 @@ fun LibraryScreen(
                             emptySubtitle = "Videos you watch will appear here.",
                             emptyIcon = Icons.Default.History,
                             progressFractions = progressMap,
-                            remainingSeconds = remainingMap
+                            remainingSeconds = remainingMap,
+                            header = { HistoryStatsRow(history) }
                         )
                     }
                     2 -> VideoListWithSearch(
@@ -175,7 +178,8 @@ fun LibraryScreen(
                             subscriptions = subscriptions,
                             onChannelClick = onChannelClick,
                             onUnsubscribe = vm::unsubscribe,
-                            onFeedClick = onFeedClick
+                            onFeedClick = onFeedClick,
+                            onSetGroup = vm::setGroup
                         )
                     4 -> PlaylistList(
                             playlists = playlists,
@@ -342,6 +346,51 @@ private fun DownloadList(
     }
 }
 
+// Watch stats for the History tab: videos today / this week, total watch time
+@Composable
+private fun HistoryStatsRow(history: List<HistoryEntity>) {
+    if (history.isEmpty()) return
+    val dayStart = remember(history.size) {
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val weekStart = System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000
+    val today = history.count { it.watchedAt >= dayStart }
+    val week  = history.count { it.watchedAt >= weekStart }
+    val watchMs = history.sumOf { it.position }
+    val watchLabel = run {
+        val totalMin = watchMs / 60000L
+        if (totalMin >= 60) "${totalMin / 60}h ${totalMin % 60}m" else "${totalMin}m"
+    }
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatCell("$today", "Today")
+            StatCell("$week", "This week")
+            StatCell(watchLabel, "Watch time")
+        }
+    }
+}
+
+@Composable
+private fun StatCell(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+            color = MaterialTheme.colorScheme.primary)
+        Text(label, fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @Composable
 private fun VideoListWithSearch(
     items: List<VideoItem>,
@@ -351,7 +400,8 @@ private fun VideoListWithSearch(
     emptySubtitle: String,
     emptyIcon: ImageVector,
     progressFractions: Map<String, Float> = emptyMap(),
-    remainingSeconds: Map<String, Long> = emptyMap()
+    remainingSeconds: Map<String, Long> = emptyMap(),
+    header: (@Composable () -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var sortBy by remember { mutableStateOf("Date") }
@@ -368,6 +418,7 @@ private fun VideoListWithSearch(
         }
 
     Column(Modifier.fillMaxSize()) {
+        header?.invoke()
         // Search + sort row
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -489,13 +540,23 @@ private fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SubscriptionList(
     subscriptions: List<SubscriptionEntity>,
     onChannelClick: ((String) -> Unit)?,
     onUnsubscribe: (String) -> Unit,
-    onFeedClick: (() -> Unit)? = null
+    onFeedClick: (() -> Unit)? = null,
+    onSetGroup: ((String, String) -> Unit)? = null
 ) {
+    var groupFilter by remember { mutableStateOf("All") }
+    var groupTarget by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    val groups = remember(subscriptions) {
+        subscriptions.mapNotNull { it.groupName.ifBlank { null } }.distinct().sorted()
+    }
+    val shown = if (groupFilter == "All") subscriptions
+                else subscriptions.filter { it.groupName == groupFilter }
+
     if (subscriptions.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
@@ -515,56 +576,136 @@ private fun SubscriptionList(
         }
         return
     }
-    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-        if (onFeedClick != null) {
-            item {
-                Button(
-                    onClick = onFeedClick,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                ) {
-                    Icon(Icons.Default.Subscriptions, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("New videos from your channels", fontWeight = FontWeight.SemiBold)
+    Column(Modifier.fillMaxSize()) {
+        // Group filter chips (shown once at least one group exists)
+        if (groups.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                (listOf("All") + groups).forEach { g ->
+                    FilterChip(
+                        selected = groupFilter == g,
+                        onClick  = { groupFilter = g },
+                        label    = { Text(g, fontSize = 12.sp) },
+                        shape    = RoundedCornerShape(16.dp)
+                    )
                 }
             }
         }
-        items(subscriptions, key = { it.channelUrl }) { sub ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(enabled = onChannelClick != null) { onChannelClick?.invoke(sub.channelUrl) }
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (sub.avatarUrl.isNotEmpty()) {
-                    coil.compose.AsyncImage(
-                        model = sub.avatarUrl, contentDescription = null,
-                        modifier = Modifier.size(46.dp).clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                } else {
-                    Box(
-                        Modifier.size(46.dp).clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
+        LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+            if (onFeedClick != null) {
+                item {
+                    Button(
+                        onClick = onFeedClick,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     ) {
-                        Text(sub.name.firstOrNull()?.uppercase() ?: "?",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Subscriptions, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("New videos from your channels", fontWeight = FontWeight.SemiBold)
                     }
                 }
-                Text(sub.name, modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground)
-                TextButton(onClick = { onUnsubscribe(sub.channelUrl) }) {
-                    Text("Unsubscribe", fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(shown, key = { it.channelUrl }) { sub ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(enabled = onChannelClick != null) { onChannelClick?.invoke(sub.channelUrl) }
+                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (sub.avatarUrl.isNotEmpty()) {
+                        coil.compose.AsyncImage(
+                            model = sub.avatarUrl, contentDescription = null,
+                            modifier = Modifier.size(46.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
+                    } else {
+                        Box(
+                            Modifier.size(46.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(sub.name.firstOrNull()?.uppercase() ?: "?",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(sub.name,
+                            fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onBackground)
+                        if (sub.groupName.isNotBlank()) {
+                            Text(sub.groupName, fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    if (onSetGroup != null) {
+                        IconButton(onClick = { groupTarget = sub }) {
+                            Icon(Icons.Default.Folder, "Set group",
+                                tint = if (sub.groupName.isNotBlank()) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
+                                modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    TextButton(onClick = { onUnsubscribe(sub.channelUrl) }) {
+                        Text("Unsubscribe", fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.1f))
+            }
+        }
+    }
+
+    // "Set group" dialog: pick an existing group, type a new one, or clear it
+    groupTarget?.let { sub ->
+        var groupName by remember(sub.channelUrl) { mutableStateOf(sub.groupName) }
+        AlertDialog(
+            onDismissRequest = { groupTarget = null },
+            title = { Text("Group for ${sub.name}") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = groupName, onValueChange = { groupName = it },
+                        placeholder = { Text("Group name (e.g. Music)") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (groups.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            groups.forEach { g ->
+                                SuggestionChip(onClick = { groupName = g },
+                                    label = { Text(g, fontSize = 12.sp) })
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSetGroup?.invoke(sub.channelUrl, groupName)
+                    groupTarget = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row {
+                    if (sub.groupName.isNotBlank()) {
+                        TextButton(onClick = {
+                            onSetGroup?.invoke(sub.channelUrl, "")
+                            groupTarget = null
+                        }) { Text("Remove") }
+                    }
+                    TextButton(onClick = { groupTarget = null }) { Text("Cancel") }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.1f))
-        }
+        )
     }
 }
 

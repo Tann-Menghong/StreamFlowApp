@@ -270,6 +270,15 @@ fun VideoCard(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Play next") },
+                            leadingIcon = { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                PlaybackQueue.addNext(video)
+                                Toast.makeText(context, "Will play next", Toast.LENGTH_SHORT).show()
+                                showMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Add to queue") },
                             leadingIcon = { Icon(Icons.Default.QueueMusic, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
@@ -404,6 +413,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
 fun CompactVideoCard(
     video: VideoItem,
     onClick: () -> Unit,
+    progressFraction: Float = 0f,
     onChannelClick: ((String) -> Unit)? = null,
     onAddToWatchLater: (() -> Unit)? = null,
     onAddToFavorites:  (() -> Unit)? = null,
@@ -454,6 +464,19 @@ fun CompactVideoCard(
                 ) {
                     Text(formatDuration(video.duration), color = Color.White,
                         fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            // Watch progress bar
+            if (progressFraction in 0.01f..0.99f) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                ) {
+                    Box(Modifier.fillMaxSize().background(Color.White.copy(0.3f)))
+                    Box(Modifier.fillMaxWidth(progressFraction).fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary))
                 }
             }
         }
@@ -532,6 +555,15 @@ fun CompactVideoCard(
                     onClick = {
                         val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, video.url) }
                         context.startActivity(Intent.createChooser(i, "Share video"))
+                        showMenu = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Play next") },
+                    leadingIcon = { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        PlaybackQueue.addNext(video)
+                        Toast.makeText(context, "Will play next", Toast.LENGTH_SHORT).show()
                         showMenu = false
                     }
                 )

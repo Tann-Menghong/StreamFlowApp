@@ -2,6 +2,7 @@ package com.streamflow.data
 
 import com.streamflow.data.model.Comment
 import com.streamflow.data.model.SponsorSegment
+import com.streamflow.data.model.Storyboard
 import com.streamflow.data.model.SubtitleTrack
 import com.streamflow.data.model.VideoChapter
 import com.streamflow.data.model.VideoDetails
@@ -156,38 +157,45 @@ class YouTubeRepository {
             } catch (_: Exception) { false }
 
             val currentQuality: Int
+            val videoCodec: String
             when {
                 // Live streams: play the HLS (or DASH) manifest; ExoPlayer handles quality adaptively
                 isLive && (!hlsUrl.isNullOrEmpty() || !dashUrl.isNullOrEmpty()) -> {
                     streamUrl = if (!hlsUrl.isNullOrEmpty()) hlsUrl!! else dashUrl!!
                     audioUrl = null
                     currentQuality = 0
+                    videoCodec = "Adaptive"
                 }
                 videoOnlyStream != null && audioStream != null &&
                     videoOnlyStream.height > (muxedStream?.height ?: 0) -> {
                     streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
                     audioUrl = audioStream.content
                     currentQuality = videoOnlyStream.height
+                    videoCodec = codecLabel(videoOnlyStream.format)
                 }
                 muxedStream != null -> {
                     streamUrl = muxedStream.content ?: throw Exception("Muxed stream URL is null")
                     audioUrl = null
                     currentQuality = muxedStream.height
+                    videoCodec = codecLabel(muxedStream.format)
                 }
                 videoOnlyStream != null && audioStream != null -> {
                     streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
                     audioUrl = audioStream.content
                     currentQuality = videoOnlyStream.height
+                    videoCodec = codecLabel(videoOnlyStream.format)
                 }
                 !hlsUrl.isNullOrEmpty() -> {
                     streamUrl = hlsUrl!!
                     audioUrl = null
                     currentQuality = 0
+                    videoCodec = "Adaptive"
                 }
                 audioStream != null -> {
                     streamUrl = audioStream.content ?: throw Exception("Audio stream URL is null")
                     audioUrl = null
                     currentQuality = 0
+                    videoCodec = "Audio"
                 }
                 else -> throw Exception("No playable stream found for: $videoUrl")
             }
@@ -210,6 +218,25 @@ class YouTubeRepository {
                 }
             } catch (_: Exception) { emptyList() }
 
+            // Seek-preview sprite sheets; pick the frameset closest to ~200px wide
+            // (big enough to see, small enough to load instantly while scrubbing)
+            val storyboard = try {
+                info.previewFrames
+                    .filter { it.urls.isNotEmpty() && it.frameWidth > 0 && it.durationPerFrame > 0 }
+                    .minByOrNull { kotlin.math.abs(it.frameWidth - 200) }
+                    ?.let { fs ->
+                        Storyboard(
+                            urls = fs.urls,
+                            frameWidth = fs.frameWidth,
+                            frameHeight = fs.frameHeight,
+                            totalCount = fs.totalCount,
+                            framesPerPageX = fs.framesPerPageX,
+                            framesPerPageY = fs.framesPerPageY,
+                            durationPerFrameMs = fs.durationPerFrame
+                        )
+                    }
+            } catch (_: Exception) { null }
+
             val details = VideoDetails(
                 url = videoUrl,
                 title = info.name,
@@ -228,11 +255,20 @@ class YouTubeRepository {
                 subtitles = subtitles,
                 availableQualities = if (isLive) emptyList() else availableQualities,
                 currentQuality = currentQuality,
-                isLive = isLive
+                isLive = isLive,
+                videoCodec = videoCodec,
+                storyboard = storyboard
             )
             VideoDetailsCache.put(cacheKey, details)
             details
         }
+
+    private fun codecLabel(format: org.schabi.newpipe.extractor.MediaFormat?): String = when (format) {
+        org.schabi.newpipe.extractor.MediaFormat.MPEG_4 -> "H.264 / MP4"
+        org.schabi.newpipe.extractor.MediaFormat.WEBM   -> "VP9 / WebM"
+        org.schabi.newpipe.extractor.MediaFormat.v3GPP  -> "3GPP"
+        else -> format?.getName() ?: ""
+    }
 
     suspend fun getChannelInfo(channelUrl: String, tabFilter: String = "videos"): ChannelResult = withContext(Dispatchers.IO) {
         val info = ChannelInfo.getInfo(youtube, channelUrl)

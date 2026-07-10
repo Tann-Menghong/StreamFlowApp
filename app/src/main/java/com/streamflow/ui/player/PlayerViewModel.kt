@@ -175,9 +175,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _sponsorSegments = MutableStateFlow<List<SponsorSegment>>(emptyList())
     val sponsorSegments: StateFlow<List<SponsorSegment>> = _sponsorSegments
 
-    // ── Audio-only ────────────────────────────────────────────────────────────
+    // ── Audio-only (remembered across videos/sessions) ───────────────────────
     private val _audioOnly = MutableStateFlow(false)
     val audioOnly: StateFlow<Boolean> = _audioOnly
+
+    init {
+        viewModelScope.launch { _audioOnly.value = prefs.audioOnlyMode.first() }
+    }
 
     // ── Playback queue ────────────────────────────────────────────────────────
     val queue = PlaybackQueue.queue
@@ -289,6 +293,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleAudioOnly() {
         _audioOnly.value = !_audioOnly.value
+        viewModelScope.launch { prefs.setAudioOnlyMode(_audioOnly.value) }
     }
 
     fun toggleFavorite() {

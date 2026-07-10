@@ -98,6 +98,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _suggestions.value = emptyList()
     }
 
+    // Watched-progress per video url, for the red progress bar on thumbnails
+    val historyProgress: StateFlow<Map<String, Float>> = db.historyDao().getAll()
+        .map { list ->
+            list.asSequence()
+                .filter { it.duration > 0L && it.position > 0L }
+                .associate { it.url to (it.position / 1000f / it.duration).coerceIn(0f, 1f) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val hideWatched = prefs.hideWatched.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     fun setHideWatched(v: Boolean) = viewModelScope.launch { prefs.setHideWatched(v) }
 
@@ -261,7 +272,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         clearSuggestions()
         feedGeneration++
         viewModelScope.launch {
-            prefs.addRecentSearch(query)
+            // Incognito: leave no trace in recent searches
+            if (!prefs.incognito.first()) prefs.addRecentSearch(query)
             _uiState.value = HomeUiState.Loading
             nextPage = null
             try {

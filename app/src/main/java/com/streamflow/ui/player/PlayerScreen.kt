@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -293,6 +294,20 @@ fun PlayerScreen(
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
+
+    // ── A–B section loop ─────────────────────────────────────────────────────
+    var loopA by remember { mutableStateOf<Long?>(null) }
+    var loopB by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(videoUrl) { loopA = null; loopB = null }
+    LaunchedEffect(loopA, loopB, mediaController) {
+        val a = loopA ?: return@LaunchedEffect
+        val b = loopB ?: return@LaunchedEffect
+        while (true) {
+            delay(250L)
+            val mc = mediaController ?: continue
+            if (mc.currentPosition >= b) mc.seekTo(a)
+        }
+    }
 
     // ── Auto-save position every 5 s while playing ──────────────────────────
     LaunchedEffect(videoUrl, mediaController) {
@@ -873,6 +888,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         .padding(12.dp)
                 ) {
                     Column {
+                        val stDetails = (state as? PlayerUiState.Ready)?.details
+                        if (stDetails != null && stDetails.currentQuality > 0) {
+                            Text("Quality: ${stDetails.currentQuality}p" +
+                                (if (stDetails.videoCodec.isNotEmpty()) "  ·  ${stDetails.videoCodec}" else ""),
+                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
                         Text("Buffer: $bufferPct%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Text("Position: ${pos / 1000}s / ${dur / 1000}s", color = Color.White, fontSize = 11.sp)
                         Text("Zoom: ${"%.1f".format(zoom)}x", color = Color.White, fontSize = 11.sp)
@@ -915,16 +936,31 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
 
-            // ── Scrub preview ────────────────────────────────────────────
+            // ── Scrub preview (frame thumbnail + time + chapter) ─────────
             if (isScrubbing) {
-                Box(Modifier.align(Alignment.Center)
-                    .background(Color.Black.copy(0.7f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    val h = scrubTargetMs / 3_600_000
-                    val m = (scrubTargetMs % 3_600_000) / 60_000
-                    val s = (scrubTargetMs % 60_000) / 1_000
-                    Text(if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s),
-                        color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                val scrubDetails = (state as? PlayerUiState.Ready)?.details
+                Column(
+                    Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    scrubDetails?.storyboard?.let { sb ->
+                        StoryboardPreview(sb, scrubTargetMs,
+                            Modifier.size(176.dp, 99.dp).clip(RoundedCornerShape(10.dp)))
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Column(
+                        Modifier.background(Color.Black.copy(0.7f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(fmtMs(scrubTargetMs),
+                            color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        val chTitle = scrubDetails?.chapters
+                            ?.lastOrNull { scrubTargetMs >= it.startMs }?.title
+                        if (!chTitle.isNullOrEmpty()) {
+                            Text(chTitle, color = Color.White.copy(0.8f), fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
                 }
             }
 
@@ -991,24 +1027,29 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     val fsIsLive = (state as? PlayerUiState.Ready)?.details?.isLive == true
+                    val fsChapters = (state as? PlayerUiState.Ready)?.details?.chapters ?: emptyList()
                     Column(Modifier.fillMaxWidth()) {
                         if (playerDuration > 0L && !fsIsLive) {
-                            Slider(
-                                value = (if (isScrubbing) scrubTargetMs else playerPosition).toFloat(),
-                                onValueChange = { v ->
-                                    scrubTargetMs = v.toLong(); isScrubbing = true
-                                },
-                                onValueChangeFinished = {
-                                    mediaController?.seekTo(scrubTargetMs); isScrubbing = false
-                                },
-                                valueRange = 0f..playerDuration.toFloat(),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = Color.White.copy(0.35f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Box(Modifier.fillMaxWidth()) {
+                                Slider(
+                                    value = (if (isScrubbing) scrubTargetMs else playerPosition).toFloat(),
+                                    onValueChange = { v ->
+                                        scrubTargetMs = v.toLong(); isScrubbing = true
+                                    },
+                                    onValueChangeFinished = {
+                                        mediaController?.seekTo(scrubTargetMs); isScrubbing = false
+                                    },
+                                    valueRange = 0f..playerDuration.toFloat(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                                        inactiveTrackColor = Color.White.copy(0.35f)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                ChapterTicks(fsChapters, playerDuration,
+                                    Modifier.matchParentSize().padding(horizontal = 10.dp))
+                            }
                         }
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -1219,22 +1260,51 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             }
                                         }
                                         if (playerDuration > 0L && !s.details.isLive) {
-                                            Slider(
-                                                value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
-                                                onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
-                                                onValueChangeFinished = {
-                                                    mediaController?.seekTo(seekTargetPortrait); isSeekingPortrait = false
-                                                },
-                                                valueRange = 0f..playerDuration.toFloat(),
-                                                colors = SliderDefaults.colors(
-                                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                                    inactiveTrackColor = Color.White.copy(0.3f)
-                                                ),
-                                                modifier = Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 4.dp)
-                                            )
+                                            Box(Modifier.fillMaxWidth()) {
+                                                Slider(
+                                                    value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
+                                                    onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
+                                                    onValueChangeFinished = {
+                                                        mediaController?.seekTo(seekTargetPortrait); isSeekingPortrait = false
+                                                    },
+                                                    valueRange = 0f..playerDuration.toFloat(),
+                                                    colors = SliderDefaults.colors(
+                                                        thumbColor = MaterialTheme.colorScheme.primary,
+                                                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                                                        inactiveTrackColor = Color.White.copy(0.3f)
+                                                    ),
+                                                    modifier = Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 4.dp)
+                                                )
+                                                ChapterTicks(s.details.chapters, playerDuration,
+                                                    Modifier.matchParentSize().padding(horizontal = 12.dp))
+                                            }
                                         }
                                     }
+                                }
+                            }
+
+                            // Seek preview while dragging the portrait seek bar
+                            if (isSeekingPortrait) {
+                                Column(
+                                    Modifier.align(Alignment.Center),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    s.details.storyboard?.let { sb ->
+                                        StoryboardPreview(sb, seekTargetPortrait,
+                                            Modifier.size(144.dp, 81.dp).clip(RoundedCornerShape(8.dp)))
+                                        Spacer(Modifier.height(6.dp))
+                                    }
+                                    val chTitle = s.details.chapters
+                                        .lastOrNull { seekTargetPortrait >= it.startMs }?.title
+                                    Text(
+                                        fmtMs(seekTargetPortrait) +
+                                            (if (!chTitle.isNullOrEmpty()) "  ·  $chTitle" else ""),
+                                        color = Color.White, fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold, maxLines = 1,
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(0.65f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
                                 }
                             }
                         }
@@ -1477,6 +1547,28 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     tint = if (repeatMode == Player.REPEAT_MODE_ONE) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            // A–B loop: tap sets point A, tap again sets B, third tap clears
+                            TextButton(
+                                onClick = {
+                                    when {
+                                        loopA == null -> loopA = playerPosition
+                                        loopB == null -> loopB = maxOf(playerPosition, loopA!! + 1000L)
+                                        else -> { loopA = null; loopB = null }
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp)
+                            ) {
+                                Text(
+                                    when {
+                                        loopA == null -> "A·B"
+                                        loopB == null -> "A·?"
+                                        else -> "A·B ✓"
+                                    },
+                                    fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                    color = if (loopA != null) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurface.copy(0.6f)
                                 )
                             }
                             // Audio-only toggle
@@ -1838,7 +1930,14 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     Text("Queue  (${queue.size})", style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                     if (queue.isNotEmpty()) {
-                        TextButton(onClick = { PlaybackQueue.clear() }) { Text("Clear all") }
+                        Row {
+                            IconButton(onClick = { PlaybackQueue.shuffle() }) {
+                                Icon(Icons.Default.Shuffle, "Shuffle queue",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp))
+                            }
+                            TextButton(onClick = { PlaybackQueue.clear() }) { Text("Clear all") }
+                        }
                     }
                 }
                 HorizontalDivider()
@@ -1873,6 +1972,21 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 Text(video.uploaderName, fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            // Reorder
+                            IconButton(onClick = { PlaybackQueue.move(idx, idx - 1) },
+                                enabled = idx > 0, modifier = Modifier.size(26.dp)) {
+                                Icon(Icons.Default.KeyboardArrowUp, "Move up",
+                                    tint = if (idx > 0) MaterialTheme.colorScheme.onSurfaceVariant
+                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                                    modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { PlaybackQueue.move(idx, idx + 1) },
+                                enabled = idx < queue.size - 1, modifier = Modifier.size(26.dp)) {
+                                Icon(Icons.Default.KeyboardArrowDown, "Move down",
+                                    tint = if (idx < queue.size - 1) MaterialTheme.colorScheme.onSurfaceVariant
+                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                                    modifier = Modifier.size(18.dp))
+                            }
                             IconButton(onClick = { PlaybackQueue.remove(idx) },
                                 modifier = Modifier.size(28.dp)) {
                                 Icon(Icons.Default.Close, null,
@@ -1892,4 +2006,68 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 private fun fmtMs(ms: Long): String {
     val s = ms / 1000L; val h = s / 3600; val m = (s % 3600) / 60; val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+// Chapter boundary tick marks drawn over a seek Slider (draw-only, never
+// intercepts touches)
+@Composable
+private fun ChapterTicks(
+    chapters: List<com.streamflow.data.model.VideoChapter>,
+    durationMs: Long,
+    modifier: Modifier
+) {
+    if (chapters.size < 2 || durationMs <= 0L) return
+    androidx.compose.foundation.Canvas(modifier) {
+        val tickW = 2.dp.toPx()
+        val tickH = 5.dp.toPx()
+        chapters.drop(1).forEach { ch ->
+            val x = (ch.startMs.toFloat() / durationMs) * size.width
+            drawRect(
+                color = Color.Black.copy(0.6f),
+                topLeft = Offset(x - tickW / 2, size.height / 2 - tickH / 2),
+                size = androidx.compose.ui.geometry.Size(tickW, tickH)
+            )
+        }
+    }
+}
+
+// Draws the storyboard frame for a playback position by cropping the right
+// cell out of YouTube's sprite-sheet page (loaded and cached via Coil)
+@Composable
+private fun StoryboardPreview(
+    sb: com.streamflow.data.model.Storyboard,
+    positionMs: Long,
+    modifier: Modifier
+) {
+    val perPage = (sb.framesPerPageX * sb.framesPerPageY).coerceAtLeast(1)
+    val frameIdx = (positionMs / sb.durationPerFrameMs.coerceAtLeast(1))
+        .toInt().coerceIn(0, (sb.totalCount - 1).coerceAtLeast(0))
+    val pageIdx = (frameIdx / perPage).coerceIn(0, sb.urls.size - 1)
+    val inPage = frameIdx % perPage
+    val col = inPage % sb.framesPerPageX
+    val rowIdx = inPage / sb.framesPerPageX
+
+    val context = LocalContext.current
+    var pageBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(pageIdx) {
+        // allowHardware(false): Canvas cropping needs a software bitmap
+        val request = coil.request.ImageRequest.Builder(context)
+            .data(sb.urls[pageIdx])
+            .allowHardware(false)
+            .build()
+        val drawable = try { coil.Coil.imageLoader(context).execute(request).drawable } catch (_: Exception) { null }
+        (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap?.let {
+            pageBitmap = it.asImageBitmap()
+        }
+    }
+
+    val bmp = pageBitmap ?: return
+    androidx.compose.foundation.Canvas(modifier.background(Color.Black)) {
+        drawImage(
+            image = bmp,
+            srcOffset = androidx.compose.ui.unit.IntOffset(col * sb.frameWidth, rowIdx * sb.frameHeight),
+            srcSize = androidx.compose.ui.unit.IntSize(sb.frameWidth, sb.frameHeight),
+            dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+        )
+    }
 }

@@ -26,4 +26,7 @@ interface SubscriptionDao {
 
     @Query("UPDATE subscriptions SET lastVideoUrl = :videoUrl WHERE channelUrl = :channelUrl")
     suspend fun updateLastVideo(channelUrl: String, videoUrl: String)
+
+    @Query("UPDATE subscriptions SET groupName = :group WHERE channelUrl = :channelUrl")
+    suspend fun updateGroup(channelUrl: String, group: String)
 }

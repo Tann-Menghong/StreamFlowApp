@@ -12,18 +12,26 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.streamflow.data.NewVideosWorker
 import com.streamflow.data.OkHttpDownloader
+import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.AppDatabase
 import com.streamflow.data.local.AppPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.schabi.newpipe.extractor.NewPipe
 import java.util.concurrent.TimeUnit
 
 class StreamFlowApp : Application(), ImageLoaderFactory {
     val database by lazy { AppDatabase.get(this) }
     val prefs by lazy { AppPreferences.get(this) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         NewPipe.init(OkHttpDownloader.instance)
+
+        // Restore + persist the playback queue across app restarts
+        PlaybackQueue.bind(prefs, appScope)
 
         // Periodic new-upload check; the worker itself no-ops when the
         // notification setting is off

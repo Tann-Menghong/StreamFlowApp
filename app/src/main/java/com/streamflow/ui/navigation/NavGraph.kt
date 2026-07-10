@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -107,6 +109,46 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             miniMediaController?.release()
             miniMediaController = null
         }
+    }
+
+    // "What's New" dialog: shown once after every app update (not on fresh installs)
+    var showWhatsNew by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val lastSeen = appPrefs.lastSeenVersion.first()
+        val current = com.streamflow.BuildConfig.VERSION_CODE
+        if (lastSeen in 1 until current) showWhatsNew = true
+        if (lastSeen != current) appPrefs.setLastSeenVersion(current)
+    }
+    if (showWhatsNew) {
+        AlertDialog(
+            onDismissRequest = { showWhatsNew = false },
+            title = {
+                Column {
+                    Text("What's new", fontWeight = FontWeight.Bold)
+                    Text("Version ${com.streamflow.data.Changelog.VERSION_NAME}",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            text = {
+                Column(
+                    Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    com.streamflow.data.Changelog.notes.forEach { note ->
+                        Row(Modifier.padding(vertical = 5.dp)) {
+                            Text("•  ", color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold)
+                            Text(note, fontSize = 13.sp, lineHeight = 18.sp,
+                                color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWhatsNew = false }) { Text("Got it") }
+            }
+        )
     }
 
     LaunchedEffect(startUrl) {

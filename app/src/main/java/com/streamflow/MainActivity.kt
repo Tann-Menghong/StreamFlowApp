@@ -52,10 +52,11 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> intent.dataString
             else -> null
         }
-        // Launcher shortcut destinations (long-press app icon)
+        // Launcher shortcut / widget destinations
         val shortcutDest = when (intent?.action) {
             "com.streamflow.shortcut.FEED" -> "feed"
             "com.streamflow.shortcut.LIBRARY" -> "library"
+            "com.streamflow.shortcut.SEARCH" -> "search"
             else -> null
         }
 

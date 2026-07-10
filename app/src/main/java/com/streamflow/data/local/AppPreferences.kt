@@ -40,8 +40,13 @@ class AppPreferences(private val context: Context) {
         val INCOGNITO_KEY              = booleanPreferencesKey("incognito")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
+        val AUDIO_ONLY_KEY   = booleanPreferencesKey("audio_only_mode")
         // Search
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
+        // What's New dialog: last app version the user has seen release notes for
+        val LAST_SEEN_VERSION_KEY = stringPreferencesKey("last_seen_version")
+        // Playback queue persisted across app restarts (JSON)
+        val SAVED_QUEUE_KEY = stringPreferencesKey("saved_queue")
 
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
@@ -77,9 +82,30 @@ class AppPreferences(private val context: Context) {
     val incognito           : Flow<Boolean> = context.dataStore.data.map { it[INCOGNITO_KEY] ?: false }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
+    val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
+    }
+    val lastSeenVersion: Flow<Int> = context.dataStore.data.map {
+        it[LAST_SEEN_VERSION_KEY]?.toIntOrNull() ?: 0
+    }
+    // Saved playback queue (restored on app start)
+    val savedQueue: Flow<List<com.streamflow.data.model.VideoItem>> = context.dataStore.data.map { prefsMap ->
+        try {
+            val arr = org.json.JSONArray(prefsMap[SAVED_QUEUE_KEY] ?: "[]")
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                com.streamflow.data.model.VideoItem(
+                    url = o.getString("url"),
+                    title = o.optString("title"),
+                    thumbnailUrl = o.optString("thumbnailUrl"),
+                    uploaderName = o.optString("uploaderName"),
+                    viewCount = o.optLong("viewCount"),
+                    duration = o.optLong("duration")
+                )
+            }
+        } catch (_: Exception) { emptyList() }
     }
 
     suspend fun setTheme(v: String)    = context.dataStore.edit { it[THEME_KEY]    = v }
@@ -107,6 +133,18 @@ class AppPreferences(private val context: Context) {
     suspend fun setIncognito(v: Boolean)            = context.dataStore.edit { it[INCOGNITO_KEY]              = v }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
+    suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }
+    suspend fun setLastSeenVersion(v: Int) = context.dataStore.edit { it[LAST_SEEN_VERSION_KEY] = v.toString() }
+    suspend fun saveQueue(items: List<com.streamflow.data.model.VideoItem>) = context.dataStore.edit { prefsMap ->
+        val arr = org.json.JSONArray()
+        items.take(50).forEach { v ->
+            arr.put(org.json.JSONObject()
+                .put("url", v.url).put("title", v.title)
+                .put("thumbnailUrl", v.thumbnailUrl).put("uploaderName", v.uploaderName)
+                .put("viewCount", v.viewCount).put("duration", v.duration))
+        }
+        prefsMap[SAVED_QUEUE_KEY] = arr.toString()
+    }
     // Search
     suspend fun addRecentSearch(query: String) = context.dataStore.edit { prefs ->
         val current = prefs[RECENT_SEARCHES_KEY]?.split("|||")?.filter { it.isNotBlank() } ?: emptyList()

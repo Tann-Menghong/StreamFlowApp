@@ -117,7 +117,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val ok = try {
                 val root = org.json.JSONObject().apply {
-                    put("app", "StreamFlow"); put("backupVersion", 1)
+                    put("app", "StreamFlow"); put("backupVersion", 2)
+                    put("history", org.json.JSONArray().also { arr ->
+                        db.historyDao().getAll().first().forEach { h ->
+                            arr.put(org.json.JSONObject()
+                                .put("url", h.url).put("title", h.title)
+                                .put("thumbnailUrl", h.thumbnailUrl).put("uploaderName", h.uploaderName)
+                                .put("viewCount", h.viewCount).put("duration", h.duration)
+                                .put("watchedAt", h.watchedAt).put("position", h.position))
+                        }
+                    })
                     put("subscriptions", org.json.JSONArray().also { arr ->
                         db.subscriptionDao().getAllOnce().forEach { s ->
                             arr.put(org.json.JSONObject()
@@ -210,6 +219,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                             url = o.getString("url"), title = o.optString("title"),
                             thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
                             viewCount = o.optLong("viewCount"), duration = o.optLong("duration")))
+                        restored++
+                    }
+                }
+                root.optJSONArray("history")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.historyDao().insert(com.streamflow.data.local.entity.HistoryEntity(
+                            url = o.getString("url"), title = o.optString("title"),
+                            thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
+                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration"),
+                            watchedAt = o.optLong("watchedAt", System.currentTimeMillis()),
+                            position = o.optLong("position")))
                         restored++
                     }
                 }
