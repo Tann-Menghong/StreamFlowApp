@@ -103,12 +103,15 @@ class YouTubeRepository {
                 .filterIsInstance<StreamInfoItem>()
                 .map { it.toVideoItem() }
 
+            // AUTO starts at 720p for fast startup (highest resolutions are often
+            // VP9/AV1 — software-decoded on many phones — and need far more
+            // bandwidth to begin playing). Manual picks can still go higher.
             val maxHeight = maxHeightOverride ?: when (qualityPref) {
                 "1080P" -> 1080
                 "720P"  -> 720
                 "480P"  -> 480
                 "360P"  -> 360
-                else    -> Int.MAX_VALUE
+                else    -> 720
             }
 
             val streamUrl: String
@@ -120,17 +123,30 @@ class YouTubeRepository {
                 info.videoOnlyStreams.mapNotNull { s -> s.height.takeIf { it > 0 && !s.content.isNullOrEmpty() } }
             ).distinct().sortedDescending()
 
+            // At equal height prefer MP4/H.264 (hardware-decoded everywhere) over
+            // WEBM VP9/AV1 — this is the difference between instant start and a
+            // long buffering wait on most devices
             val muxedStream = info.videoStreams
                 .filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
-                .maxByOrNull { it.height }
+                .maxWithOrNull(compareBy(
+                    { it.height },
+                    { if (it.format == org.schabi.newpipe.extractor.MediaFormat.MPEG_4) 1 else 0 }
+                ))
 
             val videoOnlyStream = info.videoOnlyStreams
                 .filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
-                .maxByOrNull { it.height }
+                .maxWithOrNull(compareBy(
+                    { it.height },
+                    { if (it.format == org.schabi.newpipe.extractor.MediaFormat.MPEG_4) 1 else 0 }
+                ))
 
+            // Prefer M4A audio (pairs safely with MP4 video in the merged source)
             val audioStream = info.audioStreams
                 .filter { !it.content.isNullOrEmpty() }
-                .maxByOrNull { it.averageBitrate }
+                .maxWithOrNull(compareBy(
+                    { if (it.format == org.schabi.newpipe.extractor.MediaFormat.M4A) 1 else 0 },
+                    { it.averageBitrate }
+                ))
 
             val hlsUrl = info.hlsUrl
             val dashUrl = try { info.dashMpdUrl } catch (_: Exception) { null }

@@ -207,8 +207,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 recordHistory(details, videoUrl)
             } else {
                 try {
-                    val quality = prefs.quality.first()
-                    _autoQuality.value = quality == "AUTO"
+                    val qualityPref = prefs.quality.first()
+                    _autoQuality.value = qualityPref == "AUTO"
+                    // Data saver caps Auto at 480p
+                    val quality = if (qualityPref == "AUTO" && prefs.dataSaver.first()) "480P" else qualityPref
                     val details = repo.getVideoDetails(videoUrl, quality)
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
@@ -226,7 +228,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private fun prefetchNext(details: com.streamflow.data.model.VideoDetails, quality: String) {
         val currentUrl = details.url
         viewModelScope.launch {
-            delay(2_000L)
+            delay(6_000L) // let the current video buffer comfortably first
             if ((_uiState.value as? PlayerUiState.Ready)?.details?.url != currentUrl) return@launch
             // Warm up to 2 likely-next videos, one at a time so playback bandwidth wins
             val candidates = buildList {
