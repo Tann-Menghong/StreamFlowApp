@@ -66,8 +66,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // Persist the user's in-player quality pick as the default for future videos
-    fun rememberQuality(height: Int) {
+    fun rememberQuality(height: Int?) {
         val pref = when {
+            height == null -> "AUTO"
             height >= 1080 -> "1080P"
             height >= 720  -> "720P"
             height >= 480  -> "480P"
@@ -121,6 +122,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 try {
                     val quality = prefs.quality.first()
+                    _autoQuality.value = quality == "AUTO"
                     val details = repo.getVideoDetails(videoUrl, quality)
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
@@ -147,9 +149,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Reload the same video at a specific resolution; keeps comments/sponsor data.
-    fun changeQuality(videoUrl: String, height: Int) {
+    // ── Quality mode (auto vs manual pick) ────────────────────────────────────
+    private val _autoQuality = MutableStateFlow(true)
+    val autoQuality: StateFlow<Boolean> = _autoQuality
+
+    // Reload the same video at a specific resolution (null = Auto, best available).
+    fun changeQuality(videoUrl: String, height: Int?) {
         val current = _uiState.value as? PlayerUiState.Ready ?: return
+        _autoQuality.value = height == null
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
             try {

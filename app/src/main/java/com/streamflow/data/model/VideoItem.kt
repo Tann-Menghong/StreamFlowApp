@@ -39,5 +39,6 @@ data class VideoDetails(
     val chapters: List<VideoChapter> = emptyList(),
     val subtitles: List<SubtitleTrack> = emptyList(),
     val availableQualities: List<Int> = emptyList(),
-    val currentQuality: Int = 0
+    val currentQuality: Int = 0,
+    val isLive: Boolean = false
 )

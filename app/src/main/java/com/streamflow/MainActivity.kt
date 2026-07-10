@@ -45,11 +45,13 @@ class MainActivity : ComponentActivity() {
 
         val prefs = AppPreferences.get(this)
 
-        val sharedUrl = intent?.takeIf { it.action == Intent.ACTION_SEND }
-            ?.getStringExtra(Intent.EXTRA_TEXT)
-            ?.let { text ->
-                Regex("https?://(?:www\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
+        val sharedUrl = when (intent?.action) {
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+                Regex("https?://(?:www\\.|m\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
             }
+            Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
 
         enableHighRefreshRate()
         enableEdgeToEdge()

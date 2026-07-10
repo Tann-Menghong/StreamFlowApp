@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -91,6 +92,7 @@ fun PlayerScreen(
     val isFavorite by vm.isFavorite.collectAsState(initial = false)
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val isSubscribed by vm.isSubscribed.collectAsState()
+    val autoQuality by vm.autoQuality.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -187,7 +189,7 @@ fun PlayerScreen(
         val extras = Bundle().apply {
             if (d.audioUrl != null) putString("audioUrl", d.audioUrl)
         }
-        val mediaItem = MediaItem.Builder()
+        val mediaItemBuilder = MediaItem.Builder()
             .setUri(d.streamUrl)
             .setMediaMetadata(
                 MediaMetadata.Builder()
@@ -197,13 +199,20 @@ fun PlayerScreen(
                     .build()
             )
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
-            .build()
-
-        mc.setMediaItem(mediaItem)
+        if (d.isLive) {
+            // Live manifest URLs often lack a file extension — give ExoPlayer the type
+            mediaItemBuilder.setMimeType(
+                if (d.streamUrl.contains("mpd", true) || d.streamUrl.contains("dash", true))
+                    MimeTypes.APPLICATION_MPD else MimeTypes.APPLICATION_M3U8
+            )
+        }
+        mc.setMediaItem(mediaItemBuilder.build())
         mc.prepare()
         mc.play()
-        val savedPos = vm.getSavedPosition(videoUrl)
-        if (savedPos > 0L) mc.seekTo(savedPos)
+        if (!d.isLive) {
+            val savedPos = vm.getSavedPosition(videoUrl)
+            if (savedPos > 0L) mc.seekTo(savedPos)
+        }
 
         val speedStr = prefs.defaultSpeed.first()
         mc.setPlaybackSpeed(speedStr.toFloatOrNull() ?: 1f)
@@ -773,21 +782,39 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 Box {
                                     TextButton(onClick = { showFsQualityMenu = true; fsTapTimestamp = System.currentTimeMillis() }) {
                                         Text(
-                                            if (fsDetails.currentQuality > 0) "${fsDetails.currentQuality}p" else "Auto",
+                                            when {
+                                                autoQuality && fsDetails.currentQuality > 0 -> "Auto (${fsDetails.currentQuality}p)"
+                                                fsDetails.currentQuality > 0 -> "${fsDetails.currentQuality}p"
+                                                else -> "Auto"
+                                            },
                                             fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White
                                         )
                                     }
                                     DropdownMenu(expanded = showFsQualityMenu, onDismissRequest = { showFsQualityMenu = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
+                                            trailingIcon = {
+                                                if (autoQuality) Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                            },
+                                            onClick = {
+                                                showFsQualityMenu = false
+                                                if (!autoQuality) {
+                                                    vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                    vm.rememberQuality(null)
+                                                    vm.changeQuality(videoUrl, null)
+                                                }
+                                            }
+                                        )
                                         fsDetails.availableQualities.forEach { h ->
                                             DropdownMenuItem(
-                                                text = { Text("${h}p", fontWeight = if (h == fsDetails.currentQuality) FontWeight.Bold else FontWeight.Normal) },
+                                                text = { Text("${h}p", fontWeight = if (!autoQuality && h == fsDetails.currentQuality) FontWeight.Bold else FontWeight.Normal) },
                                                 trailingIcon = {
-                                                    if (h == fsDetails.currentQuality)
+                                                    if (!autoQuality && h == fsDetails.currentQuality)
                                                         Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
                                                 },
                                                 onClick = {
                                                     showFsQualityMenu = false
-                                                    if (h != fsDetails.currentQuality) {
+                                                    if (autoQuality || h != fsDetails.currentQuality) {
                                                         vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
                                                         vm.rememberQuality(h)
                                                         vm.changeQuality(videoUrl, h)
@@ -959,8 +986,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.9f))))
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
+                    val fsIsLive = (state as? PlayerUiState.Ready)?.details?.isLive == true
                     Column(Modifier.fillMaxWidth()) {
-                        if (playerDuration > 0L) {
+                        if (playerDuration > 0L && !fsIsLive) {
                             Slider(
                                 value = (if (isScrubbing) scrubTargetMs else playerPosition).toFloat(),
                                 onValueChange = { v ->
@@ -1010,10 +1038,19 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 }
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text(
-                                "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
-                                color = Color.White, fontSize = 12.sp
-                            )
+                            if (fsIsLive) {
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), CircleShape))
+                                    Text("LIVE", color = Color.White, fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                Text(
+                                    "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
+                                    color = Color.White, fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -1147,10 +1184,19 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
-                                                color = Color.White, fontSize = 11.sp
-                                            )
+                                            if (s.details.isLive) {
+                                                Row(verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), CircleShape))
+                                                    Text("LIVE", color = Color.White, fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold)
+                                                }
+                                            } else {
+                                                Text(
+                                                    "${fmtMs(playerPosition)} / ${fmtMs(playerDuration)}",
+                                                    color = Color.White, fontSize = 11.sp
+                                                )
+                                            }
                                             Spacer(Modifier.weight(1f))
                                             if (queue.isNotEmpty()) {
                                                 IconButton(
@@ -1168,7 +1214,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
                                             }
                                         }
-                                        if (playerDuration > 0L) {
+                                        if (playerDuration > 0L && !s.details.isLive) {
                                             Slider(
                                                 value = (if (isSeekingPortrait) seekTargetPortrait else playerPosition).toFloat(),
                                                 onValueChange = { v -> seekTargetPortrait = v.toLong(); isSeekingPortrait = true },
@@ -1348,22 +1394,40 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 Box {
                                     TextButton(onClick = { showQualityMenu = true }) {
                                         Text(
-                                            if (details.currentQuality > 0) "${details.currentQuality}p" else "Auto",
+                                            when {
+                                                autoQuality && details.currentQuality > 0 -> "Auto (${details.currentQuality}p)"
+                                                details.currentQuality > 0 -> "${details.currentQuality}p"
+                                                else -> "Auto"
+                                            },
                                             fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     DropdownMenu(expanded = showQualityMenu, onDismissRequest = { showQualityMenu = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
+                                            trailingIcon = {
+                                                if (autoQuality) Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                            },
+                                            onClick = {
+                                                showQualityMenu = false
+                                                if (!autoQuality) {
+                                                    vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
+                                                    vm.rememberQuality(null)
+                                                    vm.changeQuality(videoUrl, null)
+                                                }
+                                            }
+                                        )
                                         details.availableQualities.forEach { h ->
                                             DropdownMenuItem(
-                                                text = { Text("${h}p", fontWeight = if (h == details.currentQuality) FontWeight.Bold else FontWeight.Normal) },
+                                                text = { Text("${h}p", fontWeight = if (!autoQuality && h == details.currentQuality) FontWeight.Bold else FontWeight.Normal) },
                                                 trailingIcon = {
-                                                    if (h == details.currentQuality)
+                                                    if (!autoQuality && h == details.currentQuality)
                                                         Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
                                                 },
                                                 onClick = {
                                                     showQualityMenu = false
-                                                    if (h != details.currentQuality) {
+                                                    if (autoQuality || h != details.currentQuality) {
                                                         vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
                                                         vm.rememberQuality(h)
                                                         vm.changeQuality(videoUrl, h)

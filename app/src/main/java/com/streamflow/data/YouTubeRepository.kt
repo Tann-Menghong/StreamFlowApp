@@ -21,6 +21,7 @@ import org.schabi.newpipe.extractor.comments.CommentsInfoItem
 import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import org.schabi.newpipe.extractor.stream.StreamType
 import java.net.URLEncoder
 
 class YouTubeRepository {
@@ -133,9 +134,19 @@ class YouTubeRepository {
                 .maxByOrNull { it.averageBitrate }
 
             val hlsUrl = info.hlsUrl
+            val dashUrl = try { info.dashMpdUrl } catch (_: Exception) { null }
+            val isLive = try {
+                info.streamType == StreamType.LIVE_STREAM || info.streamType == StreamType.AUDIO_LIVE_STREAM
+            } catch (_: Exception) { false }
 
             val currentQuality: Int
             when {
+                // Live streams: play the HLS (or DASH) manifest; ExoPlayer handles quality adaptively
+                isLive && (!hlsUrl.isNullOrEmpty() || !dashUrl.isNullOrEmpty()) -> {
+                    streamUrl = if (!hlsUrl.isNullOrEmpty()) hlsUrl!! else dashUrl!!
+                    audioUrl = null
+                    currentQuality = 0
+                }
                 videoOnlyStream != null && audioStream != null &&
                     videoOnlyStream.height > (muxedStream?.height ?: 0) -> {
                     streamUrl = videoOnlyStream.content ?: throw Exception("Video-only stream URL is null")
@@ -198,8 +209,9 @@ class YouTubeRepository {
                 relatedVideos = related,
                 chapters = chapters,
                 subtitles = subtitles,
-                availableQualities = availableQualities,
-                currentQuality = currentQuality
+                availableQualities = if (isLive) emptyList() else availableQualities,
+                currentQuality = currentQuality,
+                isLive = isLive
             )
             VideoDetailsCache.put(cacheKey, details)
             details
