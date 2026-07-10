@@ -37,6 +37,7 @@ class AppPreferences(private val context: Context) {
         val FONT_SCALE_KEY             = stringPreferencesKey("font_scale")
         val SHOW_DONGHUA_KEY           = booleanPreferencesKey("show_donghua")
         val START_TAB_KEY              = stringPreferencesKey("start_tab")
+        val INCOGNITO_KEY              = booleanPreferencesKey("incognito")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         // Search
@@ -73,6 +74,7 @@ class AppPreferences(private val context: Context) {
     val fontScale           : Flow<String>  = context.dataStore.data.map { it[FONT_SCALE_KEY] ?: "DEFAULT" }
     val showDonghua         : Flow<Boolean> = context.dataStore.data.map { it[SHOW_DONGHUA_KEY] ?: true }
     val startTab            : Flow<String>  = context.dataStore.data.map { it[START_TAB_KEY] ?: "home" }
+    val incognito           : Flow<Boolean> = context.dataStore.data.map { it[INCOGNITO_KEY] ?: false }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     // Search
@@ -102,6 +104,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setFontScale(v: String)             = context.dataStore.edit { it[FONT_SCALE_KEY]             = v }
     suspend fun setShowDonghua(v: Boolean)          = context.dataStore.edit { it[SHOW_DONGHUA_KEY]           = v }
     suspend fun setStartTab(v: String)              = context.dataStore.edit { it[START_TAB_KEY]              = v }
+    suspend fun setIncognito(v: Boolean)            = context.dataStore.edit { it[INCOGNITO_KEY]              = v }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     // Search

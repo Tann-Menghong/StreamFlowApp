@@ -75,7 +75,7 @@ private val allBottomRoutes = listOf(
 )
 
 @Composable
-fun NavGraph(startUrl: String? = null) {
+fun NavGraph(startUrl: String? = null, startDest: String? = null) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
@@ -117,6 +117,9 @@ fun NavGraph(startUrl: String? = null) {
             } else {
                 navController.navigate(Screen.Player.createRoute(startUrl))
             }
+        } else if (startDest != null) {
+            // Launcher shortcut destination
+            navController.navigate(startDest) { launchSingleTop = true }
         } else {
             // User-chosen start screen (Home stays the back-stack root)
             val tab = appPrefs.startTab.first()

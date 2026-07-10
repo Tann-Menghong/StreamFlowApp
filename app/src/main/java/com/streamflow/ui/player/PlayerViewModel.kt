@@ -348,6 +348,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun recordHistory(details: VideoDetails, url: String) {
+        if (prefs.incognito.first()) return // incognito: leave no history
         db.historyDao().insert(HistoryEntity(
             url = url,
             title = details.title,

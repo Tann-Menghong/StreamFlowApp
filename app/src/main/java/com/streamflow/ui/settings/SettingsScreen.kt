@@ -79,6 +79,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val fontScale            by vm.fontScale.collectAsState()
     val showDonghua          by vm.showDonghua.collectAsState()
     val startTab             by vm.startTab.collectAsState()
+    val incognito            by vm.incognito.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -247,6 +248,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver",
                     "Prefer lower quality to save mobile data", dataSaver
                 ) { vm.setDataSaver(it) }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.VisibilityOff, "Incognito mode",
+                    "Watch without saving to history", incognito
+                ) { vm.setIncognito(it) }
                 SettingsDivider()
                 SettingsItem(Icons.Default.Language, "Trending country",
                     countryOptions.firstOrNull { it.first == country }?.second ?: country

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="feed"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_feed">
+        <intent
+            android:action="com.streamflow.shortcut.FEED"
+            android:targetPackage="com.streamflow"
+            android:targetClass="com.streamflow.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="library"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_library">
+        <intent
+            android:action="com.streamflow.shortcut.LIBRARY"
+            android:targetPackage="com.streamflow"
+            android:targetClass="com.streamflow.MainActivity" />
+    </shortcut>
+</shortcuts>

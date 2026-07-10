@@ -148,15 +148,41 @@ fun ChannelScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
                 }
 
-                // ── Videos label ──────────────────────────────────────────
+                // ── Content tabs (Videos / Shorts / Live) ─────────────────
                 item {
-                    Text("Videos",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+                    if (data.availableTabs.size > 1) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            data.availableTabs.forEach { tab ->
+                                val label = when (tab) {
+                                    "shorts" -> "Shorts"
+                                    "livestreams" -> "Live"
+                                    else -> "Videos"
+                                }
+                                FilterChip(
+                                    selected = data.selectedTab == tab,
+                                    onClick  = { vm.selectTab(tab) },
+                                    label    = { Text(label, fontSize = 12.sp) },
+                                    colors   = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor         = MaterialTheme.colorScheme.surface,
+                                        labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        Text("Videos",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+                    }
                 }
 
                 // ── Video list ────────────────────────────────────────────

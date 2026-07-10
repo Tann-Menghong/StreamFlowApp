@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -125,6 +126,30 @@ fun HomeScreen(
     var searchText     by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
+
+    // Voice search via the system speech recognizer
+    val voiceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val spoken = result.data
+            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+        if (!spoken.isNullOrBlank()) {
+            searchExpanded = true
+            searchText = spoken
+            vm.search(spoken)
+        }
+    }
+    val launchVoiceSearch: () -> Unit = {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search YouTube")
+        }
+        try { voiceLauncher.launch(intent) } catch (_: Exception) {
+            Toast.makeText(context, "Voice search not available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
 
@@ -225,6 +250,15 @@ fun HomeScreen(
                                                 Icon(Icons.Default.Close, null,
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size(16.dp))
+                                            }
+                                        } else {
+                                            IconButton(
+                                                onClick  = launchVoiceSearch,
+                                                modifier = Modifier.size(22.dp)
+                                            ) {
+                                                Icon(Icons.Default.Mic, "Voice search",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(17.dp))
                                             }
                                         }
                                     }

@@ -27,7 +27,9 @@ data class ChannelData(
     val nextPage: Page? = null,
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val availableTabs: List<String> = emptyList(),
+    val selectedTab: String = "videos"
 )
 
 class ChannelViewModel(app: Application) : AndroidViewModel(app) {
@@ -57,22 +59,30 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private var loadedUrl = ""
+    private var currentTab = "videos"
 
-    fun loadChannel(url: String) {
+    fun loadChannel(url: String, tab: String = "videos") {
         _currentUrl.value = url
-        if (loadedUrl == url && _channel.value.name.isNotEmpty()) return
+        if (loadedUrl == url && currentTab == tab && _channel.value.name.isNotEmpty()) return
         loadedUrl = url
+        currentTab = tab
         viewModelScope.launch {
-            _channel.value = ChannelData(isLoading = true)
+            // Keep the header while switching tabs; full spinner only on first load
+            val prev = _channel.value
+            _channel.value = if (prev.name.isNotEmpty())
+                prev.copy(videos = emptyList(), isLoading = true, selectedTab = tab)
+            else ChannelData(isLoading = true, selectedTab = tab)
             try {
-                val result = repo.getChannelInfo(url)
+                val result = repo.getChannelInfo(url, tab)
                 _channel.value = ChannelData(
                     name = result.name,
                     avatarUrl = result.avatarUrl,
                     bannerUrl = result.bannerUrl,
                     subscriberCount = result.subscriberCount,
                     videos = result.videos,
-                    nextPage = result.nextPage
+                    nextPage = result.nextPage,
+                    availableTabs = result.availableTabs,
+                    selectedTab = tab
                 )
             } catch (e: Exception) {
                 _channel.value = ChannelData(error = friendlyError(e))
@@ -80,15 +90,22 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun selectTab(tab: String) {
+        if (tab == currentTab) return
+        loadChannel(loadedUrl, tab)
+    }
+
     fun loadMore() {
         val data = _channel.value
         val nextPage = data.nextPage ?: return
         if (data.isLoadingMore) return
         val url = loadedUrl
+        val tab = currentTab
         viewModelScope.launch {
             _channel.value = data.copy(isLoadingMore = true)
             try {
-                val result = repo.getChannelNextPage(url, nextPage)
+                val result = repo.getChannelNextPage(url, nextPage, tab)
+                if (currentTab != tab) return@launch // tab switched mid-load
                 _channel.value = _channel.value.copy(
                     videos = _channel.value.videos + result.videos,
                     nextPage = result.nextPage,

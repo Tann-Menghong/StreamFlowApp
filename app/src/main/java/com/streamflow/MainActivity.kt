@@ -52,6 +52,12 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> intent.dataString
             else -> null
         }
+        // Launcher shortcut destinations (long-press app icon)
+        val shortcutDest = when (intent?.action) {
+            "com.streamflow.shortcut.FEED" -> "feed"
+            "com.streamflow.shortcut.LIBRARY" -> "library"
+            else -> null
+        }
 
         enableHighRefreshRate()
         enableEdgeToEdge()
@@ -65,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 else -> 1f
             }
             StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr, fontScale = fontScale) {
-                NavGraph(startUrl = sharedUrl)
+                NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
             }
         }
     }

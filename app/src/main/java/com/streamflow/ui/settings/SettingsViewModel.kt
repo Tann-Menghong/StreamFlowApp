@@ -48,6 +48,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val fontScale = prefs.fontScale.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
     val showDonghua = prefs.showDonghua.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val startTab = prefs.startTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "home")
+    val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -108,6 +109,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }
     fun setStartTab(v: String)           = viewModelScope.launch { prefs.setStartTab(v) }
+    fun setIncognito(v: Boolean)         = viewModelScope.launch { prefs.setIncognito(v) }
 
     // ── Backup & restore (JSON via Storage Access Framework) ──────
     fun exportBackup(uri: android.net.Uri) {

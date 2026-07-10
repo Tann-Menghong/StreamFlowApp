@@ -39,7 +39,8 @@ class YouTubeRepository {
         val bannerUrl: String,
         val subscriberCount: Long,
         val videos: List<VideoItem>,
-        val nextPage: Page?
+        val nextPage: Page?,
+        val availableTabs: List<String> = emptyList() // "videos", "shorts", "livestreams"
     )
 
     suspend fun getTrending(country: String = "US"): PagedResult = withContext(Dispatchers.IO) {
@@ -233,19 +234,25 @@ class YouTubeRepository {
             details
         }
 
-    suspend fun getChannelInfo(channelUrl: String): ChannelResult = withContext(Dispatchers.IO) {
+    suspend fun getChannelInfo(channelUrl: String, tabFilter: String = "videos"): ChannelResult = withContext(Dispatchers.IO) {
         val info = ChannelInfo.getInfo(youtube, channelUrl)
 
         val avatarUrl = try { info.avatars.lastOrNull()?.url ?: "" } catch (_: Exception) { "" }
         val bannerUrl = try { info.banners.lastOrNull()?.url ?: "" } catch (_: Exception) { "" }
         val subscriberCount = try { info.subscriberCount } catch (_: Exception) { -1L }
 
+        val availableTabs = try {
+            info.tabs.mapNotNull { it.contentFilters.firstOrNull()?.lowercase() }
+                .filter { it in listOf("videos", "shorts", "livestreams") }
+                .distinct()
+        } catch (_: Exception) { emptyList() }
+
         var videos = emptyList<VideoItem>()
         var nextPage: Page? = null
 
         try {
             val videoTab = info.tabs.firstOrNull { tab ->
-                tab.contentFilters.any { it.contains("videos", ignoreCase = true) }
+                tab.contentFilters.any { it.contains(tabFilter, ignoreCase = true) }
             } ?: info.tabs.firstOrNull()
 
             if (videoTab != null) {
@@ -261,15 +268,16 @@ class YouTubeRepository {
             bannerUrl = bannerUrl,
             subscriberCount = subscriberCount,
             videos = videos,
-            nextPage = nextPage
+            nextPage = nextPage,
+            availableTabs = availableTabs
         )
     }
 
-    suspend fun getChannelNextPage(channelUrl: String, nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
+    suspend fun getChannelNextPage(channelUrl: String, nextPage: Page, tabFilter: String = "videos"): PagedResult = withContext(Dispatchers.IO) {
         try {
             val info = ChannelInfo.getInfo(youtube, channelUrl)
             val videoTab = info.tabs.firstOrNull { tab ->
-                tab.contentFilters.any { it.contains("videos", ignoreCase = true) }
+                tab.contentFilters.any { it.contains(tabFilter, ignoreCase = true) }
             } ?: info.tabs.firstOrNull() ?: return@withContext PagedResult(emptyList(), null)
 
             val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
