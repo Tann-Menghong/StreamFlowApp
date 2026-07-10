@@ -30,6 +30,10 @@ class AppPreferences(private val context: Context) {
         val HOME_CARD_STYLE_KEY        = stringPreferencesKey("home_card_style")
         val HOME_CATEGORIES_KEY        = stringPreferencesKey("home_categories")
         val HIDE_WATCHED_KEY           = booleanPreferencesKey("hide_watched")
+        val HIDE_SHORTS_KEY            = booleanPreferencesKey("hide_shorts")
+        val NOTIFY_NEW_VIDEOS_KEY      = booleanPreferencesKey("notify_new_videos")
+        val VOLUME_BOOST_KEY           = stringPreferencesKey("volume_boost")
+        val LANGUAGE_KEY               = stringPreferencesKey("language")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         // Search
@@ -59,6 +63,10 @@ class AppPreferences(private val context: Context) {
             ?: listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
     }
     val hideWatched         : Flow<Boolean> = context.dataStore.data.map { it[HIDE_WATCHED_KEY] ?: false }
+    val hideShorts          : Flow<Boolean> = context.dataStore.data.map { it[HIDE_SHORTS_KEY] ?: false }
+    val notifyNewVideos     : Flow<Boolean> = context.dataStore.data.map { it[NOTIFY_NEW_VIDEOS_KEY] ?: false }
+    val volumeBoost         : Flow<String>  = context.dataStore.data.map { it[VOLUME_BOOST_KEY] ?: "0" }
+    val language            : Flow<String>  = context.dataStore.data.map { it[LANGUAGE_KEY] ?: "EN" }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     // Search
@@ -81,6 +89,10 @@ class AppPreferences(private val context: Context) {
     suspend fun setHomeCardStyle(v: String)         = context.dataStore.edit { it[HOME_CARD_STYLE_KEY]        = v }
     suspend fun setHomeCategories(v: List<String>)  = context.dataStore.edit { it[HOME_CATEGORIES_KEY]        = v.joinToString(",") }
     suspend fun setHideWatched(v: Boolean)          = context.dataStore.edit { it[HIDE_WATCHED_KEY]           = v }
+    suspend fun setHideShorts(v: Boolean)           = context.dataStore.edit { it[HIDE_SHORTS_KEY]            = v }
+    suspend fun setNotifyNewVideos(v: Boolean)      = context.dataStore.edit { it[NOTIFY_NEW_VIDEOS_KEY]      = v }
+    suspend fun setVolumeBoost(v: String)           = context.dataStore.edit { it[VOLUME_BOOST_KEY]           = v }
+    suspend fun setLanguage(v: String)              = context.dataStore.edit { it[LANGUAGE_KEY]               = v }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     // Search

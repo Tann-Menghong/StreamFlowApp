@@ -1,5 +1,7 @@
 package com.streamflow.data.model
 
+import org.schabi.newpipe.extractor.Page
+
 data class Comment(
     val author: String,
     val text: String,
@@ -7,5 +9,6 @@ data class Comment(
     val avatarUrl: String,
     val isOwnerComment: Boolean,
     val publishedTime: String,
-    val replyCount: Int = 0
+    val replyCount: Int = 0,
+    val repliesPage: Page? = null // non-null when replies can be fetched
 )

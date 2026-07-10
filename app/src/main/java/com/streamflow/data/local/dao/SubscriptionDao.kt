@@ -20,4 +20,10 @@ interface SubscriptionDao {
 
     @Query("SELECT COUNT(*) FROM subscriptions")
     fun count(): Flow<Int>
+
+    @Query("SELECT * FROM subscriptions")
+    suspend fun getAllOnce(): List<SubscriptionEntity>
+
+    @Query("UPDATE subscriptions SET lastVideoUrl = :videoUrl WHERE channelUrl = :channelUrl")
+    suspend fun updateLastVideo(channelUrl: String, videoUrl: String)
 }

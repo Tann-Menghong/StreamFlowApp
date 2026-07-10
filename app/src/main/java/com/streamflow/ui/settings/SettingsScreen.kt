@@ -73,6 +73,16 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val favCount             by vm.favoritesCount.collectAsState()
     val histCount            by vm.historyCount.collectAsState()
     val blockedCount         by vm.blockedCount.collectAsState()
+    val volumeBoost          by vm.volumeBoost.collectAsState()
+    val notifyNewVideos      by vm.notifyNewVideos.collectAsState()
+    val language             by vm.language.collectAsState()
+
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) vm.exportBackup(uri) }
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.importBackup(uri) }
     val update               by vm.update.collectAsState()
     val context              = LocalContext.current
 
@@ -86,6 +96,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showClearHist      by remember { mutableStateOf(false) }
     var showClearFav       by remember { mutableStateOf(false) }
     var showClearBlocked   by remember { mutableStateOf(false) }
+    var showBoostDialog    by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -158,6 +170,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     if (accentColor == "DYNAMIC") "Dynamic (Material You)"
                     else accentColor.lowercase().replaceFirstChar { it.uppercase() }
                 ) { showAccentDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Translate, "Language / ភាសា",
+                    if (language == "KM") "ភាសាខ្មែរ" else "English"
+                ) { showLanguageDialog = true }
+            }
+
+            // ── Notifications ────────────────────────────────────────────
+            SettingsSection("Notifications")
+            SettingsCard {
+                SettingsSwitchItem(Icons.Default.NotificationsActive, "New video alerts",
+                    "Notify when subscribed channels upload (checks every ~6h)", notifyNewVideos
+                ) { vm.setNotifyNewVideos(it) }
             }
 
             // ── Home customization ────────────────────────────────────────
@@ -199,6 +223,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     "Play related videos automatically", autoPlay
                 ) { vm.setAutoPlay(it) }
                 SettingsDivider()
+                SettingsItem(Icons.Default.VolumeUp, "Volume boost",
+                    when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
+                ) { showBoostDialog = true }
+                SettingsDivider()
                 SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver",
                     "Prefer lower quality to save mobile data", dataSaver
                 ) { vm.setDataSaver(it) }
@@ -222,6 +250,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.VisibilityOff, "Hidden videos & channels",
                     if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
                 ) { if (blockedCount > 0) showClearBlocked = true }
+            }
+
+            // ── Backup ───────────────────────────────────────────────────
+            SettingsSection("Backup")
+            SettingsCard {
+                SettingsItem(Icons.Default.Upload, "Export backup",
+                    "Subscriptions, favorites, playlists → JSON file"
+                ) { exportLauncher.launch("streamflow-backup.json") }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Download, "Import backup",
+                    "Restore from a StreamFlow backup file"
+                ) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
             }
 
             // ── About ────────────────────────────────────────────────────
@@ -292,6 +332,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     if (showClearBlocked) {
         ConfirmDialog("Unhide all", "Show the $blockedCount hidden videos/channels in your feed again?",
             { vm.clearBlocked(); showClearBlocked = false }, { showClearBlocked = false })
+    }
+    if (showBoostDialog) {
+        val boostOpts = listOf("0" to "Off", "300" to "Low (+30%)", "600" to "High (+60%)", "1000" to "Max (+100%)")
+        PickerDialog("Volume boost", boostOpts.map { it.second },
+            boostOpts.indexOfFirst { it.first == volumeBoost }.coerceAtLeast(0),
+            { vm.setVolumeBoost(boostOpts[it].first); showBoostDialog = false }, { showBoostDialog = false })
+    }
+    if (showLanguageDialog) {
+        val langOpts = listOf("EN" to "English", "KM" to "ភាសាខ្មែរ (Khmer)")
+        PickerDialog("Language / ភាសា", langOpts.map { it.second },
+            langOpts.indexOfFirst { it.first == language }.coerceAtLeast(0),
+            { vm.setLanguage(langOpts[it].first); showLanguageDialog = false }, { showLanguageDialog = false })
     }
 }
 

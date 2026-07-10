@@ -8,5 +8,6 @@ data class SubscriptionEntity(
     @PrimaryKey val channelUrl: String,
     val name: String,
     val avatarUrl: String,
-    val subscribedAt: Long = System.currentTimeMillis()
+    val subscribedAt: Long = System.currentTimeMillis(),
+    val lastVideoUrl: String = "" // newest known video, for new-upload notifications
 )

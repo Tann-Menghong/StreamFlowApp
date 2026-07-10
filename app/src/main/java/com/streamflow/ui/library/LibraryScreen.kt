@@ -23,7 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.streamflow.data.local.dao.PlaylistWithCount
+import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
@@ -38,14 +42,21 @@ fun LibraryScreen(
     onVideoClick: (String) -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
     onFeedClick: (() -> Unit)? = null,
+    onPlaylistClick: ((Long) -> Unit)? = null,
     vm: LibraryViewModel = viewModel()
 ) {
     val favorites     by vm.favorites.collectAsState()
     val history       by vm.history.collectAsState()
     val watchLater    by vm.watchLater.collectAsState()
     val subscriptions by vm.subscriptions.collectAsState()
+    val playlists     by vm.playlists.collectAsState()
+    val downloads     by vm.downloads.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Favorites", "History", "Watch Later", "Channels")
+    val libContext = androidx.compose.ui.platform.LocalContext.current
+    val libPrefs = remember { com.streamflow.data.local.AppPreferences.get(libContext) }
+    val uiLang by libPrefs.language.collectAsState(initial = "EN")
+    val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+        .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }
 
     Scaffold(
         topBar = {
@@ -73,11 +84,12 @@ fun LibraryScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size)
-            TabRow(
+            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size)
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = MaterialTheme.colorScheme.background,
                 contentColor     = MaterialTheme.colorScheme.primary,
+                edgePadding      = 8.dp,
                 divider          = { HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.4f)) }
             ) {
                 tabs.forEachIndexed { i, title ->
@@ -159,12 +171,171 @@ fun LibraryScreen(
                             emptySubtitle = "Tap bookmark while watching to add videos here.",
                             emptyIcon = Icons.Default.BookmarkBorder
                         )
-                    else -> SubscriptionList(
+                    3 -> SubscriptionList(
                             subscriptions = subscriptions,
                             onChannelClick = onChannelClick,
                             onUnsubscribe = vm::unsubscribe,
                             onFeedClick = onFeedClick
                         )
+                    4 -> PlaylistList(
+                            playlists = playlists,
+                            onPlaylistClick = onPlaylistClick,
+                            onDelete = vm::deletePlaylist,
+                            onCreate = vm::createPlaylist
+                        )
+                    else -> DownloadList(
+                            downloads = downloads,
+                            onPlay = { d ->
+                                if (d.status == "DONE" && d.filePath.isNotEmpty()) onVideoClick(d.filePath)
+                                else onVideoClick(d.url)
+                            },
+                            onRemove = vm::removeDownload
+                        )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistList(
+    playlists: List<PlaylistWithCount>,
+    onPlaylistClick: ((Long) -> Unit)?,
+    onDelete: (Long) -> Unit,
+    onCreate: (String) -> Unit
+) {
+    var showCreate by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+
+    Column(Modifier.fillMaxSize()) {
+        TextButton(
+            onClick = { showCreate = true },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("New playlist", fontSize = 13.sp)
+        }
+        if (playlists.isEmpty()) {
+            EmptyState(Icons.Default.PlaylistPlay, "No playlists yet",
+                "Create one here, or save videos from the player.")
+        } else {
+            LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(playlists, key = { it.id }) { pl ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable { onPlaylistClick?.invoke(pl.id) }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.width(100.dp).height(56.dp).clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!pl.firstThumb.isNullOrEmpty()) {
+                                AsyncImage(pl.firstThumb, null,
+                                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            } else {
+                                Icon(Icons.Default.PlaylistPlay, null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(pl.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onBackground)
+                            Text("${pl.count} videos", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { onDelete(pl.id) }) {
+                            Icon(Icons.Default.DeleteOutline, "Delete playlist",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
+                                modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCreate) {
+        AlertDialog(
+            onDismissRequest = { showCreate = false },
+            title = { Text("New playlist") },
+            text = {
+                OutlinedTextField(
+                    value = newName, onValueChange = { newName = it },
+                    placeholder = { Text("Playlist name") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = newName.isNotBlank(),
+                    onClick = { onCreate(newName); newName = ""; showCreate = false }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { showCreate = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun DownloadList(
+    downloads: List<DownloadEntity>,
+    onPlay: (DownloadEntity) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    if (downloads.isEmpty()) {
+        EmptyState(Icons.Default.Download, "No downloads",
+            "Use the download button in the player to save videos for offline watching.")
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+        items(downloads, key = { it.url }) { d ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onPlay(d) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(Modifier.width(100.dp).height(56.dp).clip(RoundedCornerShape(8.dp))) {
+                    AsyncImage(d.thumbnailUrl, null,
+                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    if (d.isAudio) {
+                        Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                            .background(androidx.compose.ui.graphics.Color.Black.copy(0.7f), RoundedCornerShape(4.dp))
+                            .padding(3.dp)) {
+                            Icon(Icons.Default.MusicNote, null,
+                                tint = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.size(12.dp))
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(d.title, fontWeight = FontWeight.Medium, fontSize = 13.sp,
+                        maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground, lineHeight = 17.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        when (d.status) {
+                            "DONE" -> "Saved offline${if (d.isAudio) " · audio" else ""}"
+                            "FAILED" -> "Download failed"
+                            else -> "Downloading…"
+                        },
+                        fontSize = 11.sp,
+                        color = when (d.status) {
+                            "DONE" -> MaterialTheme.colorScheme.primary
+                            "FAILED" -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+                IconButton(onClick = { onRemove(d.url) }) {
+                    Icon(Icons.Default.DeleteOutline, "Remove download",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
+                        modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -296,6 +467,24 @@ private fun VideoListWithSearch(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
+            Icon(icon, null,
+                tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
+                modifier = Modifier.size(64.dp))
+            Spacer(Modifier.height(16.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(0.55f))
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                textAlign = TextAlign.Center)
         }
     }
 }

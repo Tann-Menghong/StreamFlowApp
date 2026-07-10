@@ -267,22 +267,94 @@ class YouTubeRepository {
         }
     }
 
+    private fun CommentsInfoItem.toComment() = Comment(
+        author = uploaderName ?: "",
+        text = try { commentText?.content ?: "" } catch (_: Exception) { commentText.toString() },
+        likeCount = likeCount.coerceAtLeast(0).toLong(),
+        avatarUrl = try { thumbnails.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
+        isOwnerComment = false,
+        publishedTime = try { textualUploadDate ?: "" } catch (_: Exception) { "" },
+        replyCount = try { replyCount } catch (_: Exception) { 0 },
+        repliesPage = try { replies } catch (_: Exception) { null }
+    )
+
     suspend fun getComments(videoUrl: String): List<Comment> = withContext(Dispatchers.IO) {
         try {
             val info = CommentsInfo.getInfo(youtube, videoUrl)
-            info.relatedItems.filterIsInstance<CommentsInfoItem>().map { item ->
-                Comment(
-                    author = item.uploaderName ?: "",
-                    text = try { item.commentText?.content ?: "" } catch (_: Exception) { item.commentText.toString() },
-                    likeCount = item.likeCount.coerceAtLeast(0).toLong(),
-                    avatarUrl = try { item.thumbnails.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
-                    isOwnerComment = false,
-                    publishedTime = try { item.textualUploadDate ?: "" } catch (_: Exception) { "" },
-                    replyCount = try { item.replyCount } catch (_: Exception) { 0 }
-                )
-            }
+            info.relatedItems.filterIsInstance<CommentsInfoItem>().map { it.toComment() }
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    suspend fun getCommentReplies(videoUrl: String, page: Page): List<Comment> = withContext(Dispatchers.IO) {
+        try {
+            val extractor = youtube.getCommentsExtractor(videoUrl)
+            extractor.getPage(page).items
+                .filterIsInstance<CommentsInfoItem>()
+                .map { it.toComment() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    // Live search suggestions while the user types
+    suspend fun getSearchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+        try {
+            youtube.suggestionExtractor.suggestionList(query).take(8)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    data class DownloadStreams(
+        val videoUrl: String?,   // best muxed stream (single playable file)
+        val videoHeight: Int,
+        val audioUrl: String?    // best audio-only stream
+    )
+
+    // Streams suitable for saving as a single file (muxed video, or audio-only)
+    suspend fun getDownloadStreams(videoUrl: String): DownloadStreams = withContext(Dispatchers.IO) {
+        val info = StreamInfo.getInfo(youtube, videoUrl)
+        val muxed = info.videoStreams.filter { !it.content.isNullOrEmpty() }.maxByOrNull { it.height }
+        val audio = info.audioStreams.filter { !it.content.isNullOrEmpty() }.maxByOrNull { it.averageBitrate }
+        DownloadStreams(
+            videoUrl = muxed?.content,
+            videoHeight = muxed?.height ?: 0,
+            audioUrl = audio?.content
+        )
+    }
+
+    data class RemotePlaylist(
+        val name: String,
+        val uploaderName: String,
+        val thumbnailUrl: String,
+        val videoCount: Long,
+        val videos: List<VideoItem>,
+        val nextPage: Page?
+    )
+
+    suspend fun getRemotePlaylist(playlistUrl: String): RemotePlaylist = withContext(Dispatchers.IO) {
+        val info = org.schabi.newpipe.extractor.playlist.PlaylistInfo.getInfo(youtube, playlistUrl)
+        RemotePlaylist(
+            name = info.name ?: "Playlist",
+            uploaderName = try { info.uploaderName ?: "" } catch (_: Exception) { "" },
+            thumbnailUrl = try { info.thumbnails.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
+            videoCount = try { info.streamCount } catch (_: Exception) { -1L },
+            videos = info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            nextPage = info.nextPage
+        )
+    }
+
+    suspend fun getRemotePlaylistNextPage(playlistUrl: String, page: Page): PagedResult = withContext(Dispatchers.IO) {
+        try {
+            val result = org.schabi.newpipe.extractor.playlist.PlaylistInfo.getMoreItems(youtube, playlistUrl, page)
+            PagedResult(
+                videos = result.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                nextPage = result.nextPage
+            )
+        } catch (_: Exception) {
+            PagedResult(emptyList(), null)
         }
     }
 

@@ -242,6 +242,8 @@ fun PlayerScreen(
 
     // ── Speed & seek state ───────────────────────────────────────────────────
     var showSpeedMenu by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
+    var showPlaylistDialog by remember { mutableStateOf(false) }
     var currentSpeed by remember { mutableFloatStateOf(1f) }
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
     LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
@@ -262,6 +264,8 @@ fun PlayerScreen(
     // ── Comments ─────────────────────────────────────────────────────────────
     val comments         by vm.comments.collectAsState()
     val commentsLoading  by vm.commentsLoading.collectAsState()
+    val repliesMap       by vm.replies.collectAsState()
+    val repliesLoading   by vm.repliesLoading.collectAsState()
     var showComments     by remember { mutableStateOf(false) }
 
     // ── Queue ─────────────────────────────────────────────────────────────────
@@ -1382,6 +1386,16 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         "Favourite", tint = heartColor, modifier = Modifier.size(24.dp).scale(heartScale)
                                     )
                                 }
+                                if (!details.isLive) {
+                                    IconButton(onClick = { showDownloadDialog = true }) {
+                                        Icon(Icons.Default.Download, "Download",
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    }
+                                }
+                                IconButton(onClick = { showPlaylistDialog = true }) {
+                                    Icon(Icons.Default.PlaylistAdd, "Save to playlist",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                }
                             }
                         }
 
@@ -1665,6 +1679,55 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
+                                // Replies (expand/collapse, fetched on demand)
+                                if (comment.replyCount > 0 && comment.repliesPage != null) {
+                                    val key = vm.replyKey(comment)
+                                    val expanded = repliesMap.containsKey(key)
+                                    TextButton(
+                                        onClick = { vm.toggleReplies(videoUrl, comment) },
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        if (key in repliesLoading) {
+                                            CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                                        } else {
+                                            Text(
+                                                if (expanded) "Hide replies"
+                                                else "View ${comment.replyCount} replies",
+                                                fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    repliesMap[key]?.forEach { reply ->
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(top = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Box(
+                                                Modifier.size(22.dp).clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (reply.avatarUrl.isNotEmpty()) {
+                                                    coil.compose.AsyncImage(reply.avatarUrl, null,
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxSize())
+                                                } else {
+                                                    Text(reply.author.firstOrNull()?.uppercase() ?: "?",
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                                }
+                                            }
+                                            Column(Modifier.weight(1f)) {
+                                                Text(reply.author, fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onBackground)
+                                                Text(reply.text, fontSize = 12.sp, lineHeight = 16.sp,
+                                                    color = MaterialTheme.colorScheme.onBackground)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp),
@@ -1693,6 +1756,76 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
     }
 
     // ── Queue bottom sheet ────────────────────────────────────────────────────
+    if (showDownloadDialog) {
+        AlertDialog(
+            onDismissRequest = { showDownloadDialog = false },
+            title = { Text("Download") },
+            text = { Text("Saved to Downloads/StreamFlow. Find it in Library > Downloads.") },
+            confirmButton = {
+                TextButton(onClick = { vm.download(isAudio = false); showDownloadDialog = false }) {
+                    Text("Video")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { vm.download(isAudio = true); showDownloadDialog = false }) {
+                        Text("Audio only")
+                    }
+                    TextButton(onClick = { showDownloadDialog = false }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    if (showPlaylistDialog) {
+        val playlists by vm.playlists.collectAsState()
+        var newName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showPlaylistDialog = false },
+            title = { Text("Save to playlist") },
+            text = {
+                Column {
+                    playlists.forEach { pl ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clickable { vm.addToPlaylist(pl.id); showPlaylistDialog = false }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(Icons.Default.PlaylistPlay, null,
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Text(pl.name, modifier = Modifier.weight(1f), maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text("${pl.count}", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (playlists.isNotEmpty()) {
+                        HorizontalDivider(Modifier.padding(vertical = 6.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(0.3f))
+                    }
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        placeholder = { Text("New playlist name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newName.isNotBlank(),
+                    onClick = { vm.createPlaylistAndAdd(newName); showPlaylistDialog = false }
+                ) { Text("Create & save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPlaylistDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showQueueSheet) {
         ModalBottomSheet(onDismissRequest = { showQueueSheet = false }) {
             Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {

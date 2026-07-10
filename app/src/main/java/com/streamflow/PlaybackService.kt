@@ -14,10 +14,35 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
+    private var boostGainMb = 0
+    private var audioSessionId = 0
+
+    // Amplify quiet videos beyond 100% via LoudnessEnhancer (gain in millibels)
+    private fun applyBoost() {
+        try {
+            loudnessEnhancer?.release()
+            loudnessEnhancer = null
+            if (boostGainMb > 0 && audioSessionId != 0) {
+                loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
+                    setTargetGain(boostGainMb)
+                    enabled = true
+                }
+            }
+        } catch (_: Exception) {
+            loudnessEnhancer = null
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -70,6 +95,23 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        audioSessionId = player.audioSessionId
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onAudioSessionIdChanged(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                sessionId: Int
+            ) {
+                audioSessionId = sessionId
+                applyBoost()
+            }
+        })
+        serviceScope.launch {
+            (application as StreamFlowApp).prefs.volumeBoost.collect { v ->
+                boostGainMb = v.toIntOrNull() ?: 0
+                applyBoost()
+            }
+        }
+
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(
@@ -90,6 +132,9 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
     override fun onDestroy() {
+        serviceScope.cancel()
+        try { loudnessEnhancer?.release() } catch (_: Exception) {}
+        loudnessEnhancer = null
         mediaSession?.run {
             player.release()
             release()

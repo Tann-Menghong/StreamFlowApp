@@ -7,19 +7,24 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.streamflow.data.local.dao.BlockedDao
+import com.streamflow.data.local.dao.DownloadDao
 import com.streamflow.data.local.dao.FavoriteDao
 import com.streamflow.data.local.dao.HistoryDao
+import com.streamflow.data.local.dao.PlaylistDao
 import com.streamflow.data.local.dao.SubscriptionDao
 import com.streamflow.data.local.dao.WatchLaterDao
 import com.streamflow.data.local.entity.BlockedItemEntity
+import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.PlaylistEntity
+import com.streamflow.data.local.entity.PlaylistItemEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 
 @Database(
-    entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class],
-    version = 4,
+    entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class, DownloadEntity::class, PlaylistEntity::class, PlaylistItemEntity::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +33,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchLaterDao(): WatchLaterDao
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun blockedDao(): BlockedDao
+    abstract fun downloadDao(): DownloadDao
+    abstract fun playlistDao(): PlaylistDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -60,10 +67,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Downloads + local playlists tables, and lastVideoUrl for upload notifications
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `downloads` (" +
+                    "`url` TEXT NOT NULL, `title` TEXT NOT NULL, `thumbnailUrl` TEXT NOT NULL, " +
+                    "`uploaderName` TEXT NOT NULL, `filePath` TEXT NOT NULL, `isAudio` INTEGER NOT NULL, " +
+                    "`downloadId` INTEGER NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`url`))"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `playlists` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `playlist_items` (" +
+                    "`playlistId` INTEGER NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                    "`thumbnailUrl` TEXT NOT NULL, `uploaderName` TEXT NOT NULL, " +
+                    "`duration` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`playlistId`, `url`))"
+                )
+                db.execSQL("ALTER TABLE `subscriptions` ADD COLUMN `lastVideoUrl` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "streamflow.db")
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

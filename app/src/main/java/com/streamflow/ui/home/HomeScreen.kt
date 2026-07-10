@@ -88,6 +88,9 @@ fun HomeScreen(
     val recentSearches   by vm.recentSearches.collectAsState()
     val currentCountry   by vm.currentCountry.collectAsState()
     val hideWatched      by vm.hideWatched.collectAsState()
+    val hideShorts       by vm.hideShorts.collectAsState()
+    val suggestions      by vm.suggestions.collectAsState()
+    val sortMode         by vm.sortMode.collectAsState()
     val listState        = rememberLazyListState()
     val context          = LocalContext.current
     var showCountryPicker by remember { mutableStateOf(false) }
@@ -178,7 +181,7 @@ fun HomeScreen(
                                             modifier = Modifier.size(18.dp))
                                         BasicTextField(
                                             value          = searchText,
-                                            onValueChange  = { searchText = it },
+                                            onValueChange  = { searchText = it; vm.fetchSuggestions(it) },
                                             modifier       = Modifier.weight(1f)
                                                 .focusRequester(focusRequester),
                                             singleLine     = true,
@@ -323,6 +326,70 @@ fun HomeScreen(
                                     }
                                 )
                             }
+                        }
+                    }
+                }
+                // Live search suggestions while typing
+                AnimatedVisibility(
+                    visible = searchExpanded && searchText.isNotEmpty() && suggestions.isNotEmpty(),
+                    enter   = fadeIn(tween(150)) + expandVertically(tween(150)),
+                    exit    = fadeOut(tween(100)) + shrinkVertically(tween(100))
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        suggestions.forEach { s ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication        = null
+                                    ) {
+                                        searchText = s
+                                        vm.search(s)
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.Search, null,
+                                    tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
+                                    modifier = Modifier.size(15.dp))
+                                Text(s, style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+                // Sort chips for search results
+                AnimatedVisibility(
+                    visible = activeSearch.isNotEmpty(),
+                    enter   = fadeIn(tween(150)) + expandVertically(tween(150)),
+                    exit    = fadeOut(tween(100)) + shrinkVertically(tween(100))
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("RELEVANCE" to "Relevance", "VIEWS" to "Most viewed", "NEWEST" to "Newest").forEach { (key, label) ->
+                            FilterChip(
+                                selected = sortMode == key,
+                                onClick  = { vm.setSortMode(key) },
+                                label    = { Text(label, fontSize = 12.sp) },
+                                shape    = RoundedCornerShape(16.dp),
+                                colors   = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor         = MaterialTheme.colorScheme.surface,
+                                    labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
                         }
                     }
                 }
@@ -531,6 +598,7 @@ fun HomeScreen(
                 showCW             = showCW,
                 showHero           = showHero,
                 hideWatched        = hideWatched,
+                hideShorts         = hideShorts,
                 selectedCategories = selectedCats,
                 categoryPool       = vm.categoryPool,
                 onLayout           = vm::setLayout,
@@ -539,6 +607,7 @@ fun HomeScreen(
                 onShowCW           = vm::setShowCW,
                 onShowHero         = vm::setShowFeatured,
                 onHideWatched      = vm::setHideWatched,
+                onHideShorts       = vm::setHideShorts,
                 onToggleCategory   = vm::toggleCategory,
                 onResetCategories  = vm::resetCategories,
                 onDismiss          = { showCustomizeSheet = false }
@@ -625,6 +694,7 @@ private fun CustomizeHomeSheet(
     showCW: Boolean,
     showHero: Boolean,
     hideWatched: Boolean,
+    hideShorts: Boolean,
     selectedCategories: List<String>,
     categoryPool: List<String>,
     onLayout: (String) -> Unit,
@@ -633,6 +703,7 @@ private fun CustomizeHomeSheet(
     onShowCW: (Boolean) -> Unit,
     onShowHero: (Boolean) -> Unit,
     onHideWatched: (Boolean) -> Unit,
+    onHideShorts: (Boolean) -> Unit,
     onToggleCategory: (String) -> Unit,
     onResetCategories: () -> Unit,
     onDismiss: () -> Unit
@@ -689,6 +760,7 @@ private fun CustomizeHomeSheet(
             SheetSwitchRow("Continue Watching", "Resume videos you started", showCW, onShowCW)
             SheetSwitchRow("Featured row", "Horizontal top-trending strip", showHero, onShowHero)
             SheetSwitchRow("Hide watched videos", "Skip videos already in your history", hideWatched, onHideWatched)
+            SheetSwitchRow("Hide Shorts", "Skip videos under 60 seconds", hideShorts, onHideShorts)
 
             Spacer(Modifier.height(20.dp))
 

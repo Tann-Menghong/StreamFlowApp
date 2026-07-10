@@ -34,27 +34,75 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
 
-    // Displayed feed = raw feed minus "not interested" videos/channels and
-    // (optionally) already-watched videos. Live: hiding a video removes it instantly.
-    val uiState: StateFlow<HomeUiState> = combine(
-        _uiState,
+    // Sort applied to search results only (client-side)
+    private val _sortMode = MutableStateFlow("RELEVANCE") // RELEVANCE | VIEWS | NEWEST
+    val sortMode: StateFlow<String> = _sortMode
+    fun setSortMode(v: String) { _sortMode.value = v }
+
+    private data class FeedFilters(
+        val blocked: List<BlockedItemEntity>,
+        val hideWatched: Boolean,
+        val hideShorts: Boolean,
+        val history: List<HistoryEntity>,
+        val sort: String
+    )
+
+    private val feedFilters = combine(
         db.blockedDao().getAll(),
         prefs.hideWatched,
-        db.historyDao().getAll()
-    ) { state, blocked, hideWatched, history ->
+        prefs.hideShorts,
+        db.historyDao().getAll(),
+        _sortMode
+    ) { blocked, hideWatched, hideShorts, history, sort ->
+        FeedFilters(blocked, hideWatched, hideShorts, history, sort)
+    }
+
+    // Displayed feed = raw feed minus "not interested" videos/channels, optionally
+    // watched videos and Shorts; search results get the picked sort applied.
+    val uiState: StateFlow<HomeUiState> = combine(_uiState, feedFilters) { state, f ->
         if (state !is HomeUiState.Success) return@combine state
-        val blockedVideos   = blocked.asSequence().filter { it.type == "VIDEO" }.mapTo(HashSet()) { it.itemKey }
-        val blockedChannels = blocked.asSequence().filter { it.type == "CHANNEL" }.mapTo(HashSet()) { it.itemKey }
-        val watched = if (hideWatched) history.mapTo(HashSet()) { it.url } else emptySet<String>()
-        state.copy(videos = state.videos.filter { v ->
+        val blockedVideos   = f.blocked.asSequence().filter { it.type == "VIDEO" }.mapTo(HashSet()) { it.itemKey }
+        val blockedChannels = f.blocked.asSequence().filter { it.type == "CHANNEL" }.mapTo(HashSet()) { it.itemKey }
+        val watched = if (f.hideWatched) f.history.mapTo(HashSet()) { it.url } else emptySet<String>()
+        val filtered = state.videos.filter { v ->
             v.url !in blockedVideos &&
             (v.uploaderUrl.isEmpty() || v.uploaderUrl !in blockedChannels) &&
-            v.url !in watched
-        })
+            v.url !in watched &&
+            !(f.hideShorts && v.duration in 1..60)
+        }
+        val sorted = when {
+            _activeSearchQuery.value.isEmpty() -> filtered
+            f.sort == "VIEWS"  -> filtered.sortedByDescending { it.viewCount }
+            f.sort == "NEWEST" -> filtered.sortedByDescending { it.uploadedEpoch }
+            else -> filtered
+        }
+        state.copy(videos = sorted)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState.Loading)
+
+    // ── Live search suggestions ──────────────────────────────
+    private val _suggestions = MutableStateFlow<List<String>>(emptyList())
+    val suggestions: StateFlow<List<String>> = _suggestions
+    private var suggestionsJob: kotlinx.coroutines.Job? = null
+
+    fun fetchSuggestions(query: String) {
+        suggestionsJob?.cancel()
+        if (query.isBlank()) { _suggestions.value = emptyList(); return }
+        suggestionsJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(250) // debounce typing
+            _suggestions.value = try { repo.getSearchSuggestions(query) } catch (_: Exception) { emptyList() }
+        }
+    }
+
+    fun clearSuggestions() {
+        suggestionsJob?.cancel()
+        _suggestions.value = emptyList()
+    }
 
     val hideWatched = prefs.hideWatched.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     fun setHideWatched(v: Boolean) = viewModelScope.launch { prefs.setHideWatched(v) }
+
+    val hideShorts = prefs.hideShorts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun setHideShorts(v: Boolean) = viewModelScope.launch { prefs.setHideShorts(v) }
 
     fun blockVideo(v: VideoItem) = viewModelScope.launch {
         db.blockedDao().insert(BlockedItemEntity(itemKey = v.url, type = "VIDEO", name = v.title))
@@ -205,6 +253,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         currentQuery = query
         _selectedCategory.value = "All"
         _activeSearchQuery.value = query
+        _sortMode.value = "RELEVANCE"
+        clearSuggestions()
         feedGeneration++
         viewModelScope.launch {
             prefs.addRecentSearch(query)

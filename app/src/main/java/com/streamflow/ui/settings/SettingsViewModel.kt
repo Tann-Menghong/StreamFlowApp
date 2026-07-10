@@ -42,6 +42,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── New player prefs ──────────────────────────────────────────
     val skipSeconds = prefs.skipSeconds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "10")
+    val volumeBoost = prefs.volumeBoost.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
+    val notifyNewVideos = prefs.notifyNewVideos.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val language = prefs.language.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "EN")
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -96,4 +99,145 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun clearHistory()   = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
     fun clearBlocked()   = viewModelScope.launch { db.blockedDao().clearAll() }
+    fun setVolumeBoost(v: String)        = viewModelScope.launch { prefs.setVolumeBoost(v) }
+    fun setNotifyNewVideos(v: Boolean)   = viewModelScope.launch { prefs.setNotifyNewVideos(v) }
+    fun setLanguage(v: String)           = viewModelScope.launch { prefs.setLanguage(v) }
+
+    // ── Backup & restore (JSON via Storage Access Framework) ──────
+    fun exportBackup(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val ok = try {
+                val root = org.json.JSONObject().apply {
+                    put("app", "StreamFlow"); put("backupVersion", 1)
+                    put("subscriptions", org.json.JSONArray().also { arr ->
+                        db.subscriptionDao().getAllOnce().forEach { s ->
+                            arr.put(org.json.JSONObject()
+                                .put("channelUrl", s.channelUrl).put("name", s.name)
+                                .put("avatarUrl", s.avatarUrl))
+                        }
+                    })
+                    put("favorites", org.json.JSONArray().also { arr ->
+                        db.favoriteDao().getAll().first().forEach { f ->
+                            arr.put(org.json.JSONObject()
+                                .put("url", f.url).put("title", f.title)
+                                .put("thumbnailUrl", f.thumbnailUrl).put("uploaderName", f.uploaderName)
+                                .put("viewCount", f.viewCount).put("duration", f.duration))
+                        }
+                    })
+                    put("watchLater", org.json.JSONArray().also { arr ->
+                        db.watchLaterDao().getAll().first().forEach { w ->
+                            arr.put(org.json.JSONObject()
+                                .put("url", w.url).put("title", w.title)
+                                .put("thumbnailUrl", w.thumbnailUrl).put("uploaderName", w.uploaderName)
+                                .put("viewCount", w.viewCount).put("duration", w.duration))
+                        }
+                    })
+                    put("blocked", org.json.JSONArray().also { arr ->
+                        db.blockedDao().getAll().first().forEach { b ->
+                            arr.put(org.json.JSONObject()
+                                .put("itemKey", b.itemKey).put("type", b.type).put("name", b.name))
+                        }
+                    })
+                    put("playlists", org.json.JSONArray().also { arr ->
+                        db.playlistDao().getPlaylistsOnce().forEach { p ->
+                            arr.put(org.json.JSONObject().put("name", p.name)
+                                .put("items", org.json.JSONArray().also { itemsArr ->
+                                    db.playlistDao().getItemsOnce(p.id).forEach { i ->
+                                        itemsArr.put(org.json.JSONObject()
+                                            .put("url", i.url).put("title", i.title)
+                                            .put("thumbnailUrl", i.thumbnailUrl)
+                                            .put("uploaderName", i.uploaderName)
+                                            .put("duration", i.duration))
+                                    }
+                                }))
+                        }
+                    })
+                }
+                app.contentResolver.openOutputStream(uri)?.use {
+                    it.write(root.toString(2).toByteArray())
+                } != null
+            } catch (_: Exception) { false }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(app,
+                    if (ok) "Backup saved" else "Backup failed",
+                    android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun importBackup(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var restored = 0
+            val ok = try {
+                val text = app.contentResolver.openInputStream(uri)?.use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                } ?: throw Exception("empty")
+                val root = org.json.JSONObject(text)
+
+                root.optJSONArray("subscriptions")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.subscriptionDao().insert(com.streamflow.data.local.entity.SubscriptionEntity(
+                            channelUrl = o.getString("channelUrl"), name = o.optString("name"),
+                            avatarUrl = o.optString("avatarUrl")))
+                        restored++
+                    }
+                }
+                root.optJSONArray("favorites")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.favoriteDao().insert(com.streamflow.data.local.entity.FavoriteEntity(
+                            url = o.getString("url"), title = o.optString("title"),
+                            thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
+                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration")))
+                        restored++
+                    }
+                }
+                root.optJSONArray("watchLater")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.watchLaterDao().insert(com.streamflow.data.local.entity.WatchLaterEntity(
+                            url = o.getString("url"), title = o.optString("title"),
+                            thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
+                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration")))
+                        restored++
+                    }
+                }
+                root.optJSONArray("blocked")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.blockedDao().insert(com.streamflow.data.local.entity.BlockedItemEntity(
+                            itemKey = o.getString("itemKey"), type = o.optString("type", "VIDEO"),
+                            name = o.optString("name")))
+                        restored++
+                    }
+                }
+                root.optJSONArray("playlists")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val id = db.playlistDao().create(com.streamflow.data.local.entity.PlaylistEntity(
+                            name = o.optString("name", "Imported")))
+                        o.optJSONArray("items")?.let { itemsArr ->
+                            for (j in 0 until itemsArr.length()) {
+                                val it2 = itemsArr.getJSONObject(j)
+                                db.playlistDao().addItem(com.streamflow.data.local.entity.PlaylistItemEntity(
+                                    playlistId = id, url = it2.getString("url"),
+                                    title = it2.optString("title"), thumbnailUrl = it2.optString("thumbnailUrl"),
+                                    uploaderName = it2.optString("uploaderName"), duration = it2.optLong("duration")))
+                            }
+                        }
+                        restored++
+                    }
+                }
+                true
+            } catch (_: Exception) { false }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(app,
+                    if (ok) "Restored $restored items" else "Import failed — not a StreamFlow backup?",
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 }

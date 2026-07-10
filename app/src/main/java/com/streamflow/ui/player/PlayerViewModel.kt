@@ -7,8 +7,11 @@ import com.streamflow.StreamFlowApp
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
+import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
 import com.streamflow.data.local.entity.HistoryEntity
+import com.streamflow.data.local.entity.PlaylistEntity
+import com.streamflow.data.local.entity.PlaylistItemEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.Comment
@@ -86,6 +89,88 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private var commentsLoadedFor = ""
 
+    // ── Comment replies (keyed by comment identity, toggle to collapse) ───────
+    private val _replies = MutableStateFlow<Map<String, List<Comment>>>(emptyMap())
+    val replies: StateFlow<Map<String, List<Comment>>> = _replies
+
+    private val _repliesLoading = MutableStateFlow<Set<String>>(emptySet())
+    val repliesLoading: StateFlow<Set<String>> = _repliesLoading
+
+    fun replyKey(c: Comment) = "${c.author}|${c.publishedTime}|${c.text.hashCode()}"
+
+    fun toggleReplies(videoUrl: String, comment: Comment) {
+        val key = replyKey(comment)
+        if (_replies.value.containsKey(key)) {
+            _replies.value = _replies.value - key
+            return
+        }
+        val page = comment.repliesPage ?: return
+        if (key in _repliesLoading.value) return
+        viewModelScope.launch {
+            _repliesLoading.value = _repliesLoading.value + key
+            val result = try { repo.getCommentReplies(videoUrl, page) } catch (_: Exception) { emptyList() }
+            _replies.value = _replies.value + (key to result)
+            _repliesLoading.value = _repliesLoading.value - key
+        }
+    }
+
+    // ── Downloads ─────────────────────────────────────────────────────────────
+    fun download(isAudio: Boolean) {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val streams = repo.getDownloadStreams(d.url)
+                val streamUrl = (if (isAudio) streams.audioUrl else streams.videoUrl)
+                if (streamUrl == null) {
+                    android.widget.Toast.makeText(app, "No downloadable stream found", android.widget.Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                val id = com.streamflow.data.DownloadHelper.enqueue(app, streamUrl, d.title, isAudio)
+                db.downloadDao().insert(DownloadEntity(
+                    url = d.url, title = d.title, thumbnailUrl = d.thumbnailUrl,
+                    uploaderName = d.uploaderName, filePath = "", isAudio = isAudio,
+                    downloadId = id, status = "DOWNLOADING"
+                ))
+                android.widget.Toast.makeText(app,
+                    if (isAudio) "Downloading audio…" else "Downloading video (${streams.videoHeight}p)…",
+                    android.widget.Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(app, "Download failed to start", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ── Local playlists ───────────────────────────────────────────────────────
+    val playlists = db.playlistDao().getPlaylistsWithCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addToPlaylist(playlistId: Long) {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            db.playlistDao().addItem(PlaylistItemEntity(
+                playlistId = playlistId, url = d.url, title = d.title,
+                thumbnailUrl = d.thumbnailUrl, uploaderName = d.uploaderName, duration = d.duration
+            ))
+            android.widget.Toast.makeText(app, "Saved to playlist", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun createPlaylistAndAdd(name: String) {
+        if (name.isBlank()) return
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val id = db.playlistDao().create(PlaylistEntity(name = name.trim()))
+            db.playlistDao().addItem(PlaylistItemEntity(
+                playlistId = id, url = d.url, title = d.title,
+                thumbnailUrl = d.thumbnailUrl, uploaderName = d.uploaderName, duration = d.duration
+            ))
+            android.widget.Toast.makeText(app, "Created \"${name.trim()}\"", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // ── SponsorBlock ──────────────────────────────────────────────────────────
     private val _sponsorSegments = MutableStateFlow<List<SponsorSegment>>(emptyList())
     val sponsorSegments: StateFlow<List<SponsorSegment>> = _sponsorSegments
@@ -99,6 +184,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadVideo(videoUrl: String) {
         _currentUrl.value = videoUrl
+        _replies.value = emptyMap()
         _comments.value = emptyList()
         commentsLoadedFor = ""
         _sponsorSegments.value = emptyList()
@@ -272,9 +358,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun isDirectStream(url: String): Boolean {
         val lower = url.lowercase()
-        return lower.contains(".m3u8") || lower.contains(".mp4") ||
-               lower.contains(".webm") || lower.contains("/hls/") ||
-               lower.contains("/stream/")
+        return lower.startsWith("file://") || lower.startsWith("content://") ||
+               lower.contains(".m3u8") || lower.contains(".mp4") ||
+               lower.contains(".m4a") || lower.contains(".webm") ||
+               lower.contains("/hls/") || lower.contains("/stream/")
     }
 
     private fun extractTitleFromUrl(url: String): String {

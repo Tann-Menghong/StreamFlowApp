@@ -40,6 +40,8 @@ import com.streamflow.ui.feed.FeedScreen
 import com.streamflow.ui.home.HomeScreen
 import com.streamflow.ui.library.LibraryScreen
 import com.streamflow.ui.player.PlayerScreen
+import com.streamflow.ui.playlist.PlaylistDetailScreen
+import com.streamflow.ui.playlist.RemotePlaylistScreen
 import com.streamflow.ui.search.SearchScreen
 import com.streamflow.ui.settings.SettingsScreen
 import java.net.URLDecoder
@@ -59,6 +61,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
         fun createRoute(url: String) = "channel?channelUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
     object Feed     : Screen("feed", "Feed", Icons.Default.Subscriptions)
+    object LocalPlaylist : Screen("localplaylist/{playlistId}", "Playlist", Icons.Default.PlaylistPlay) {
+        fun createRoute(id: Long) = "localplaylist/$id"
+    }
+    object YtPlaylist : Screen("ytplaylist?url={url}", "YouTube Playlist", Icons.Default.PlaylistPlay) {
+        fun createRoute(url: String) = "ytplaylist?url=${URLEncoder.encode(url, "UTF-8")}"
+    }
 }
 
 private val bottomItems = listOf(
@@ -79,6 +87,8 @@ fun NavGraph(startUrl: String? = null) {
 
     // Mini player MediaController
     val context = LocalContext.current
+    val appPrefs = remember { com.streamflow.data.local.AppPreferences.get(context) }
+    val uiLang by appPrefs.language.collectAsState(initial = "EN")
     var miniMediaController by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(context) {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
@@ -95,7 +105,12 @@ fun NavGraph(startUrl: String? = null) {
 
     LaunchedEffect(startUrl) {
         if (startUrl != null) {
-            navController.navigate(Screen.Player.createRoute(startUrl))
+            // Pure playlist links open the playlist screen; watch links open the player
+            if (startUrl.contains("/playlist") && startUrl.contains("list=")) {
+                navController.navigate(Screen.YtPlaylist.createRoute(startUrl))
+            } else {
+                navController.navigate(Screen.Player.createRoute(startUrl))
+            }
         }
     }
 
@@ -127,6 +142,7 @@ fun NavGraph(startUrl: String? = null) {
                     AnimatedNavBar(
                         items    = bottomItems,
                         current  = currentDest,
+                        lang     = uiLang,
                         onSelect = { screen ->
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -179,7 +195,33 @@ fun NavGraph(startUrl: String? = null) {
                     onChannelClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
                     },
-                    onFeedClick = { navController.navigate(Screen.Feed.route) }
+                    onFeedClick = { navController.navigate(Screen.Feed.route) },
+                    onPlaylistClick = { id -> navController.navigate(Screen.LocalPlaylist.createRoute(id)) }
+                )
+            }
+            composable(
+                route = Screen.LocalPlaylist.route,
+                arguments = listOf(navArgument("playlistId") { type = NavType.LongType })
+            ) { back ->
+                PlaylistDetailScreen(
+                    playlistId = back.arguments?.getLong("playlistId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) }
+                )
+            }
+            composable(
+                route = Screen.YtPlaylist.route,
+                arguments = listOf(navArgument("url") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                })
+            ) { back ->
+                val url = URLDecoder.decode(back.arguments?.getString("url") ?: "", "UTF-8")
+                RemotePlaylistScreen(
+                    playlistUrl = url,
+                    onBack = { navController.popBackStack() },
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) }
                 )
             }
             composable(Screen.Feed.route) {
@@ -236,6 +278,7 @@ fun NavGraph(startUrl: String? = null) {
 private fun AnimatedNavBar(
     items: List<Screen>,
     current: androidx.navigation.NavDestination?,
+    lang: String = "EN",
     onSelect: (Screen) -> Unit
 ) {
     Surface(
@@ -295,7 +338,7 @@ private fun AnimatedNavBar(
                         exit  = fadeOut(tween(120)) + shrinkVertically(tween(120))
                     ) {
                         Text(
-                            text  = screen.label,
+                            text  = com.streamflow.ui.theme.KmStrings.t(screen.label, lang),
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
