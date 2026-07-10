@@ -37,8 +37,23 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val showContinueWatching = prefs.showContinueWatching.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val showHeroCard         = prefs.showHeroCard.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val gridColumns          = prefs.gridColumns.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "2")
+    val cardStyle            = prefs.homeCardStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "COMFORT")
 
-    val categories = listOf("All", "Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
+    // Full pool of pickable category chips; user selects which ones show on Home
+    val categoryPool = listOf(
+        "Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film",
+        "Podcasts", "Cooking", "Travel", "Fitness", "Education", "Beauty",
+        "Cars", "Animals", "Anime", "Science", "Fashion", "Khmer News", "K-Pop"
+    )
+
+    private val defaultCategories = listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
+
+    val selectedCategories = prefs.homeCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultCategories)
+
+    val categories: StateFlow<List<String>> = prefs.homeCategories
+        .map { listOf("All") + it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("All") + defaultCategories)
 
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory
@@ -180,6 +195,29 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val current = prefs.homeLayout.first()
             prefs.setHomeLayout(if (current == "GRID") "LIST" else "GRID")
+        }
+    }
+
+    // ── Customize Home sheet setters ─────────────────────────
+    fun setLayout(v: String)             = viewModelScope.launch { prefs.setHomeLayout(v) }
+    fun setGridColumns(v: String)        = viewModelScope.launch { prefs.setGridColumns(v) }
+    fun setCardStyle(v: String)          = viewModelScope.launch { prefs.setHomeCardStyle(v) }
+    fun setShowCW(v: Boolean)            = viewModelScope.launch { prefs.setShowContinueWatching(v) }
+    fun setShowFeatured(v: Boolean)      = viewModelScope.launch { prefs.setShowHeroCard(v) }
+
+    fun toggleCategory(cat: String) {
+        viewModelScope.launch {
+            val current = prefs.homeCategories.first()
+            val updated = if (cat in current) current - cat else current + cat
+            prefs.setHomeCategories(updated)
+            // If the currently selected chip was removed, fall back to All
+            if (cat == _selectedCategory.value && cat !in updated) loadTrending()
+        }
+    }
+
+    fun resetCategories() {
+        viewModelScope.launch {
+            prefs.setHomeCategories(listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film"))
         }
     }
 }

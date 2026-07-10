@@ -60,7 +60,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             if (dao.isSubscribed(d.uploaderUrl).first()) {
                 dao.delete(d.uploaderUrl)
             } else {
-                dao.insert(SubscriptionEntity(channelUrl = d.uploaderUrl, name = d.uploaderName, avatarUrl = ""))
+                dao.insert(SubscriptionEntity(channelUrl = d.uploaderUrl, name = d.uploaderName, avatarUrl = d.uploaderAvatarUrl))
             }
         }
     }

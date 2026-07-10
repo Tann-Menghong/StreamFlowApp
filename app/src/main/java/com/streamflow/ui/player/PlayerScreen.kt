@@ -1302,8 +1302,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(
-                                Modifier.weight(1f).then(
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f).then(
                                     if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
                                         Modifier.clickable(
                                             interactionSource = remember { MutableInteractionSource() },
@@ -1312,17 +1313,25 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     else Modifier
                                 )
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(details.uploaderName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                                        color = if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
-                                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
-                                    if (onChannelClick != null && details.uploaderUrl.isNotEmpty()) {
-                                        Icon(Icons.Default.ChevronRight, null,
-                                            tint = MaterialTheme.colorScheme.primary.copy(0.7f),
-                                            modifier = Modifier.size(16.dp))
+                                com.streamflow.ui.components.ChannelAvatar(
+                                    name      = details.uploaderName,
+                                    avatarUrl = details.uploaderAvatarUrl,
+                                    size      = 34.dp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(details.uploaderName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                                            color = if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
+                                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
+                                        if (onChannelClick != null && details.uploaderUrl.isNotEmpty()) {
+                                            Icon(Icons.Default.ChevronRight, null,
+                                                tint = MaterialTheme.colorScheme.primary.copy(0.7f),
+                                                modifier = Modifier.size(16.dp))
+                                        }
                                     }
+                                    if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (details.uploaderUrl.isNotEmpty()) {
                                 Button(

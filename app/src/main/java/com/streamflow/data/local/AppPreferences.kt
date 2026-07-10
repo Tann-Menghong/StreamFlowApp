@@ -27,6 +27,8 @@ class AppPreferences(private val context: Context) {
         val SHOW_CONTINUE_WATCHING_KEY = booleanPreferencesKey("show_continue_watching")
         val SHOW_HERO_CARD_KEY         = booleanPreferencesKey("show_hero_card")
         val GRID_COLUMNS_KEY           = stringPreferencesKey("grid_columns")
+        val HOME_CARD_STYLE_KEY        = stringPreferencesKey("home_card_style")
+        val HOME_CATEGORIES_KEY        = stringPreferencesKey("home_categories")
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         // Search
@@ -50,6 +52,11 @@ class AppPreferences(private val context: Context) {
     val showContinueWatching: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CONTINUE_WATCHING_KEY] ?: true }
     val showHeroCard        : Flow<Boolean> = context.dataStore.data.map { it[SHOW_HERO_CARD_KEY]         ?: true }
     val gridColumns         : Flow<String>  = context.dataStore.data.map { it[GRID_COLUMNS_KEY]           ?: "2" }
+    val homeCardStyle       : Flow<String>  = context.dataStore.data.map { it[HOME_CARD_STYLE_KEY]        ?: "COMFORT" }
+    val homeCategories      : Flow<List<String>> = context.dataStore.data.map {
+        it[HOME_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() }
+            ?: listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
+    }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     // Search
@@ -69,6 +76,8 @@ class AppPreferences(private val context: Context) {
     suspend fun setShowContinueWatching(v: Boolean) = context.dataStore.edit { it[SHOW_CONTINUE_WATCHING_KEY] = v }
     suspend fun setShowHeroCard(v: Boolean)         = context.dataStore.edit { it[SHOW_HERO_CARD_KEY]         = v }
     suspend fun setGridColumns(v: String)           = context.dataStore.edit { it[GRID_COLUMNS_KEY]           = v }
+    suspend fun setHomeCardStyle(v: String)         = context.dataStore.edit { it[HOME_CARD_STYLE_KEY]        = v }
+    suspend fun setHomeCategories(v: List<String>)  = context.dataStore.edit { it[HOME_CATEGORIES_KEY]        = v.joinToString(",") }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     // Search
