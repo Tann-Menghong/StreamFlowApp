@@ -346,6 +346,9 @@ fun HomeScreen(
             AnimatedContent(
                 targetState  = state,
                 transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
+                // Only animate on Loading/Success/Error changes — load-more appends
+                // update in place instead of crossfading (flashing) the whole feed
+                contentKey   = { it::class },
                 label        = "home_state"
             ) { s ->
                 when (s) {
