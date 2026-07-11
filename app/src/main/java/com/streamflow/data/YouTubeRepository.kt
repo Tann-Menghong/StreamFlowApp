@@ -311,7 +311,8 @@ class YouTubeRepository {
                 currentQuality = currentQuality,
                 isLive = isLive,
                 videoCodec = videoCodec,
-                storyboard = storyboard
+                storyboard = storyboard,
+                uploadedAgo = try { info.textualUploadDate ?: "" } catch (_: Exception) { "" }
             )
             VideoDetailsCache.put(cacheKey, details)
             details

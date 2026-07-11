@@ -1409,7 +1409,17 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             style = MaterialTheme.typography.titleSmall.copy(lineHeight = 21.sp),
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(Modifier.height(4.dp))
+                        // YouTube-style metadata line: "2.2M views · 2 months ago"
+                        val metaLine = listOfNotNull(
+                            details.viewCount.takeIf { it > 0 }?.let { "${formatViews(it)} views" },
+                            details.uploadedAgo.takeIf { it.isNotBlank() }
+                        ).joinToString("  ·  ")
+                        if (metaLine.isNotEmpty()) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(metaLine, fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.height(6.dp))
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1445,7 +1455,6 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 modifier = Modifier.size(16.dp))
                                         }
                                     }
-                                    if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             if (details.uploaderUrl.isNotEmpty()) {
@@ -1465,66 +1474,42 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 }
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
-                        // Actions live on their own scrollable row: sharing one row with the
-                        // channel name squeezed the name to zero width, wrapping it one
-                        // character per line into a huge invisible column (the "big space")
+                        Spacer(Modifier.height(8.dp))
+                        // YouTube-style labeled pill chips, on their own scrollable row so
+                        // they can never squeeze the channel name (the old "big space" bug)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                         ) {
-                                if (details.likeCount > 0) {
-                                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
-                                        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.ThumbUp, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(4.dp))
-                                            Text(formatViews(details.likeCount), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                                        }
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                // Compact 38dp buttons: default IconButtons are 48dp tall and
-                                // were adding a lot of empty space around this row
-                                IconButton(onClick = {
-                                    // Share at the current position (YouTube-style ?t= link)
-                                    val posSec = playerPosition / 1000
-                                    val shareUrl = if (!details.isLive && posSec > 5)
-                                        videoUrl + (if (videoUrl.contains("?")) "&t=${posSec}s" else "?t=${posSec}s")
-                                    else videoUrl
-                                    val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareUrl) }
-                                    context.startActivity(Intent.createChooser(i, "Share video"))
-                                }, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Share, "Share", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp)) }
-                                IconButton(onClick = { vm.toggleWatchLater() }, modifier = Modifier.size(38.dp)) {
-                                    Icon(
-                                        if (isInWatchLater) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                        "Watch Later",
-                                        tint = if (isInWatchLater) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                IconButton(onClick = { vm.toggleFavorite() }, modifier = Modifier.size(38.dp)) {
-                                    Icon(
-                                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                        "Favourite", tint = heartColor, modifier = Modifier.size(22.dp).scale(heartScale)
-                                    )
-                                }
-                                if (!details.isLive) {
-                                    IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(38.dp)) {
-                                        Icon(Icons.Default.Download, "Download",
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
-                                    }
-                                }
-                                IconButton(onClick = { showPlaylistDialog = true }, modifier = Modifier.size(38.dp)) {
-                                    Icon(Icons.Default.PlaylistAdd, "Save to playlist",
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
-                                }
-                                if (AiEngine.isSupported() && !details.isLive) {
-                                    IconButton(onClick = { showAiSheet = true }, modifier = Modifier.size(38.dp)) {
-                                        Icon(Icons.Default.AutoAwesome, "AI summary",
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
-                                    }
-                                }
+                            ActionChip(
+                                icon = if (isFavorite) Icons.Default.ThumbUp else Icons.Default.ThumbUpOffAlt,
+                                label = if (details.likeCount > 0) formatViews(details.likeCount) else "Like",
+                                active = isFavorite
+                            ) { vm.toggleFavorite() }
+                            ActionChip(icon = Icons.Default.Share, label = "Share") {
+                                // Share at the current position (YouTube-style ?t= link)
+                                val posSec = playerPosition / 1000
+                                val shareUrl = if (!details.isLive && posSec > 5)
+                                    videoUrl + (if (videoUrl.contains("?")) "&t=${posSec}s" else "?t=${posSec}s")
+                                else videoUrl
+                                val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareUrl) }
+                                context.startActivity(Intent.createChooser(i, "Share video"))
+                            }
+                            ActionChip(
+                                icon = if (isInWatchLater) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                label = "Watch later",
+                                active = isInWatchLater
+                            ) { vm.toggleWatchLater() }
+                            if (!details.isLive) {
+                                ActionChip(icon = Icons.Default.Download, label = "Download") { showDownloadDialog = true }
+                            }
+                            ActionChip(icon = Icons.Default.PlaylistAdd, label = "Save") { showPlaylistDialog = true }
+                            if (AiEngine.isSupported() && !details.isLive) {
+                                ActionChip(icon = Icons.Default.AutoAwesome, label = "Ask AI") { showAiSheet = true }
+                            }
                         }
+                        Spacer(Modifier.height(4.dp))
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1680,40 +1665,47 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
                         if (details.description.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                            Spacer(Modifier.height(8.dp))
                             var expanded by remember { mutableStateOf(false) }
-                            // Timestamps seek the video; links open externally
-                            val accent = MaterialTheme.colorScheme.primary
-                            val descAnnotated = remember(details.description, accent) {
-                                annotateDescription(details.description, accent)
-                            }
-                            androidx.compose.foundation.text.ClickableText(
-                                text = descAnnotated,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontSize = 13.sp, lineHeight = 18.sp,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
-                                ),
-                                maxLines = if (expanded) Int.MAX_VALUE else 3,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                onClick = { offset ->
-                                    val ts = descAnnotated.getStringAnnotations("timestamp", offset, offset).firstOrNull()
-                                    val link = descAnnotated.getStringAnnotations("url", offset, offset).firstOrNull()
-                                    when {
-                                        ts != null -> mediaController?.seekTo(ts.item.toLongOrNull() ?: 0L)
-                                        link != null -> runCatching {
-                                            context.startActivity(Intent.createChooser(
-                                                Intent(Intent.ACTION_VIEW, link.item.toUri()), "Open link"))
-                                        }
-                                        else -> expanded = !expanded
+                            // YouTube-style rounded description card
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    // Timestamps seek the video; links open externally
+                                    val accent = MaterialTheme.colorScheme.primary
+                                    val descAnnotated = remember(details.description, accent) {
+                                        annotateDescription(details.description, accent)
                                     }
+                                    androidx.compose.foundation.text.ClickableText(
+                                        text = descAnnotated,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 13.sp, lineHeight = 18.sp,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                                        ),
+                                        maxLines = if (expanded) Int.MAX_VALUE else 3,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        onClick = { offset ->
+                                            val ts = descAnnotated.getStringAnnotations("timestamp", offset, offset).firstOrNull()
+                                            val link = descAnnotated.getStringAnnotations("url", offset, offset).firstOrNull()
+                                            when {
+                                                ts != null -> mediaController?.seekTo(ts.item.toLongOrNull() ?: 0L)
+                                                link != null -> runCatching {
+                                                    context.startActivity(Intent.createChooser(
+                                                        Intent(Intent.ACTION_VIEW, link.item.toUri()), "Open link"))
+                                                }
+                                                else -> expanded = !expanded
+                                            }
+                                        }
+                                    )
+                                    Text(
+                                        if (expanded) "Show less" else "...more", fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(top = 5.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded }
+                                    )
                                 }
-                            )
-                            Text(
-                                if (expanded) "Show less" else "Show more", fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 5.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded }
-                            )
+                            }
                         }
                     }
                 }
@@ -2285,5 +2277,40 @@ private fun StoryboardPreview(
             srcSize = androidx.compose.ui.unit.IntSize(sb.frameWidth, sb.frameHeight),
             dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
         )
+    }
+}
+
+// YouTube-style pill action chip (icon + label); `active` fills it with the accent
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ActionChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    ) {
+        Row(
+            Modifier.height(34.dp).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon, null,
+                tint = if (active) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                modifier = Modifier.size(17.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                color = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+            )
+        }
     }
 }

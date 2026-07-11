@@ -56,5 +56,6 @@ data class VideoDetails(
     val currentQuality: Int = 0,
     val isLive: Boolean = false,
     val videoCodec: String = "",
-    val storyboard: Storyboard? = null
+    val storyboard: Storyboard? = null,
+    val uploadedAgo: String = ""
 )
