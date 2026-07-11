@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SlowMotionVideo
 import androidx.compose.material.icons.filled.Tune
@@ -285,11 +286,20 @@ fun HomeScreen(
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    // App logo: play glyph in an accent circle
+                                    Box(
+                                        Modifier.size(28.dp).background(
+                                            MaterialTheme.colorScheme.primary, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, null,
+                                            tint = Color.White, modifier = Modifier.size(19.dp))
+                                    }
                                     Text(
                                         "StreamFlow",
                                         fontWeight = FontWeight.ExtraBold,
-                                        fontSize   = 22.sp,
-                                        color      = MaterialTheme.colorScheme.primary
+                                        fontSize   = 21.sp,
+                                        color      = MaterialTheme.colorScheme.onBackground
                                     )
                                     if (incognitoOn) {
                                         Row(
@@ -488,8 +498,8 @@ fun HomeScreen(
                                     colors   = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                                         selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
-                                        containerColor         = MaterialTheme.colorScheme.surface,
-                                        labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                        containerColor         = MaterialTheme.colorScheme.surfaceVariant.copy(0.55f),
+                                        labelColor             = MaterialTheme.colorScheme.onSurface.copy(0.8f)
                                     )
                                 )
                             }
@@ -508,8 +518,8 @@ fun HomeScreen(
                                         colors   = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                                             selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
-                                            containerColor         = MaterialTheme.colorScheme.surface,
-                                            labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor         = MaterialTheme.colorScheme.surfaceVariant.copy(0.55f),
+                                            labelColor             = MaterialTheme.colorScheme.onSurface.copy(0.8f)
                                         )
                                     )
                                 }
@@ -652,12 +662,11 @@ fun HomeScreen(
                                     }
                                     Text(
                                         label,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight    = FontWeight.Bold,
-                                            letterSpacing = 1.2.sp,
-                                            color         = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color      = MaterialTheme.colorScheme.onBackground
                                         ),
-                                        modifier = Modifier.padding(start = 16.dp, bottom = 6.dp, top = 8.dp)
+                                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, top = 10.dp)
                                     )
                                 }
 
@@ -796,15 +805,11 @@ private fun CategoryChipsRow(
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
-                    containerColor         = MaterialTheme.colorScheme.surface,
-                    labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                    containerColor         = MaterialTheme.colorScheme.surfaceVariant.copy(0.55f),
+                    labelColor             = MaterialTheme.colorScheme.onSurface.copy(0.8f)
                 ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled             = true,
-                    selected            = selected,
-                    borderColor         = MaterialTheme.colorScheme.outline.copy(0.4f),
-                    selectedBorderColor = MaterialTheme.colorScheme.primary
-                )
+                // Flat, borderless pills (YouTube style)
+                border = null
             )
         }
         if (onEdit != null) {
@@ -1092,11 +1097,10 @@ private fun ContinueWatchingSection(
 ) {
     Column(Modifier.padding(bottom = 4.dp)) {
         Text(
-            "Continue Watching",
-            style    = MaterialTheme.typography.labelMedium.copy(
-                fontWeight    = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                color         = MaterialTheme.colorScheme.onSurfaceVariant
+            "Continue watching",
+            style    = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color      = MaterialTheme.colorScheme.onBackground
             ),
             modifier = Modifier.padding(start = 16.dp, bottom = 10.dp)
         )
@@ -1127,9 +1131,9 @@ private fun FeaturedVideoRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Featured", style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                color = MaterialTheme.colorScheme.primary))
+            Text("Featured", style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground))
             Text("See all ›", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
