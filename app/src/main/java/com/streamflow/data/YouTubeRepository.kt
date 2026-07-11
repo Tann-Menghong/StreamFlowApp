@@ -41,7 +41,26 @@ class YouTubeRepository {
         val subscriberCount: Long,
         val videos: List<VideoItem>,
         val nextPage: Page?,
-        val availableTabs: List<String> = emptyList() // "videos", "shorts", "livestreams"
+        val availableTabs: List<String> = emptyList(), // "videos", "shorts", "livestreams"
+        val description: String = ""
+    )
+
+    // Search results for the Channels / Playlists filter tabs
+    data class ChannelItem(
+        val name: String,
+        val url: String,
+        val avatarUrl: String,
+        val subscriberCount: Long,
+        val streamCount: Long,
+        val description: String
+    )
+
+    data class PlaylistItem(
+        val name: String,
+        val url: String,
+        val thumbnailUrl: String,
+        val uploaderName: String,
+        val streamCount: Long
     )
 
     suspend fun getTrending(country: String = "US"): PagedResult = withContext(Dispatchers.IO) {
@@ -88,6 +107,39 @@ class YouTubeRepository {
             videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
             nextPage = page.nextPage
         )
+    }
+
+    suspend fun searchChannels(query: String): List<ChannelItem> = withContext(Dispatchers.IO) {
+        val extractor = youtube.getSearchExtractor(query, listOf("channels"), "")
+        extractor.fetchPage()
+        extractor.initialPage.items
+            .filterIsInstance<org.schabi.newpipe.extractor.channel.ChannelInfoItem>()
+            .map { c ->
+                ChannelItem(
+                    name = c.name ?: "",
+                    url = c.url ?: "",
+                    avatarUrl = try { c.thumbnails.lastOrNull()?.url ?: "" } catch (_: Exception) { "" },
+                    subscriberCount = try { c.subscriberCount } catch (_: Exception) { -1L },
+                    streamCount = try { c.streamCount } catch (_: Exception) { -1L },
+                    description = try { c.description ?: "" } catch (_: Exception) { "" }
+                )
+            }.filter { it.url.isNotEmpty() }
+    }
+
+    suspend fun searchPlaylists(query: String): List<PlaylistItem> = withContext(Dispatchers.IO) {
+        val extractor = youtube.getSearchExtractor(query, listOf("playlists"), "")
+        extractor.fetchPage()
+        extractor.initialPage.items
+            .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
+            .map { p ->
+                PlaylistItem(
+                    name = p.name ?: "",
+                    url = p.url ?: "",
+                    thumbnailUrl = try { p.thumbnails.lastOrNull()?.url ?: "" } catch (_: Exception) { "" },
+                    uploaderName = try { p.uploaderName ?: "" } catch (_: Exception) { "" },
+                    streamCount = try { p.streamCount } catch (_: Exception) { -1L }
+                )
+            }.filter { it.url.isNotEmpty() }
     }
 
     suspend fun getVideoDetails(
@@ -305,7 +357,8 @@ class YouTubeRepository {
             subscriberCount = subscriberCount,
             videos = videos,
             nextPage = nextPage,
-            availableTabs = availableTabs
+            availableTabs = availableTabs,
+            description = try { info.description ?: "" } catch (_: Exception) { "" }
         )
     }
 

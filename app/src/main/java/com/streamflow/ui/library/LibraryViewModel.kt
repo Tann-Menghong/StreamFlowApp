@@ -51,6 +51,9 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun setGroup(channelUrl: String, group: String) = viewModelScope.launch {
         db.subscriptionDao().updateGroup(channelUrl, group.trim())
     }
+    fun setNotify(channelUrl: String, notify: Boolean) = viewModelScope.launch {
+        db.subscriptionDao().updateNotify(channelUrl, notify)
+    }
     fun removeFavorite(url: String) = viewModelScope.launch { db.favoriteDao().delete(url) }
     fun removeHistory(url: String) = viewModelScope.launch { db.historyDao().delete(url) }
     fun removeWatchLater(url: String) = viewModelScope.launch { db.watchLaterDao().delete(url) }

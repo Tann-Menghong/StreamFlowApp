@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,7 +35,9 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SlowMotionVideo
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -59,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.CompactVideoCard
 import com.streamflow.ui.components.ContinueWatchingCard
@@ -74,6 +78,8 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
+    onPlaylistClick: ((String) -> Unit)? = null,
+    onShortsClick: (() -> Unit)? = null,
     vm: HomeViewModel = viewModel()
 ) {
     val state            by vm.uiState.collectAsState()
@@ -95,6 +101,10 @@ fun HomeScreen(
     val sortMode         by vm.sortMode.collectAsState()
     val historyProgress  by vm.historyProgress.collectAsState()
     val incognitoOn      by vm.incognito.collectAsState()
+    val searchType       by vm.searchType.collectAsState()
+    val channelResults   by vm.channelResults.collectAsState()
+    val playlistResults  by vm.playlistResults.collectAsState()
+    val typeLoading      by vm.typeLoading.collectAsState()
     val listState        = rememberLazyListState()
     val context          = LocalContext.current
     var showCountryPicker by remember { mutableStateOf(false) }
@@ -317,6 +327,12 @@ fun HomeScreen(
                             )
                         }
                         if (!searchExpanded) {
+                            if (onShortsClick != null) {
+                                IconButton(onClick = onShortsClick) {
+                                    Icon(Icons.Default.SlowMotionVideo, contentDescription = "Shorts",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                             // Country quick-picker
                             Box {
                                 TextButton(onClick = { showCountryPicker = true }) {
@@ -440,29 +456,52 @@ fun HomeScreen(
                         }
                     }
                 }
-                // Sort chips for search results
+                // Search result type + sort chips
                 AnimatedVisibility(
                     visible = activeSearch.isNotEmpty(),
                     enter   = fadeIn(tween(150)) + expandVertically(tween(150)),
                     exit    = fadeOut(tween(100)) + shrinkVertically(tween(100))
                 ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("RELEVANCE" to "Relevance", "VIEWS" to "Most viewed", "NEWEST" to "Newest").forEach { (key, label) ->
-                            FilterChip(
-                                selected = sortMode == key,
-                                onClick  = { vm.setSortMode(key) },
-                                label    = { Text(label, fontSize = 12.sp) },
-                                shape    = RoundedCornerShape(16.dp),
-                                colors   = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
-                                    containerColor         = MaterialTheme.colorScheme.surface,
-                                    labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                    Column {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("VIDEOS" to "Videos", "CHANNELS" to "Channels", "PLAYLISTS" to "Playlists").forEach { (key, label) ->
+                                FilterChip(
+                                    selected = searchType == key,
+                                    onClick  = { vm.setSearchType(key) },
+                                    label    = { Text(label, fontSize = 12.sp) },
+                                    shape    = RoundedCornerShape(16.dp),
+                                    colors   = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor         = MaterialTheme.colorScheme.surface,
+                                        labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 )
-                            )
+                            }
+                        }
+                        if (searchType == "VIDEOS") {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf("RELEVANCE" to "Relevance", "VIEWS" to "Most viewed", "NEWEST" to "Newest").forEach { (key, label) ->
+                                    FilterChip(
+                                        selected = sortMode == key,
+                                        onClick  = { vm.setSortMode(key) },
+                                        label    = { Text(label, fontSize = 12.sp) },
+                                        shape    = RoundedCornerShape(16.dp),
+                                        colors   = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                            selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
+                                            containerColor         = MaterialTheme.colorScheme.surface,
+                                            labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -497,6 +536,17 @@ fun HomeScreen(
         }
 
         Box(Modifier.fillMaxSize().padding(padding).nestedScroll(ptrState.nestedScrollConnection)) {
+            if (activeSearch.isNotEmpty() && searchType != "VIDEOS") {
+                // Channel / playlist search results
+                SearchTypeResults(
+                    isChannels      = searchType == "CHANNELS",
+                    loading         = typeLoading,
+                    channels        = channelResults,
+                    playlists       = playlistResults,
+                    onChannelClick  = onChannelClick,
+                    onPlaylistClick = onPlaylistClick
+                )
+            } else {
             AnimatedContent(
                 targetState  = state,
                 transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
@@ -656,6 +706,7 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
             }
 
             PullToRefreshContainer(
@@ -1062,5 +1113,128 @@ private fun FeaturedCard(video: VideoItem, onClick: () -> Unit) {
             fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1, overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+// ── Channel / Playlist search results ─────────────────────────────────────────
+@Composable
+private fun SearchTypeResults(
+    isChannels: Boolean,
+    loading: Boolean,
+    channels: List<YouTubeRepository.ChannelItem>,
+    playlists: List<YouTubeRepository.PlaylistItem>,
+    onChannelClick: ((String) -> Unit)?,
+    onPlaylistClick: ((String) -> Unit)?
+) {
+    if (loading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    val empty = if (isChannels) channels.isEmpty() else playlists.isEmpty()
+    if (empty) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                if (isChannels) "No channels found" else "No playlists found",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (isChannels) {
+            items(channels, key = { it.url }) { ch ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onChannelClick?.invoke(ch.url) }
+                        .padding(horizontal = 6.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (ch.avatarUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = ch.avatarUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
+                    } else {
+                        Box(
+                            Modifier.size(56.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(ch.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onBackground)
+                        val meta = buildString {
+                            if (ch.subscriberCount > 0) append("${formatViews(ch.subscriberCount)} subscribers")
+                            if (ch.streamCount > 0) {
+                                if (isNotEmpty()) append("  ·  ")
+                                append("${ch.streamCount} videos")
+                            }
+                        }
+                        if (meta.isNotEmpty()) {
+                            Text(meta, fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (ch.description.isNotBlank()) {
+                            Text(ch.description, fontSize = 11.sp, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f))
+                        }
+                    }
+                }
+            }
+        } else {
+            items(playlists, key = { it.url }) { pl ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onPlaylistClick?.invoke(pl.url) }
+                        .padding(horizontal = 6.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AsyncImage(
+                        model = pl.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(width = 110.dp, height = 62.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(pl.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onBackground, lineHeight = 17.sp)
+                        Spacer(Modifier.height(2.dp))
+                        if (pl.uploaderName.isNotBlank()) {
+                            Text(pl.uploaderName, fontSize = 11.sp, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (pl.streamCount > 0) {
+                            Text("${pl.streamCount} videos", fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

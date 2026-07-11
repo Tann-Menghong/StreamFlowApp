@@ -28,7 +28,8 @@ class NewVideosWorker(
         if (!app.prefs.notifyNewVideos.first()) return Result.success()
 
         val repo = YouTubeRepository()
-        val subs = app.database.subscriptionDao().getAllOnce().take(20)
+        // Only channels the user left the bell on for
+        val subs = app.database.subscriptionDao().getAllOnce().filter { it.notify }.take(20)
         var notifId = 2000
 
         subs.forEach { sub ->

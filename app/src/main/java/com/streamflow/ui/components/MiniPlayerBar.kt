@@ -2,6 +2,8 @@ package com.streamflow.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +33,9 @@ fun MiniPlayerBar(
 ) {
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
+    // Gestures: swipe sideways to dismiss, swipe up to reopen the full player
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(mediaController) {
         while (true) {
             val mc = mediaController
@@ -44,7 +51,35 @@ fun MiniPlayerBar(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 8.dp,
-        shadowElevation = 4.dp
+        shadowElevation = 4.dp,
+        modifier = Modifier
+            .graphicsLayer {
+                translationX = dragX
+                alpha = 1f - (kotlin.math.abs(dragX) / 700f).coerceIn(0f, 0.6f)
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dx -> dragX += dx },
+                    onDragEnd = {
+                        if (kotlin.math.abs(dragX) > 220f) {
+                            mediaController?.pause()
+                            onDismiss()
+                        }
+                        dragX = 0f
+                    },
+                    onDragCancel = { dragX = 0f }
+                )
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dy -> dragY += dy },
+                    onDragEnd = {
+                        if (dragY < -60f) onNavigateToPlayer(data.url)
+                        dragY = 0f
+                    },
+                    onDragCancel = { dragY = 0f }
+                )
+            }
     ) {
         Column {
         // Thin playback progress line across the top

@@ -29,4 +29,7 @@ interface HistoryDao {
 
     @Query("SELECT position FROM history WHERE url = :url LIMIT 1")
     suspend fun getPosition(url: String): Long
+
+    @Query("DELETE FROM history WHERE watchedAt < :cutoff")
+    suspend fun deleteOlderThan(cutoff: Long)
 }

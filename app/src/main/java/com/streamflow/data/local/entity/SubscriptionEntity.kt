@@ -10,5 +10,6 @@ data class SubscriptionEntity(
     val avatarUrl: String,
     val subscribedAt: Long = System.currentTimeMillis(),
     val lastVideoUrl: String = "", // newest known video, for new-upload notifications
-    val groupName: String = ""     // user-defined folder ("" = ungrouped)
+    val groupName: String = "",    // user-defined folder ("" = ungrouped)
+    val notify: Boolean = true     // per-channel new-upload notification toggle
 )

@@ -53,6 +53,23 @@ private val accentPalettes: Map<String, AccentPalette> = mapOf(
     "CYAN"   to AccentPalette(Color(0xFF22D3EE), Color(0xFF0E7490), Color(0xFF06222A), Color(0xFF9AEBF8), Color(0xFF0891B2), Color(0xFFECFEFF), Color(0xFF064E5E)),
 )
 
+// Derives a full palette from a single user-picked color (custom accent)
+private fun blend(a: Color, b: Color, t: Float) = Color(
+    red   = a.red   + (b.red   - a.red)   * t,
+    green = a.green + (b.green - a.green) * t,
+    blue  = a.blue  + (b.blue  - a.blue)  * t
+)
+
+private fun paletteFromColor(c: Color) = AccentPalette(
+    darkPrimary      = c,
+    darkSecondary    = blend(c, Color.Black, 0.35f),
+    darkContainer    = blend(c, Color.Black, 0.82f),
+    darkOnContainer  = blend(c, Color.White, 0.55f),
+    lightPrimary     = blend(c, Color.Black, 0.18f),
+    lightContainer   = blend(c, Color.White, 0.86f),
+    lightOnContainer = blend(c, Color.Black, 0.55f)
+)
+
 private fun buildDarkColors(p: AccentPalette) = darkColorScheme(
     primary            = p.darkPrimary,
     onPrimary          = Color.White,
@@ -114,7 +131,13 @@ fun StreamFlowTheme(
         else -> true
     }
     val context = LocalContext.current
-    val palette = accentPalettes[accent] ?: accentPalettes["RED"]!!
+    val palette = when {
+        accent.startsWith("CUSTOM:") ->
+            accent.removePrefix("CUSTOM:").toLongOrNull(16)
+                ?.let { paletteFromColor(Color((it or 0xFF000000L).toInt())) }
+                ?: accentPalettes["RED"]!!
+        else -> accentPalettes[accent] ?: accentPalettes["RED"]!!
+    }
     val colors  = when {
         accent == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

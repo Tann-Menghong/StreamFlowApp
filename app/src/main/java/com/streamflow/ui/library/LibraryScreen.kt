@@ -179,7 +179,8 @@ fun LibraryScreen(
                             onChannelClick = onChannelClick,
                             onUnsubscribe = vm::unsubscribe,
                             onFeedClick = onFeedClick,
-                            onSetGroup = vm::setGroup
+                            onSetGroup = vm::setGroup,
+                            onSetNotify = vm::setNotify
                         )
                     4 -> PlaylistList(
                             playlists = playlists,
@@ -547,7 +548,8 @@ private fun SubscriptionList(
     onChannelClick: ((String) -> Unit)?,
     onUnsubscribe: (String) -> Unit,
     onFeedClick: (() -> Unit)? = null,
-    onSetGroup: ((String, String) -> Unit)? = null
+    onSetGroup: ((String, String) -> Unit)? = null,
+    onSetNotify: ((String, Boolean) -> Unit)? = null
 ) {
     var groupFilter by remember { mutableStateOf("All") }
     var groupTarget by remember { mutableStateOf<SubscriptionEntity?>(null) }
@@ -642,6 +644,17 @@ private fun SubscriptionList(
                         if (sub.groupName.isNotBlank()) {
                             Text(sub.groupName, fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    if (onSetNotify != null) {
+                        IconButton(onClick = { onSetNotify(sub.channelUrl, !sub.notify) }) {
+                            Icon(
+                                if (sub.notify) Icons.Default.NotificationsActive
+                                else Icons.Default.NotificationsOff,
+                                "Toggle notifications",
+                                tint = if (sub.notify) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                                modifier = Modifier.size(18.dp))
                         }
                     }
                     if (onSetGroup != null) {

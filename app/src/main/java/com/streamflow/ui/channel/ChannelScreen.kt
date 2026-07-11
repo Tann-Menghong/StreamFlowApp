@@ -1,6 +1,7 @@
 package com.streamflow.ui.channel
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -144,6 +145,22 @@ fun ChannelScreen(
                             Text(if (isSubscribed) "Subscribed" else "Subscribe",
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
+                    }
+                    // About: channel description (tap to expand)
+                    if (data.description.isNotBlank()) {
+                        var aboutExpanded by remember { mutableStateOf(false) }
+                        Text(
+                            data.description,
+                            fontSize = 12.sp, lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (aboutExpanded) Int.MAX_VALUE else 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 10.dp)
+                                .clickable { aboutExpanded = !aboutExpanded }
+                        )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
                 }

@@ -159,6 +159,40 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _activeSearchQuery = MutableStateFlow("")
     val activeSearchQuery: StateFlow<String> = _activeSearchQuery
 
+    // ── Search result type: VIDEOS | CHANNELS | PLAYLISTS ────────
+    private val _searchType = MutableStateFlow("VIDEOS")
+    val searchType: StateFlow<String> = _searchType
+
+    private val _channelResults = MutableStateFlow<List<YouTubeRepository.ChannelItem>>(emptyList())
+    val channelResults: StateFlow<List<YouTubeRepository.ChannelItem>> = _channelResults
+
+    private val _playlistResults = MutableStateFlow<List<YouTubeRepository.PlaylistItem>>(emptyList())
+    val playlistResults: StateFlow<List<YouTubeRepository.PlaylistItem>> = _playlistResults
+
+    private val _typeLoading = MutableStateFlow(false)
+    val typeLoading: StateFlow<Boolean> = _typeLoading
+
+    fun setSearchType(type: String) {
+        if (_searchType.value == type) return
+        _searchType.value = type
+        val q = _activeSearchQuery.value
+        if (q.isEmpty() || type == "VIDEOS") return
+        viewModelScope.launch {
+            _typeLoading.value = true
+            try {
+                when (type) {
+                    "CHANNELS"  -> _channelResults.value = repo.searchChannels(q)
+                    "PLAYLISTS" -> _playlistResults.value = repo.searchPlaylists(q)
+                }
+            } catch (_: Exception) {
+                if (type == "CHANNELS") _channelResults.value = emptyList()
+                else _playlistResults.value = emptyList()
+            } finally {
+                _typeLoading.value = false
+            }
+        }
+    }
+
     val continueWatching: StateFlow<List<HistoryEntity>> = db.historyDao()
         .getRecentWithProgress(10)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -269,6 +303,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _selectedCategory.value = "All"
         _activeSearchQuery.value = query
         _sortMode.value = "RELEVANCE"
+        _searchType.value = "VIDEOS"
+        _channelResults.value = emptyList()
+        _playlistResults.value = emptyList()
         clearSuggestions()
         feedGeneration++
         viewModelScope.launch {

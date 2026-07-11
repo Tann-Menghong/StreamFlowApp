@@ -29,7 +29,8 @@ data class ChannelData(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val availableTabs: List<String> = emptyList(),
-    val selectedTab: String = "videos"
+    val selectedTab: String = "videos",
+    val description: String = ""
 )
 
 class ChannelViewModel(app: Application) : AndroidViewModel(app) {
@@ -82,7 +83,8 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                     videos = result.videos,
                     nextPage = result.nextPage,
                     availableTabs = result.availableTabs,
-                    selectedTab = tab
+                    selectedTab = tab,
+                    description = result.description
                 )
             } catch (e: Exception) {
                 _channel.value = ChannelData(error = friendlyError(e))

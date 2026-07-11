@@ -18,6 +18,8 @@ import com.streamflow.data.local.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.NewPipe
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +34,17 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
 
         // Restore + persist the playback queue across app restarts
         PlaybackQueue.bind(prefs, appScope)
+
+        // Auto-clear watch history older than the user's retention setting
+        appScope.launch {
+            try {
+                val days = prefs.historyRetention.first().toIntOrNull() ?: 0
+                if (days > 0) {
+                    database.historyDao().deleteOlderThan(
+                        System.currentTimeMillis() - days * 24L * 60 * 60 * 1000)
+                }
+            } catch (_: Exception) {}
+        }
 
         // Periodic new-upload check; the worker itself no-ops when the
         // notification setting is off

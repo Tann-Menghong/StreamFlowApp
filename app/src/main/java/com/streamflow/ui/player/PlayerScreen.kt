@@ -251,10 +251,20 @@ fun PlayerScreen(
     var skipMs by remember { mutableLongStateOf(10_000L) }
     LaunchedEffect(Unit) { skipMs = (prefs.skipSeconds.first().toLongOrNull() ?: 10L) * 1000L }
 
-    var seekFeedback by remember { mutableStateOf("") }
+    // Double-tap seek feedback: repeated taps accumulate (10s, 20s, 30s…)
+    var seekAccumMs by remember { mutableLongStateOf(0L) }
+    var seekAccumDir by remember { mutableIntStateOf(0) } // -1 back, +1 forward
+    var seekAccumAt by remember { mutableLongStateOf(0L) }
     var showSeekFeedback by remember { mutableStateOf(false) }
     if (showSeekFeedback) {
-        LaunchedEffect(seekFeedback) { delay(700); showSeekFeedback = false }
+        LaunchedEffect(seekAccumAt) { delay(800); showSeekFeedback = false; seekAccumDir = 0 }
+    }
+    val registerDoubleTapSeek: (Int, Long) -> Unit = { dir, skip ->
+        val now = System.currentTimeMillis()
+        seekAccumMs = if (seekAccumDir == dir && now - seekAccumAt < 1500) seekAccumMs + skip else skip
+        seekAccumDir = dir
+        seekAccumAt = now
+        showSeekFeedback = true
     }
 
     // ── Horizontal scrub (fullscreen) ────────────────────────────────────────
@@ -479,15 +489,33 @@ fun PlayerScreen(
         }
     }
 
+    // YouTube-style side ripple: a rounded scrim on the tapped half with the
+    // accumulated skip amount
     @Composable
     fun SeekFeedback() {
-        if (showSeekFeedback) {
-            Text(
-                seekFeedback, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp)
-            )
+        if (!showSeekFeedback || seekAccumDir == 0) return
+        val back = seekAccumDir < 0
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .align(if (back) Alignment.CenterStart else Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.3f)
+                    .clip(
+                        if (back) RoundedCornerShape(topEndPercent = 100, bottomEndPercent = 100)
+                        else RoundedCornerShape(topStartPercent = 100, bottomStartPercent = 100)
+                    )
+                    .background(Color.White.copy(0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (back) "◀◀◀" else "▶▶▶",
+                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(2.dp))
+                    Text("${seekAccumMs / 1000}s",
+                        color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 
@@ -524,7 +552,7 @@ fun PlayerScreen(
                             onDoubleTap = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0))
-                                seekFeedback = "- ${skipSec}s"; showSeekFeedback = true
+                                registerDoubleTapSeek(-1, skipMs)
                             })
                     }
             )
@@ -558,7 +586,7 @@ fun PlayerScreen(
                             onDoubleTap = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 mc.seekTo(mc.currentPosition + skipMs)
-                                seekFeedback = "+ ${skipSec}s"; showSeekFeedback = true
+                                registerDoubleTapSeek(1, skipMs)
                             })
                     }
             )
@@ -1618,11 +1646,31 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                             Spacer(Modifier.height(12.dp))
                             var expanded by remember { mutableStateOf(false) }
-                            Text(
-                                details.description, fontSize = 13.sp, lineHeight = 18.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                            // Timestamps seek the video; links open externally
+                            val accent = MaterialTheme.colorScheme.primary
+                            val descAnnotated = remember(details.description, accent) {
+                                annotateDescription(details.description, accent)
+                            }
+                            androidx.compose.foundation.text.ClickableText(
+                                text = descAnnotated,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 13.sp, lineHeight = 18.sp,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                                ),
                                 maxLines = if (expanded) Int.MAX_VALUE else 3,
-                                modifier = Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded }
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                onClick = { offset ->
+                                    val ts = descAnnotated.getStringAnnotations("timestamp", offset, offset).firstOrNull()
+                                    val link = descAnnotated.getStringAnnotations("url", offset, offset).firstOrNull()
+                                    when {
+                                        ts != null -> mediaController?.seekTo(ts.item.toLongOrNull() ?: 0L)
+                                        link != null -> runCatching {
+                                            context.startActivity(Intent.createChooser(
+                                                Intent(Intent.ACTION_VIEW, link.item.toUri()), "Open link"))
+                                        }
+                                        else -> expanded = !expanded
+                                    }
+                                }
                             )
                             Text(
                                 if (expanded) "Show less" else "Show more", fontSize = 12.sp,
@@ -2006,6 +2054,39 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 private fun fmtMs(ms: Long): String {
     val s = ms / 1000L; val h = s / 3600; val m = (s % 3600) / 60; val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+// Makes timestamps (seek) and links (open) tappable in the video description
+private fun annotateDescription(
+    text: String,
+    accent: Color
+): androidx.compose.ui.text.AnnotatedString {
+    val tsRegex = Regex("\\b(?:(\\d{1,2}):)?(\\d{1,2}):(\\d{2})\\b")
+    val urlRegex = Regex("https?://\\S+")
+    data class Marker(val range: IntRange, val tag: String, val value: String)
+
+    val markers = ArrayList<Marker>()
+    urlRegex.findAll(text).forEach { m -> markers.add(Marker(m.range, "url", m.value)) }
+    tsRegex.findAll(text).forEach { m ->
+        val h = m.groupValues[1].toLongOrNull() ?: 0L
+        val min = m.groupValues[2].toLongOrNull() ?: 0L
+        val sec = m.groupValues[3].toLongOrNull() ?: 0L
+        markers.add(Marker(m.range, "timestamp", ((h * 3600 + min * 60 + sec) * 1000L).toString()))
+    }
+
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(text)
+        var lastEnd = -1
+        markers.sortedBy { it.range.first }.forEach { mk ->
+            if (mk.range.first <= lastEnd) return@forEach // skip overlaps (e.g. time inside a URL)
+            lastEnd = mk.range.last
+            addStyle(
+                androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = FontWeight.SemiBold),
+                mk.range.first, mk.range.last + 1
+            )
+            addStringAnnotation(mk.tag, mk.value, mk.range.first, mk.range.last + 1)
+        }
+    }
 }
 
 // Chapter boundary tick marks drawn over a seek Slider (draw-only, never

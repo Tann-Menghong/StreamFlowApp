@@ -29,4 +29,7 @@ interface SubscriptionDao {
 
     @Query("UPDATE subscriptions SET groupName = :group WHERE channelUrl = :channelUrl")
     suspend fun updateGroup(channelUrl: String, group: String)
+
+    @Query("UPDATE subscriptions SET notify = :notify WHERE channelUrl = :channelUrl")
+    suspend fun updateNotify(channelUrl: String, notify: Boolean)
 }

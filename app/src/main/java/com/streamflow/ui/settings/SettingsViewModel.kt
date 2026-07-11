@@ -49,6 +49,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val showDonghua = prefs.showDonghua.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val startTab = prefs.startTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "home")
     val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val qualityCellular = prefs.qualityCellular.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SAME")
+    val historyRetention = prefs.historyRetention.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -110,6 +112,59 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }
     fun setStartTab(v: String)           = viewModelScope.launch { prefs.setStartTab(v) }
     fun setIncognito(v: Boolean)         = viewModelScope.launch { prefs.setIncognito(v) }
+    fun setQualityCellular(v: String)    = viewModelScope.launch { prefs.setQualityCellular(v) }
+    fun setHistoryRetention(v: String)   = viewModelScope.launch { prefs.setHistoryRetention(v) }
+
+    // ── Import subscriptions from a Google Takeout CSV or NewPipe JSON export ──
+    fun importSubscriptions(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var imported = 0
+            try {
+                val text = app.contentResolver.openInputStream(uri)?.use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                } ?: throw Exception("empty")
+                val trimmed = text.trimStart()
+                if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                    // NewPipe subscriptions export: {"subscriptions":[{"url":..,"name":..}]}
+                    val root = org.json.JSONObject(trimmed)
+                    val arr = root.optJSONArray("subscriptions") ?: org.json.JSONArray()
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val url = o.optString("url")
+                        if (url.contains("youtube.com")) {
+                            db.subscriptionDao().insert(com.streamflow.data.local.entity.SubscriptionEntity(
+                                channelUrl = url, name = o.optString("name"), avatarUrl = ""))
+                            imported++
+                        }
+                    }
+                } else {
+                    // Google Takeout subscriptions.csv: "Channel Id,Channel Url,Channel Title"
+                    text.lineSequence().drop(1).forEach { line ->
+                        if (line.isBlank()) return@forEach
+                        val parts = line.split(",")
+                        if (parts.size >= 2) {
+                            val id = parts[0].trim().trim('"')
+                            val name = parts.drop(2).joinToString(",").trim().trim('"')
+                                .ifBlank { id }
+                            if (id.isNotBlank()) {
+                                db.subscriptionDao().insert(com.streamflow.data.local.entity.SubscriptionEntity(
+                                    channelUrl = "https://www.youtube.com/channel/$id",
+                                    name = name, avatarUrl = ""))
+                                imported++
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(app,
+                    if (imported > 0) "Subscribed to $imported channels"
+                    else "Import failed — use a Takeout CSV or NewPipe JSON export",
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     // ── Backup & restore (JSON via Storage Access Framework) ──────
     fun exportBackup(uri: android.net.Uri) {

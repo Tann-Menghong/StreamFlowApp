@@ -46,6 +46,7 @@ import com.streamflow.ui.playlist.PlaylistDetailScreen
 import com.streamflow.ui.playlist.RemotePlaylistScreen
 import com.streamflow.ui.search.SearchScreen
 import com.streamflow.ui.settings.SettingsScreen
+import com.streamflow.ui.shorts.ShortsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import android.content.ComponentName
@@ -70,6 +71,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object YtPlaylist : Screen("ytplaylist?url={url}", "YouTube Playlist", Icons.Default.PlaylistPlay) {
         fun createRoute(url: String) = "ytplaylist?url=${URLEncoder.encode(url, "UTF-8")}"
     }
+    object Shorts : Screen("shortsfeed", "Shorts", Icons.Default.SlowMotionVideo)
 }
 
 private val allBottomRoutes = listOf(
@@ -235,6 +237,21 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             composable(Screen.Home.route) {
                 HomeScreen(
                     onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
+                    },
+                    onPlaylistClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.YtPlaylist.createRoute(url))
+                    },
+                    onShortsClick = { navController.navigate(Screen.Shorts.route) }
+                )
+            }
+            composable(Screen.Shorts.route) {
+                // Shorts has its own player — silence any background playback first
+                LaunchedEffect(Unit) { miniMediaController?.pause() }
+                ShortsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenInPlayer = { navController.navigate(Screen.Player.createRoute(it)) },
                     onChannelClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
                     }

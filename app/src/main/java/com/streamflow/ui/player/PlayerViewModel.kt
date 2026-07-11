@@ -211,7 +211,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 recordHistory(details, videoUrl)
             } else {
                 try {
-                    val qualityPref = prefs.quality.first()
+                    // Network-aware quality: a separate (usually lower) preference
+                    // applies on mobile data; "SAME" falls back to the Wi-Fi setting
+                    val cellularPref = prefs.qualityCellular.first()
+                    val qualityPref = if (isOnCellular() && cellularPref != "SAME") cellularPref
+                                      else prefs.quality.first()
                     _autoQuality.value = qualityPref == "AUTO"
                     // Data saver caps Auto at 480p
                     val quality = if (qualityPref == "AUTO" && prefs.dataSaver.first()) "480P" else qualityPref
@@ -363,6 +367,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             duration = details.duration
         ))
     }
+
+    private fun isOnCellular(): Boolean = try {
+        val cm = getApplication<Application>()
+            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+            as android.net.ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        caps != null &&
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
+            !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+    } catch (_: Exception) { false }
 
     private fun isDirectStream(url: String): Boolean {
         val lower = url.lowercase()

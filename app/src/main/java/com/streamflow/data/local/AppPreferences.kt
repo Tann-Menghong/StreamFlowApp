@@ -41,6 +41,10 @@ class AppPreferences(private val context: Context) {
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         val AUDIO_ONLY_KEY   = booleanPreferencesKey("audio_only_mode")
+        // "SAME" = use the Wi-Fi quality setting on mobile data too
+        val QUALITY_CELLULAR_KEY = stringPreferencesKey("quality_cellular")
+        // Days to keep watch history; "0" = forever
+        val HISTORY_RETENTION_KEY = stringPreferencesKey("history_retention")
         // Search
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
         // What's New dialog: last app version the user has seen release notes for
@@ -83,6 +87,8 @@ class AppPreferences(private val context: Context) {
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
+    val qualityCellular: Flow<String> = context.dataStore.data.map { it[QUALITY_CELLULAR_KEY] ?: "SAME" }
+    val historyRetention: Flow<String> = context.dataStore.data.map { it[HISTORY_RETENTION_KEY] ?: "0" }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
@@ -134,6 +140,8 @@ class AppPreferences(private val context: Context) {
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }
+    suspend fun setQualityCellular(v: String) = context.dataStore.edit { it[QUALITY_CELLULAR_KEY] = v }
+    suspend fun setHistoryRetention(v: String) = context.dataStore.edit { it[HISTORY_RETENTION_KEY] = v }
     suspend fun setLastSeenVersion(v: Int) = context.dataStore.edit { it[LAST_SEEN_VERSION_KEY] = v.toString() }
     suspend fun saveQueue(items: List<com.streamflow.data.model.VideoItem>) = context.dataStore.edit { prefsMap ->
         val arr = org.json.JSONArray()

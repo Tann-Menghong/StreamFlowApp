@@ -80,6 +80,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val showDonghua          by vm.showDonghua.collectAsState()
     val startTab             by vm.startTab.collectAsState()
     val incognito            by vm.incognito.collectAsState()
+    val qualityCellular      by vm.qualityCellular.collectAsState()
+    val historyRetention     by vm.historyRetention.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -87,6 +89,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) vm.importBackup(uri) }
+    val importSubsLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.importSubscriptions(uri) }
     val update               by vm.update.collectAsState()
     val context              = LocalContext.current
 
@@ -105,6 +110,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showFontDialog     by remember { mutableStateOf(false) }
     var showStartTabDialog by remember { mutableStateOf(false) }
     var showWhatsNewDialog by remember { mutableStateOf(false) }
+    var showCellularDialog by remember { mutableStateOf(false) }
+    var showRetentionDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -230,6 +237,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
                 ) { showQualityDialog = true }
                 SettingsDivider()
+                SettingsItem(Icons.Default.SignalCellularAlt, "Quality on mobile data",
+                    when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
+                ) { showCellularDialog = true }
+                SettingsDivider()
                 SettingsItem(Icons.Default.Speed, "Default speed",
                     when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
                 ) { showSpeedDialog = true }
@@ -273,6 +284,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.VisibilityOff, "Hidden videos & channels",
                     if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
                 ) { if (blockedCount > 0) showClearBlocked = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.AutoDelete, "Auto-clear history",
+                    when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
+                ) { showRetentionDialog = true }
             }
 
             // ── Backup ───────────────────────────────────────────────────
@@ -285,6 +300,11 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.Download, "Import backup",
                     "Restore from a StreamFlow backup file"
                 ) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Subscriptions, "Import YouTube subscriptions",
+                    "From a Google Takeout CSV or NewPipe export"
+                ) { importSubsLauncher.launch(arrayOf("text/csv", "text/comma-separated-values",
+                    "application/json", "text/*", "application/octet-stream")) }
             }
 
             // ── About ────────────────────────────────────────────────────
@@ -383,6 +403,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Start screen", tabOpts.map { it.second },
             tabOpts.indexOfFirst { it.first == startTab }.coerceAtLeast(0),
             { vm.setStartTab(tabOpts[it].first); showStartTabDialog = false }, { showStartTabDialog = false })
+    }
+    if (showCellularDialog) {
+        val cellOpts = listOf("SAME" to "Same as Wi-Fi", "AUTO" to "Auto", "720P" to "720p", "480P" to "480p", "360P" to "360p")
+        PickerDialog("Quality on mobile data", cellOpts.map { it.second },
+            cellOpts.indexOfFirst { it.first == qualityCellular }.coerceAtLeast(0),
+            { vm.setQualityCellular(cellOpts[it].first); showCellularDialog = false }, { showCellularDialog = false })
+    }
+    if (showRetentionDialog) {
+        val retOpts = listOf("0" to "Never", "30" to "After 30 days", "90" to "After 90 days")
+        PickerDialog("Auto-clear history", retOpts.map { it.second },
+            retOpts.indexOfFirst { it.first == historyRetention }.coerceAtLeast(0),
+            { vm.setHistoryRetention(retOpts[it].first); showRetentionDialog = false }, { showRetentionDialog = false })
     }
     if (showWhatsNewDialog) {
         AlertDialog(
@@ -607,6 +639,54 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                }
+                // Custom color: pick any hue with the slider
+                var customHue by remember {
+                    mutableFloatStateOf(
+                        if (selected.startsWith("CUSTOM:")) {
+                            val c = selected.removePrefix("CUSTOM:").toLongOrNull(16)
+                            if (c != null) {
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV((c or 0xFF000000L).toInt(), hsv)
+                                hsv[0]
+                            } else 200f
+                        } else 200f
+                    )
+                }
+                val customColor = Color.hsv(customHue, 0.82f, 0.95f)
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(customColor)
+                            .then(if (selected.startsWith("CUSTOM:"))
+                                Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                            .clickable {
+                                onSelect("CUSTOM:%06X".format(
+                                    android.graphics.Color.HSVToColor(floatArrayOf(customHue, 0.82f, 0.95f)) and 0xFFFFFF))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selected.startsWith("CUSTOM:")) Icon(Icons.Default.Check, null,
+                            tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Custom color — tap circle to apply",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Slider(
+                            value = customHue,
+                            onValueChange = { customHue = it },
+                            valueRange = 0f..360f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = customColor,
+                                activeTrackColor = customColor,
+                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
                 }
                 // Color grid
                 LazyVerticalGrid(

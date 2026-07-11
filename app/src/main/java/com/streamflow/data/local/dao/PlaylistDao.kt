@@ -47,6 +47,10 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND url = :url")
     suspend fun removeItem(playlistId: Long, url: String)
 
+    // Items are ordered by addedAt, so swapping two timestamps reorders them
+    @Query("UPDATE playlist_items SET addedAt = :addedAt WHERE playlistId = :playlistId AND url = :url")
+    suspend fun setAddedAt(playlistId: Long, url: String, addedAt: Long)
+
     @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId")
     suspend fun clearItems(playlistId: Long)
 }

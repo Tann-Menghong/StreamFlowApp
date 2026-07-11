@@ -11,8 +11,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -67,23 +70,31 @@ fun PlaylistDetailScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (items.isNotEmpty()) {
-                Button(
-                    onClick = {
-                        // Queue everything after the first video, then play the first
-                        PlaybackQueue.clear()
-                        items.drop(1).forEach {
-                            PlaybackQueue.add(VideoItem(
-                                url = it.url, title = it.title, thumbnailUrl = it.thumbnailUrl,
-                                uploaderName = it.uploaderName, viewCount = 0L, duration = it.duration
-                            ))
-                        }
-                        onVideoClick(items.first().url)
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                fun playAll(shuffled: Boolean) {
+                    val order = if (shuffled) items.shuffled() else items
+                    PlaybackQueue.clear()
+                    order.drop(1).forEach {
+                        PlaybackQueue.add(VideoItem(
+                            url = it.url, title = it.title, thumbnailUrl = it.thumbnailUrl,
+                            uploaderName = it.uploaderName, viewCount = 0L, duration = it.duration
+                        ))
+                    }
+                    onVideoClick(order.first().url)
+                }
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Play all (${items.size})")
+                    Button(onClick = { playAll(false) }) {
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Play all (${items.size})")
+                    }
+                    OutlinedButton(onClick = { playAll(true) }) {
+                        Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Shuffle")
+                    }
                 }
             }
             if (items.isEmpty()) {
@@ -102,7 +113,7 @@ fun PlaylistDetailScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(vertical = 4.dp, horizontal = 16.dp)) {
-                    items(items, key = { it.url }) { item ->
+                    itemsIndexed(items, key = { _, it -> it.url }) { index, item ->
                         Row(
                             Modifier.fillMaxWidth()
                                 .clickable { onVideoClick(item.url) }
@@ -127,6 +138,37 @@ fun PlaylistDetailScreen(
                                     color = MaterialTheme.colorScheme.onBackground)
                                 Text(item.uploaderName, fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            }
+                            // Reorder by swapping addedAt with the neighbour
+                            Column {
+                                IconButton(
+                                    onClick = {
+                                        val above = items.getOrNull(index - 1) ?: return@IconButton
+                                        scope.launch {
+                                            db.playlistDao().setAddedAt(playlistId, item.url, above.addedAt)
+                                            db.playlistDao().setAddedAt(playlistId, above.url, item.addedAt)
+                                        }
+                                    },
+                                    enabled = index > 0, modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.KeyboardArrowUp, "Move up",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (index > 0) 0.7f else 0.25f),
+                                        modifier = Modifier.size(16.dp))
+                                }
+                                IconButton(
+                                    onClick = {
+                                        val below = items.getOrNull(index + 1) ?: return@IconButton
+                                        scope.launch {
+                                            db.playlistDao().setAddedAt(playlistId, item.url, below.addedAt)
+                                            db.playlistDao().setAddedAt(playlistId, below.url, item.addedAt)
+                                        }
+                                    },
+                                    enabled = index < items.size - 1, modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.KeyboardArrowDown, "Move down",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (index < items.size - 1) 0.7f else 0.25f),
+                                        modifier = Modifier.size(16.dp))
+                                }
                             }
                             IconButton(onClick = {
                                 scope.launch { db.playlistDao().removeItem(playlistId, item.url) }
@@ -233,14 +275,26 @@ fun RemotePlaylistScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             if (videos.isNotEmpty()) {
-                                Button(onClick = {
-                                    PlaybackQueue.clear()
-                                    videos.drop(1).forEach { PlaybackQueue.add(it) }
-                                    onVideoClick(videos.first().url)
-                                }) {
-                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Play all")
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = {
+                                        PlaybackQueue.clear()
+                                        videos.drop(1).forEach { PlaybackQueue.add(it) }
+                                        onVideoClick(videos.first().url)
+                                    }) {
+                                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Play all")
+                                    }
+                                    OutlinedButton(onClick = {
+                                        val order = videos.shuffled()
+                                        PlaybackQueue.clear()
+                                        order.drop(1).forEach { PlaybackQueue.add(it) }
+                                        onVideoClick(order.first().url)
+                                    }) {
+                                        Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Shuffle")
+                                    }
                                 }
                             }
                         }
