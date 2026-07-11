@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.PressGestureScope
@@ -1434,6 +1435,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(details.uploaderName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                             color = if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
                                                 MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
                                         if (onChannelClick != null && details.uploaderUrl.isNotEmpty()) {
@@ -1442,7 +1445,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 modifier = Modifier.size(16.dp))
                                         }
                                     }
-                                    if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (details.viewCount > 0) Text("${formatViews(details.viewCount)} views", fontSize = 12.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             if (details.uploaderUrl.isNotEmpty()) {
@@ -1461,7 +1464,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        // Actions live on their own scrollable row: sharing one row with the
+                        // channel name squeezed the name to zero width, wrapping it one
+                        // character per line into a huge invisible column (the "big space")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        ) {
                                 if (details.likeCount > 0) {
                                     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
                                         Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1513,10 +1524,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                                     }
                                 }
-                            }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        ) {
                             Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Speed", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
