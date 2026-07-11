@@ -103,6 +103,8 @@ fun HomeScreen(
     val incognitoOn      by vm.incognito.collectAsState()
     val searchType       by vm.searchType.collectAsState()
     val showCategoryBar  by vm.showCategoryBar.collectAsState()
+    val categoryPool     by vm.categoryPool.collectAsState()
+    val customCats       by vm.customCategories.collectAsState()
     val channelResults   by vm.channelResults.collectAsState()
     val playlistResults  by vm.playlistResults.collectAsState()
     val typeLoading      by vm.typeLoading.collectAsState()
@@ -415,6 +417,15 @@ fun HomeScreen(
                                         focusManager.clearFocus()
                                     }
                                 )
+                                // Remove this single entry from recent searches
+                                IconButton(
+                                    onClick = { vm.removeRecentSearch(q) },
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, "Remove",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
+                                        modifier = Modifier.size(14.dp))
+                                }
                             }
                         }
                     }
@@ -729,7 +740,8 @@ fun HomeScreen(
                 hideShorts         = hideShorts,
                 showCategoryBar    = showCategoryBar,
                 selectedCategories = selectedCats,
-                categoryPool       = vm.categoryPool,
+                categoryPool       = categoryPool,
+                customCategories   = customCats,
                 onLayout           = vm::setLayout,
                 onGridCols         = vm::setGridColumns,
                 onCardStyle        = vm::setCardStyle,
@@ -740,6 +752,8 @@ fun HomeScreen(
                 onShowCategoryBar  = vm::setShowCategoryBar,
                 onToggleCategory   = vm::toggleCategory,
                 onResetCategories  = vm::resetCategories,
+                onAddCategory      = vm::addCustomCategory,
+                onRemoveCustom     = vm::removeCustomCategory,
                 onDismiss          = { showCustomizeSheet = false }
             )
         }
@@ -828,6 +842,7 @@ private fun CustomizeHomeSheet(
     showCategoryBar: Boolean,
     selectedCategories: List<String>,
     categoryPool: List<String>,
+    customCategories: List<String>,
     onLayout: (String) -> Unit,
     onGridCols: (String) -> Unit,
     onCardStyle: (String) -> Unit,
@@ -838,6 +853,8 @@ private fun CustomizeHomeSheet(
     onShowCategoryBar: (Boolean) -> Unit,
     onToggleCategory: (String) -> Unit,
     onResetCategories: () -> Unit,
+    onAddCategory: (String) -> Unit,
+    onRemoveCustom: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -918,10 +935,20 @@ private fun CustomizeHomeSheet(
             ) {
                 categoryPool.forEach { cat ->
                     val selected = cat in selectedCategories
+                    val isCustom = cat in customCategories
                     FilterChip(
                         selected = selected,
                         onClick  = { onToggleCategory(cat) },
                         label    = { Text(cat, fontSize = 12.sp) },
+                        trailingIcon = if (isCustom) ({
+                            Icon(Icons.Default.Close, "Remove $cat",
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { onRemoveCustom(cat) })
+                        }) else null,
                         shape    = RoundedCornerShape(16.dp),
                         colors   = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -937,6 +964,54 @@ private fun CustomizeHomeSheet(
                         )
                     )
                 }
+            }
+
+            // ── Add your own topic ─────────────────────────────
+            Spacer(Modifier.height(14.dp))
+            var newCategory by remember { mutableStateOf("") }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BasicTextField(
+                            value = newCategory,
+                            onValueChange = { newCategory = it.take(24) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onBackground),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (newCategory.isNotBlank()) {
+                                    onAddCategory(newCategory); newCategory = ""
+                                }
+                            }),
+                            decorationBox = { inner ->
+                                if (newCategory.isEmpty()) Text("Add your own topic…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                inner()
+                            }
+                        )
+                    }
+                }
+                FilledTonalButton(
+                    onClick = {
+                        if (newCategory.isNotBlank()) { onAddCategory(newCategory); newCategory = "" }
+                    },
+                    enabled = newCategory.isNotBlank(),
+                    contentPadding = PaddingValues(horizontal = 14.dp)
+                ) { Text("Add", fontSize = 13.sp) }
             }
         }
     }

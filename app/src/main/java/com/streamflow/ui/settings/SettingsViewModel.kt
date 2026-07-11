@@ -63,6 +63,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val hapticsEnabled = prefs.hapticsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val playerGestures = prefs.playerGestures.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val confirmExit    = prefs.confirmExit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val showSearchTab  = prefs.showSearchTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
+    val libraryTab     = prefs.libraryTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -146,6 +149,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setHapticsEnabled(v: Boolean) = viewModelScope.launch { prefs.setHapticsEnabled(v) }
     fun setPlayerGestures(v: Boolean) = viewModelScope.launch { prefs.setPlayerGestures(v) }
     fun setConfirmExit(v: Boolean)    = viewModelScope.launch { prefs.setConfirmExit(v) }
+    fun setShowSearchTab(v: Boolean)  = viewModelScope.launch { prefs.setShowSearchTab(v) }
+    fun setFontFamily(v: String)      = viewModelScope.launch { prefs.setFontFamily(v) }
+    fun setLibraryTab(v: String)      = viewModelScope.launch { prefs.setLibraryTab(v) }
     fun setLanguage(v: String)           = viewModelScope.launch { prefs.setLanguage(v) }
     fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }

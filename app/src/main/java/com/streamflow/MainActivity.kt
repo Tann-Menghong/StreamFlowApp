@@ -72,12 +72,14 @@ class MainActivity : ComponentActivity() {
             val fontScaleStr by prefs.fontScale.collectAsState(initial = "DEFAULT")
             val cornerStyle by prefs.cornerStyle.collectAsState(initial = "ROUNDED")
             val hapticsOn by prefs.hapticsEnabled.collectAsState(initial = true)
+            val fontFamilyStr by prefs.fontFamily.collectAsState(initial = "DEFAULT")
             val fontScale = when (fontScaleStr) {
                 "SMALL" -> 0.9f
                 "LARGE" -> 1.12f
                 else -> 1f
             }
-            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr, fontScale = fontScale) {
+            StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr,
+                fontScale = fontScale, fontFamilyPref = fontFamilyStr) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalThumbCorner provides cornerDpFor(cornerStyle),
                     LocalHapticsEnabled provides hapticsOn

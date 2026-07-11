@@ -75,7 +75,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 private val allBottomRoutes = listOf(
-    Screen.Home.route, Screen.Donghua.route, Screen.Library.route, Screen.Settings.route
+    Screen.Home.route, Screen.Search.route, Screen.Donghua.route,
+    Screen.Library.route, Screen.Settings.route
 )
 
 @Composable
@@ -95,6 +96,7 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
     val appPrefs = remember { com.streamflow.data.local.AppPreferences.get(context) }
     val uiLang by appPrefs.language.collectAsState(initial = "EN")
     val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
+    val showSearchTab by appPrefs.showSearchTab.collectAsState(initial = false)
     val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
     val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
     val confirmExit by appPrefs.confirmExit.collectAsState(initial = false)
@@ -112,9 +114,14 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val bottomItems = remember(showDonghua) {
-        if (showDonghua) listOf(Screen.Home, Screen.Donghua, Screen.Library, Screen.Settings)
-        else listOf(Screen.Home, Screen.Library, Screen.Settings)
+    val bottomItems = remember(showDonghua, showSearchTab) {
+        buildList {
+            add(Screen.Home)
+            if (showSearchTab) add(Screen.Search)
+            if (showDonghua) add(Screen.Donghua)
+            add(Screen.Library)
+            add(Screen.Settings)
+        }
     }
     var miniMediaController by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(context) {

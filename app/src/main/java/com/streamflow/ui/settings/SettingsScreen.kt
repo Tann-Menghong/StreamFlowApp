@@ -92,6 +92,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val hapticsEnabled       by vm.hapticsEnabled.collectAsState()
     val playerGestures       by vm.playerGestures.collectAsState()
     val confirmExit          by vm.confirmExit.collectAsState()
+    val showSearchTab        by vm.showSearchTab.collectAsState()
+    val fontFamily           by vm.fontFamily.collectAsState()
+    val libraryTab           by vm.libraryTab.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -127,6 +130,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showNotifFreqDialog by remember { mutableStateOf(false) }
     var showNotifMaxDialog  by remember { mutableStateOf(false) }
     var showQuietDialog     by remember { mutableStateOf(false) }
+    var showFontFamilyDialog by remember { mutableStateOf(false) }
+    var showLibTabDialog     by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -207,6 +212,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.FormatSize, "Font size",
                     when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
                 ) { showFontDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.TextFields, "Font style",
+                    when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
+                ) { showFontFamilyDialog = true }
                 SettingsDivider()
                 SettingsItem(Icons.Default.RoundedCorner, "Thumbnail corners",
                     when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
@@ -290,9 +299,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     "Hide it from the bottom bar if you don't use it", showDonghua
                 ) { vm.setShowDonghua(it) }
                 SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Search, "Search tab",
+                    "Add a dedicated Search tab to the bottom bar", showSearchTab
+                ) { vm.setShowSearchTab(it) }
+                SettingsDivider()
                 SettingsItem(Icons.Default.Start, "Start screen",
                     when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
                 ) { showStartTabDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.VideoLibrary, "Default Library tab",
+                    listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+                        .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
+                ) { showLibTabDialog = true }
             }
 
             // ── Playback ─────────────────────────────────────────────────
@@ -503,6 +521,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Quiet hours", quietOpts.map { it.second },
             quietOpts.indexOfFirst { it.first == quietHours }.coerceAtLeast(0),
             { vm.setQuietHours(quietOpts[it].first); showQuietDialog = false }, { showQuietDialog = false })
+    }
+    if (showFontFamilyDialog) {
+        val famOpts = listOf("DEFAULT" to "Default", "SERIF" to "Serif", "MONO" to "Monospace")
+        PickerDialog("Font style", famOpts.map { it.second },
+            famOpts.indexOfFirst { it.first == fontFamily }.coerceAtLeast(0),
+            { vm.setFontFamily(famOpts[it].first); showFontFamilyDialog = false }, { showFontFamilyDialog = false })
+    }
+    if (showLibTabDialog) {
+        val tabNames = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+        PickerDialog("Default Library tab", tabNames,
+            (libraryTab.toIntOrNull() ?: 0).coerceIn(0, 5),
+            { vm.setLibraryTab(it.toString()); showLibTabDialog = false }, { showLibTabDialog = false })
     }
     if (showCornerDialog) {
         val cornerOpts = listOf("SQUARE" to "Square", "ROUNDED" to "Rounded", "ROUND" to "Extra round")
@@ -740,20 +770,20 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                     }
                     Spacer(Modifier.height(12.dp))
                 }
-                // Custom color: pick any hue with the slider
-                var customHue by remember {
-                    mutableFloatStateOf(
-                        if (selected.startsWith("CUSTOM:")) {
-                            val c = selected.removePrefix("CUSTOM:").toLongOrNull(16)
-                            if (c != null) {
-                                val hsv = FloatArray(3)
-                                android.graphics.Color.colorToHSV((c or 0xFF000000L).toInt(), hsv)
-                                hsv[0]
-                            } else 200f
-                        } else 200f
-                    )
+                // Custom color: full hue/saturation/brightness control
+                val initialHsv = remember {
+                    val hsv = floatArrayOf(200f, 0.82f, 0.95f)
+                    if (selected.startsWith("CUSTOM:")) {
+                        selected.removePrefix("CUSTOM:").toLongOrNull(16)?.let { c ->
+                            android.graphics.Color.colorToHSV((c or 0xFF000000L).toInt(), hsv)
+                        }
+                    }
+                    hsv
                 }
-                val customColor = Color.hsv(customHue, 0.82f, 0.95f)
+                var customHue by remember { mutableFloatStateOf(initialHsv[0]) }
+                var customSat by remember { mutableFloatStateOf(initialHsv[1]) }
+                var customVal by remember { mutableFloatStateOf(initialHsv[2]) }
+                val customColor = Color.hsv(customHue, customSat, customVal)
                 Row(
                     Modifier.fillMaxWidth().padding(bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -765,7 +795,8 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                                 Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
                             .clickable {
                                 onSelect("CUSTOM:%06X".format(
-                                    android.graphics.Color.HSVToColor(floatArrayOf(customHue, 0.82f, 0.95f)) and 0xFFFFFF))
+                                    android.graphics.Color.HSVToColor(
+                                        floatArrayOf(customHue, customSat, customVal)) and 0xFFFFFF))
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -786,6 +817,38 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Depth", fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(44.dp))
+                            Slider(
+                                value = customSat,
+                                onValueChange = { customSat = it },
+                                valueRange = 0.15f..1f,
+                                modifier = Modifier.height(24.dp),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = customColor,
+                                    activeTrackColor = customColor,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Bright", fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(44.dp))
+                            Slider(
+                                value = customVal,
+                                onValueChange = { customVal = it },
+                                valueRange = 0.35f..1f,
+                                modifier = Modifier.height(24.dp),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = customColor,
+                                    activeTrackColor = customColor,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        }
                     }
                 }
                 // Color grid

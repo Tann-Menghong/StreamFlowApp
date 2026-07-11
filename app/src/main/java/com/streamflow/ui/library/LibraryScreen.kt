@@ -40,6 +40,7 @@ import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatDuration
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +62,10 @@ fun LibraryScreen(
     val libContext = androidx.compose.ui.platform.LocalContext.current
     val libPrefs = remember { com.streamflow.data.local.AppPreferences.get(libContext) }
     val uiLang by libPrefs.language.collectAsState(initial = "EN")
+    // Open on the user's preferred tab (Settings > Home > Default Library tab)
+    LaunchedEffect(Unit) {
+        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 5) ?: 0
+    }
     val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }
 

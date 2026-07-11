@@ -59,6 +59,10 @@ class AppPreferences(private val context: Context) {
         val SHOW_CATEGORY_BAR_KEY = booleanPreferencesKey("show_category_bar")
         val PLAYER_GESTURES_KEY = booleanPreferencesKey("player_gestures")
         val CONFIRM_EXIT_KEY    = booleanPreferencesKey("confirm_exit")
+        val CUSTOM_CATEGORIES_KEY = stringPreferencesKey("custom_categories") // user-added topic chips
+        val SHOW_SEARCH_TAB_KEY = booleanPreferencesKey("show_search_tab")
+        val FONT_FAMILY_KEY     = stringPreferencesKey("font_family")        // DEFAULT / SERIF / MONO
+        val LIBRARY_TAB_KEY     = stringPreferencesKey("library_tab")        // default Library tab index
         // Search
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
         // What's New dialog: last app version the user has seen release notes for
@@ -117,6 +121,12 @@ class AppPreferences(private val context: Context) {
     val showCategoryBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CATEGORY_BAR_KEY] ?: true }
     val playerGestures : Flow<Boolean> = context.dataStore.data.map { it[PLAYER_GESTURES_KEY] ?: true }
     val confirmExit    : Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_EXIT_KEY] ?: false }
+    val customCategories: Flow<List<String>> = context.dataStore.data.map {
+        it[CUSTOM_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() } ?: emptyList()
+    }
+    val showSearchTab  : Flow<Boolean> = context.dataStore.data.map { it[SHOW_SEARCH_TAB_KEY] ?: false }
+    val fontFamily     : Flow<String>  = context.dataStore.data.map { it[FONT_FAMILY_KEY] ?: "DEFAULT" }
+    val libraryTab     : Flow<String>  = context.dataStore.data.map { it[LIBRARY_TAB_KEY] ?: "0" }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
@@ -184,6 +194,14 @@ class AppPreferences(private val context: Context) {
     suspend fun setShowCategoryBar(v: Boolean) = context.dataStore.edit { it[SHOW_CATEGORY_BAR_KEY] = v }
     suspend fun setPlayerGestures(v: Boolean)  = context.dataStore.edit { it[PLAYER_GESTURES_KEY] = v }
     suspend fun setConfirmExit(v: Boolean)     = context.dataStore.edit { it[CONFIRM_EXIT_KEY] = v }
+    suspend fun setCustomCategories(v: List<String>) = context.dataStore.edit { it[CUSTOM_CATEGORIES_KEY] = v.joinToString(",") }
+    suspend fun setShowSearchTab(v: Boolean)   = context.dataStore.edit { it[SHOW_SEARCH_TAB_KEY] = v }
+    suspend fun setFontFamily(v: String)       = context.dataStore.edit { it[FONT_FAMILY_KEY] = v }
+    suspend fun setLibraryTab(v: String)       = context.dataStore.edit { it[LIBRARY_TAB_KEY] = v }
+    suspend fun removeRecentSearch(query: String) = context.dataStore.edit { prefs ->
+        val current = prefs[RECENT_SEARCHES_KEY]?.split("|||")?.filter { it.isNotBlank() } ?: emptyList()
+        prefs[RECENT_SEARCHES_KEY] = current.filter { it != query }.joinToString("|||")
+    }
     suspend fun setLastSeenVersion(v: Int) = context.dataStore.edit { it[LAST_SEEN_VERSION_KEY] = v.toString() }
     suspend fun saveQueue(items: List<com.streamflow.data.model.VideoItem>) = context.dataStore.edit { prefsMap ->
         val arr = org.json.JSONArray()

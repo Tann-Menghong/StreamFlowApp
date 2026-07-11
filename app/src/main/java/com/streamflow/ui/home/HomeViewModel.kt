@@ -140,11 +140,42 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val cardStyle            = prefs.homeCardStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "COMFORT")
 
     // Full pool of pickable category chips; user selects which ones show on Home
-    val categoryPool = listOf(
+    private val baseCategoryPool = listOf(
         "Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film",
         "Podcasts", "Cooking", "Travel", "Fitness", "Education", "Beauty",
         "Cars", "Animals", "Anime", "Science", "Fashion", "Khmer News", "K-Pop"
     )
+    val customCategories = prefs.customCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val categoryPool: StateFlow<List<String>> = prefs.customCategories
+        .map { baseCategoryPool + it.filter { c -> c !in baseCategoryPool } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), baseCategoryPool)
+
+    fun addCustomCategory(name: String) {
+        val cat = name.trim().take(24)
+        if (cat.isBlank()) return
+        viewModelScope.launch {
+            val custom = prefs.customCategories.first()
+            if (cat !in custom && cat !in baseCategoryPool) {
+                prefs.setCustomCategories(custom + cat)
+            }
+            // Select it right away so it appears on Home
+            val picked = prefs.homeCategories.first()
+            if (cat !in picked) prefs.setHomeCategories(picked + cat)
+        }
+    }
+
+    fun removeCustomCategory(name: String) {
+        viewModelScope.launch {
+            prefs.setCustomCategories(prefs.customCategories.first() - name)
+            prefs.setHomeCategories(prefs.homeCategories.first() - name)
+            if (name == _selectedCategory.value) loadTrending()
+        }
+    }
+
+    fun removeRecentSearch(query: String) = viewModelScope.launch {
+        prefs.removeRecentSearch(query)
+    }
 
     private val defaultCategories = listOf("Music", "Gaming", "Sports", "News", "Tech", "Comedy", "Film")
 

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
@@ -19,19 +20,19 @@ fun String.toAppTheme(): AppTheme = when (this) {
     else     -> AppTheme.DARK
 }
 
-// Typography scaled by the user's font-size preference
-private fun appTypography(s: Float) = Typography(
-    displaySmall = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s),
-    headlineMedium= TextStyle(fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s),
-    titleLarge   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s),
-    titleMedium  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s),
-    titleSmall   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s),
-    bodyLarge    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 15.sp * s, lineHeight = 22.sp * s),
-    bodyMedium   = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 13.sp * s, lineHeight = 19.sp * s),
-    bodySmall    = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp * s, lineHeight = 16.sp * s),
-    labelLarge   = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp * s, letterSpacing = 0.1.sp),
-    labelMedium  = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp * s, letterSpacing = 0.3.sp),
-    labelSmall   = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 10.sp * s, letterSpacing = 0.5.sp),
+// Typography scaled by the user's font-size preference, in their chosen face
+private fun appTypography(s: Float, f: FontFamily?) = Typography(
+    displaySmall = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s),
+    headlineMedium= TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s),
+    titleLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s),
+    titleMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s),
+    titleSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s),
+    bodyLarge    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 15.sp * s, lineHeight = 22.sp * s),
+    bodyMedium   = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 13.sp * s, lineHeight = 19.sp * s),
+    bodySmall    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 12.sp * s, lineHeight = 16.sp * s),
+    labelLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 13.sp * s, letterSpacing = 0.1.sp),
+    labelMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 11.sp * s, letterSpacing = 0.3.sp),
+    labelSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 10.sp * s, letterSpacing = 0.5.sp),
 )
 
 private data class AccentPalette(
@@ -123,8 +124,14 @@ fun StreamFlowTheme(
     theme: AppTheme = AppTheme.DARK,
     accent: String = "RED",
     fontScale: Float = 1f,
+    fontFamilyPref: String = "DEFAULT",
     content: @Composable () -> Unit
 ) {
+    val fontFamily = when (fontFamilyPref) {
+        "SERIF" -> FontFamily.Serif
+        "MONO"  -> FontFamily.Monospace
+        else    -> null // system default
+    }
     val isDark   = when (theme) {
         AppTheme.LIGHT -> false
         AppTheme.SYSTEM -> isSystemInDarkTheme()
@@ -150,7 +157,7 @@ fun StreamFlowTheme(
     }
     MaterialTheme(
         colorScheme = colors,
-        typography  = appTypography(fontScale),
+        typography  = appTypography(fontScale, fontFamily),
         content     = content
     )
 }
