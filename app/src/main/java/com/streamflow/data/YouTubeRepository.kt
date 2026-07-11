@@ -123,7 +123,7 @@ class YouTubeRepository {
                     streamCount = try { c.streamCount } catch (_: Exception) { -1L },
                     description = try { c.description ?: "" } catch (_: Exception) { "" }
                 )
-            }.filter { it.url.isNotEmpty() }
+            }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
     }
 
     suspend fun searchPlaylists(query: String): List<PlaylistItem> = withContext(Dispatchers.IO) {
@@ -139,7 +139,7 @@ class YouTubeRepository {
                     uploaderName = try { p.uploaderName ?: "" } catch (_: Exception) { "" },
                     streamCount = try { p.streamCount } catch (_: Exception) { -1L }
                 )
-            }.filter { it.url.isNotEmpty() }
+            }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
     }
 
     suspend fun getVideoDetails(

@@ -201,7 +201,6 @@ fun RemotePlaylistScreen(
     var nextPage by remember { mutableStateOf<Page?>(null) }
     var loadingMore by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(playlistUrl) {
         try {

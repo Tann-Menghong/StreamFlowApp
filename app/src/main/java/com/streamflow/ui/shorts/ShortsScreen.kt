@@ -30,7 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -58,16 +63,38 @@ fun ShortsScreen(
     val details by vm.details.collectAsState()
     val context = LocalContext.current
 
-    // One shared player swapped between pages
+    // One shared player swapped between pages. Audio focus is requested so
+    // Shorts ducks/pauses other apps' audio instead of playing over it.
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = Player.REPEAT_MODE_ONE
             playWhenReady = true
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ true
+            )
         }
     }
     DisposableEffect(Unit) { onDispose { player.release() } }
 
     var isPaused by remember { mutableStateOf(false) }
+
+    // Pause when the app goes to background — Shorts has no playback service,
+    // so without this the audio would keep playing after leaving the app
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE && player.isPlaying) {
+                player.pause()
+                isPaused = true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when {
@@ -179,8 +206,13 @@ fun ShortsScreen(
 
                         ShortsOverlay(
                             video = video,
-                            onOpenInPlayer = { onOpenInPlayer(video.url) },
-                            onChannelClick = onChannelClick,
+                            onOpenInPlayer = {
+                                player.pause()
+                                onOpenInPlayer(video.url)
+                            },
+                            onChannelClick = onChannelClick?.let { navigate ->
+                                { url: String -> player.pause(); navigate(url) }
+                            },
                             modifier = Modifier.align(Alignment.BottomStart)
                         )
                     }

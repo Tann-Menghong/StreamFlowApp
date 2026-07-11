@@ -269,8 +269,10 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
                 )
             }
             composable(Screen.Shorts.route) {
-                // Shorts has its own player — silence any background playback first
-                LaunchedEffect(Unit) { miniMediaController?.pause() }
+                // Shorts has its own player — silence any background playback.
+                // Keyed on the controller: it connects asynchronously, so an
+                // Unit-keyed effect could run while it is still null.
+                LaunchedEffect(miniMediaController) { miniMediaController?.pause() }
                 ShortsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenInPlayer = { navController.navigate(Screen.Player.createRoute(it)) },
