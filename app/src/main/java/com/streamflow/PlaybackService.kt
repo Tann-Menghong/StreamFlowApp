@@ -112,7 +112,15 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        // Tapping the media notification / lock-screen card opens the app
+        val sessionActivity = android.app.PendingIntent.getActivity(
+            this, 0,
+            android.content.Intent(this, MainActivity::class.java),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
         mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(sessionActivity)
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(
                     session: MediaSession,

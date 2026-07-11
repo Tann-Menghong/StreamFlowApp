@@ -342,6 +342,34 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsSwitchItem(Icons.Default.PictureInPicture, "Pop-up video on exit",
                     "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
                 SettingsDivider()
+                SettingsItem(Icons.Default.BatteryChargingFull, "Background play protection",
+                    "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
+                ) {
+                    try {
+                        val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
+                            as android.os.PowerManager
+                        if (android.os.Build.VERSION.SDK_INT >= 23 &&
+                            !pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                            val i = android.content.Intent(
+                                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                android.net.Uri.parse("package:${context.packageName}"))
+                            context.startActivity(i)
+                        } else {
+                            android.widget.Toast.makeText(context,
+                                "Already protected — playback won't be killed",
+                                android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (_: Exception) {
+                        // Some OEM builds block the dialog; open the app's battery settings instead
+                        try {
+                            val i = android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.parse("package:${context.packageName}"))
+                            context.startActivity(i)
+                        } catch (_: Exception) {}
+                    }
+                }
+                SettingsDivider()
                 SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play",
                     "Play related videos automatically", autoPlay
                 ) { vm.setAutoPlay(it) }
