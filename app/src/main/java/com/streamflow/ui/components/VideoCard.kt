@@ -32,6 +32,8 @@ import coil.compose.AsyncImage
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
+import com.streamflow.ui.theme.LocalHapticsEnabled
+import com.streamflow.ui.theme.LocalThumbCorner
 
 private val avatarPalette = listOf(
     Color(0xFF5C6BC0), Color(0xFF26A69A), Color(0xFFEF5350),
@@ -94,6 +96,8 @@ fun VideoCard(
 ) {
     val context  = LocalContext.current
     val haptic   = LocalHapticFeedback.current
+    val hapticsOn = LocalHapticsEnabled.current
+    val corner   = LocalThumbCorner.current
     var showMenu by remember { mutableStateOf(false) }
     var pressed  by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -111,7 +115,7 @@ fun VideoCard(
                         onPress = { pressed = true; tryAwaitRelease(); pressed = false },
                         onTap   = { onClick() },
                         onLongPress = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             showMenu = true
                         }
                     )
@@ -122,7 +126,7 @@ fun VideoCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(corner.dp))
             ) {
                 AsyncImage(
                     model              = video.thumbnailUrl,
@@ -297,6 +301,7 @@ fun VideoCard(
 @Composable
 fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
+    val corner = LocalThumbCorner.current
     val scale by animateFloatAsState(
         targetValue   = if (pressed) 0.98f else 1f,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
@@ -307,7 +312,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .scale(scale)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape((corner + 4).dp))
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress  = { pressed = true; tryAwaitRelease(); pressed = false },
@@ -376,7 +381,8 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
             }
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp))
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(LocalThumbCorner.current.dp))
         ) {
             AsyncImage(
                 model              = entity.thumbnailUrl,
@@ -422,6 +428,7 @@ fun CompactVideoCard(
 ) {
     val context  = LocalContext.current
     val haptic   = LocalHapticFeedback.current
+    val hapticsOn = LocalHapticsEnabled.current
     var showMenu by remember { mutableStateOf(false) }
     var pressed  by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -440,7 +447,7 @@ fun CompactVideoCard(
                     onPress     = { pressed = true; tryAwaitRelease(); pressed = false },
                     onTap       = { onClick() },
                     onLongPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         showMenu = true
                     }
                 )
@@ -448,7 +455,8 @@ fun CompactVideoCard(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
-            Modifier.width(150.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp))
+            Modifier.width(150.dp).aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape((LocalThumbCorner.current - 2).coerceAtLeast(3).dp))
         ) {
             AsyncImage(
                 model              = video.thumbnailUrl,

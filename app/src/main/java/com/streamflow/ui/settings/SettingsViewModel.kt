@@ -51,6 +51,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val qualityCellular = prefs.qualityCellular.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SAME")
     val historyRetention = prefs.historyRetention.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
+    // UI customization
+    val cornerStyle    = prefs.cornerStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ROUNDED")
+    val navLabels      = prefs.navLabels.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SELECTED")
+    val reduceMotion   = prefs.reduceMotion.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val hapticsEnabled = prefs.hapticsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val playerGestures = prefs.playerGestures.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val confirmExit    = prefs.confirmExit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -107,6 +114,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun clearBlocked()   = viewModelScope.launch { db.blockedDao().clearAll() }
     fun setVolumeBoost(v: String)        = viewModelScope.launch { prefs.setVolumeBoost(v) }
     fun setNotifyNewVideos(v: Boolean)   = viewModelScope.launch { prefs.setNotifyNewVideos(v) }
+    // UI customization
+    fun setCornerStyle(v: String)     = viewModelScope.launch { prefs.setCornerStyle(v) }
+    fun setNavLabels(v: String)       = viewModelScope.launch { prefs.setNavLabels(v) }
+    fun setReduceMotion(v: Boolean)   = viewModelScope.launch { prefs.setReduceMotion(v) }
+    fun setHapticsEnabled(v: Boolean) = viewModelScope.launch { prefs.setHapticsEnabled(v) }
+    fun setPlayerGestures(v: Boolean) = viewModelScope.launch { prefs.setPlayerGestures(v) }
+    fun setConfirmExit(v: Boolean)    = viewModelScope.launch { prefs.setConfirmExit(v) }
     fun setLanguage(v: String)           = viewModelScope.launch { prefs.setLanguage(v) }
     fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }

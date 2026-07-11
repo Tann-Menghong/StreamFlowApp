@@ -82,6 +82,12 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val incognito            by vm.incognito.collectAsState()
     val qualityCellular      by vm.qualityCellular.collectAsState()
     val historyRetention     by vm.historyRetention.collectAsState()
+    val cornerStyle          by vm.cornerStyle.collectAsState()
+    val navLabels            by vm.navLabels.collectAsState()
+    val reduceMotion         by vm.reduceMotion.collectAsState()
+    val hapticsEnabled       by vm.hapticsEnabled.collectAsState()
+    val playerGestures       by vm.playerGestures.collectAsState()
+    val confirmExit          by vm.confirmExit.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -112,6 +118,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showWhatsNewDialog by remember { mutableStateOf(false) }
     var showCellularDialog by remember { mutableStateOf(false) }
     var showRetentionDialog by remember { mutableStateOf(false) }
+    var showCornerDialog   by remember { mutableStateOf(false) }
+    var showNavLabelDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -192,6 +200,23 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.FormatSize, "Font size",
                     when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
                 ) { showFontDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.RoundedCorner, "Thumbnail corners",
+                    when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
+                ) { showCornerDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Label, "Bottom bar labels",
+                    when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
+                ) { showNavLabelDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Animation, "Reduce motion",
+                    "Calmer, faster screen transitions", reduceMotion, vm::setReduceMotion)
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Vibration, "Haptic feedback",
+                    "Vibrate on long-press actions", hapticsEnabled, vm::setHapticsEnabled)
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.ExitToApp, "Confirm before exit",
+                    "Press back twice on Home to close the app", confirmExit, vm::setConfirmExit)
             }
 
             // ── Notifications ────────────────────────────────────────────
@@ -248,6 +273,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsItem(Icons.Default.FastForward, "Double-tap skip",
                     "${skipSeconds}s per tap"
                 ) { showSkipDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.Swipe, "Player swipe gestures",
+                    "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
                 SettingsDivider()
                 SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play",
                     "Play related videos automatically", autoPlay
@@ -415,6 +443,18 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Auto-clear history", retOpts.map { it.second },
             retOpts.indexOfFirst { it.first == historyRetention }.coerceAtLeast(0),
             { vm.setHistoryRetention(retOpts[it].first); showRetentionDialog = false }, { showRetentionDialog = false })
+    }
+    if (showCornerDialog) {
+        val cornerOpts = listOf("SQUARE" to "Square", "ROUNDED" to "Rounded", "ROUND" to "Extra round")
+        PickerDialog("Thumbnail corners", cornerOpts.map { it.second },
+            cornerOpts.indexOfFirst { it.first == cornerStyle }.coerceAtLeast(0),
+            { vm.setCornerStyle(cornerOpts[it].first); showCornerDialog = false }, { showCornerDialog = false })
+    }
+    if (showNavLabelDialog) {
+        val labelOpts = listOf("ALWAYS" to "Always show", "SELECTED" to "Selected tab only", "NEVER" to "Icons only")
+        PickerDialog("Bottom bar labels", labelOpts.map { it.second },
+            labelOpts.indexOfFirst { it.first == navLabels }.coerceAtLeast(0),
+            { vm.setNavLabels(labelOpts[it].first); showNavLabelDialog = false }, { showNavLabelDialog = false })
     }
     if (showWhatsNewDialog) {
         AlertDialog(

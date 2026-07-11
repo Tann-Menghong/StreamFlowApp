@@ -19,7 +19,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.navigation.NavGraph
+import com.streamflow.ui.theme.LocalHapticsEnabled
+import com.streamflow.ui.theme.LocalThumbCorner
 import com.streamflow.ui.theme.StreamFlowTheme
+import com.streamflow.ui.theme.cornerDpFor
 import com.streamflow.ui.theme.toAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -66,13 +69,20 @@ class MainActivity : ComponentActivity() {
             val themeStr by prefs.theme.collectAsState(initial = "DARK")
             val accentStr by prefs.accentColor.collectAsState(initial = "RED")
             val fontScaleStr by prefs.fontScale.collectAsState(initial = "DEFAULT")
+            val cornerStyle by prefs.cornerStyle.collectAsState(initial = "ROUNDED")
+            val hapticsOn by prefs.hapticsEnabled.collectAsState(initial = true)
             val fontScale = when (fontScaleStr) {
                 "SMALL" -> 0.9f
                 "LARGE" -> 1.12f
                 else -> 1f
             }
             StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr, fontScale = fontScale) {
-                NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalThumbCorner provides cornerDpFor(cornerStyle),
+                    LocalHapticsEnabled provides hapticsOn
+                ) {
+                    NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
+                }
             }
         }
     }

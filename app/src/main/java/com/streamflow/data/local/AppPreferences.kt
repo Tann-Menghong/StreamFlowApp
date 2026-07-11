@@ -45,6 +45,14 @@ class AppPreferences(private val context: Context) {
         val QUALITY_CELLULAR_KEY = stringPreferencesKey("quality_cellular")
         // Days to keep watch history; "0" = forever
         val HISTORY_RETENTION_KEY = stringPreferencesKey("history_retention")
+        // UI customization
+        val CORNER_STYLE_KEY    = stringPreferencesKey("corner_style")      // SQUARE / ROUNDED / ROUND
+        val NAV_LABELS_KEY      = stringPreferencesKey("nav_labels")        // ALWAYS / SELECTED / NEVER
+        val REDUCE_MOTION_KEY   = booleanPreferencesKey("reduce_motion")
+        val HAPTICS_KEY         = booleanPreferencesKey("haptics_enabled")
+        val SHOW_CATEGORY_BAR_KEY = booleanPreferencesKey("show_category_bar")
+        val PLAYER_GESTURES_KEY = booleanPreferencesKey("player_gestures")
+        val CONFIRM_EXIT_KEY    = booleanPreferencesKey("confirm_exit")
         // Search
         val RECENT_SEARCHES_KEY = stringPreferencesKey("recent_searches")
         // What's New dialog: last app version the user has seen release notes for
@@ -89,6 +97,14 @@ class AppPreferences(private val context: Context) {
     val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
     val qualityCellular: Flow<String> = context.dataStore.data.map { it[QUALITY_CELLULAR_KEY] ?: "SAME" }
     val historyRetention: Flow<String> = context.dataStore.data.map { it[HISTORY_RETENTION_KEY] ?: "0" }
+    // UI customization
+    val cornerStyle    : Flow<String>  = context.dataStore.data.map { it[CORNER_STYLE_KEY] ?: "ROUNDED" }
+    val navLabels      : Flow<String>  = context.dataStore.data.map { it[NAV_LABELS_KEY] ?: "SELECTED" }
+    val reduceMotion   : Flow<Boolean> = context.dataStore.data.map { it[REDUCE_MOTION_KEY] ?: false }
+    val hapticsEnabled : Flow<Boolean> = context.dataStore.data.map { it[HAPTICS_KEY] ?: true }
+    val showCategoryBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CATEGORY_BAR_KEY] ?: true }
+    val playerGestures : Flow<Boolean> = context.dataStore.data.map { it[PLAYER_GESTURES_KEY] ?: true }
+    val confirmExit    : Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_EXIT_KEY] ?: false }
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
@@ -142,6 +158,14 @@ class AppPreferences(private val context: Context) {
     suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }
     suspend fun setQualityCellular(v: String) = context.dataStore.edit { it[QUALITY_CELLULAR_KEY] = v }
     suspend fun setHistoryRetention(v: String) = context.dataStore.edit { it[HISTORY_RETENTION_KEY] = v }
+    // UI customization
+    suspend fun setCornerStyle(v: String)      = context.dataStore.edit { it[CORNER_STYLE_KEY] = v }
+    suspend fun setNavLabels(v: String)        = context.dataStore.edit { it[NAV_LABELS_KEY] = v }
+    suspend fun setReduceMotion(v: Boolean)    = context.dataStore.edit { it[REDUCE_MOTION_KEY] = v }
+    suspend fun setHapticsEnabled(v: Boolean)  = context.dataStore.edit { it[HAPTICS_KEY] = v }
+    suspend fun setShowCategoryBar(v: Boolean) = context.dataStore.edit { it[SHOW_CATEGORY_BAR_KEY] = v }
+    suspend fun setPlayerGestures(v: Boolean)  = context.dataStore.edit { it[PLAYER_GESTURES_KEY] = v }
+    suspend fun setConfirmExit(v: Boolean)     = context.dataStore.edit { it[CONFIRM_EXIT_KEY] = v }
     suspend fun setLastSeenVersion(v: Int) = context.dataStore.edit { it[LAST_SEEN_VERSION_KEY] = v.toString() }
     suspend fun saveQueue(items: List<com.streamflow.data.model.VideoItem>) = context.dataStore.edit { prefsMap ->
         val arr = org.json.JSONArray()

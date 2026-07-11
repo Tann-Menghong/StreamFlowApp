@@ -95,6 +95,23 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
     val appPrefs = remember { com.streamflow.data.local.AppPreferences.get(context) }
     val uiLang by appPrefs.language.collectAsState(initial = "EN")
     val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
+    val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
+    val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
+    val confirmExit by appPrefs.confirmExit.collectAsState(initial = false)
+
+    // Double-back to exit (optional, Settings > Appearance)
+    var lastBackAt by remember { mutableStateOf(0L) }
+    val activity = context as? android.app.Activity
+    androidx.activity.compose.BackHandler(
+        enabled = confirmExit && currentDest?.route == Screen.Home.route
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - lastBackAt < 2200) activity?.finish()
+        else {
+            lastBackAt = now
+            android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     val bottomItems = remember(showDonghua) {
         if (showDonghua) listOf(Screen.Home, Screen.Donghua, Screen.Library, Screen.Settings)
         else listOf(Screen.Home, Screen.Library, Screen.Settings)
@@ -202,6 +219,8 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
                         items    = bottomItems,
                         current  = currentDest,
                         lang     = uiLang,
+                        labelStyle   = navLabels,
+                        reduceMotion = reduceMotion,
                         onSelect = { screen ->
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -219,19 +238,22 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             startDestination = Screen.Home.route,
             modifier         = if (showBottom) Modifier.padding(innerPadding) else Modifier.fillMaxSize(),
             enterTransition  = {
-                fadeIn(tween(270, easing = EaseInOut)) +
-                scaleIn(initialScale = 0.96f, animationSpec = tween(270, easing = EaseInOut))
+                if (reduceMotion) fadeIn(tween(120))
+                else fadeIn(tween(270, easing = EaseInOut)) +
+                    scaleIn(initialScale = 0.96f, animationSpec = tween(270, easing = EaseInOut))
             },
             exitTransition   = {
-                fadeOut(tween(200, easing = EaseInOut))
+                fadeOut(tween(if (reduceMotion) 100 else 200, easing = EaseInOut))
             },
             popEnterTransition  = {
-                fadeIn(tween(270)) +
-                scaleIn(initialScale = 0.96f, animationSpec = tween(270))
+                if (reduceMotion) fadeIn(tween(120))
+                else fadeIn(tween(270)) +
+                    scaleIn(initialScale = 0.96f, animationSpec = tween(270))
             },
             popExitTransition   = {
-                fadeOut(tween(200)) +
-                scaleOut(targetScale = 0.96f, animationSpec = tween(200))
+                if (reduceMotion) fadeOut(tween(100))
+                else fadeOut(tween(200)) +
+                    scaleOut(targetScale = 0.96f, animationSpec = tween(200))
             }
         ) {
             composable(Screen.Home.route) {
@@ -353,6 +375,8 @@ private fun AnimatedNavBar(
     items: List<Screen>,
     current: androidx.navigation.NavDestination?,
     lang: String = "EN",
+    labelStyle: String = "SELECTED", // ALWAYS / SELECTED / NEVER
+    reduceMotion: Boolean = false,
     onSelect: (Screen) -> Unit
 ) {
     Surface(
@@ -372,8 +396,9 @@ private fun AnimatedNavBar(
             items.forEach { screen ->
                 val selected = current?.hierarchy?.any { it.route == screen.route } == true
                 val iconScale by animateFloatAsState(
-                    targetValue    = if (selected) 1.12f else 1f,
-                    animationSpec  = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    targetValue    = if (selected && !reduceMotion) 1.12f else 1f,
+                    animationSpec  = if (reduceMotion) snap()
+                        else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                     label          = "nav_scale_${screen.label}"
                 )
                 Column(
@@ -406,8 +431,13 @@ private fun AnimatedNavBar(
                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
                     }
+                    val labelVisible = when (labelStyle) {
+                        "ALWAYS" -> true
+                        "NEVER"  -> false
+                        else     -> selected
+                    }
                     AnimatedVisibility(
-                        visible = selected,
+                        visible = labelVisible,
                         enter = fadeIn(tween(160)) + expandVertically(tween(160)),
                         exit  = fadeOut(tween(120)) + shrinkVertically(tween(120))
                     ) {
@@ -415,7 +445,8 @@ private fun AnimatedNavBar(
                             text  = com.streamflow.ui.theme.KmStrings.t(screen.label, lang),
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }

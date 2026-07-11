@@ -57,6 +57,23 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun removeFavorite(url: String) = viewModelScope.launch { db.favoriteDao().delete(url) }
     fun removeHistory(url: String) = viewModelScope.launch { db.historyDao().delete(url) }
     fun removeWatchLater(url: String) = viewModelScope.launch { db.watchLaterDao().delete(url) }
+
+    // Undo for swipe-to-delete: re-insert from the visible card data
+    fun restoreFavorite(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
+        db.favoriteDao().insert(FavoriteEntity(
+            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+    }
+    fun restoreHistory(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
+        db.historyDao().insert(HistoryEntity(
+            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+    }
+    fun restoreWatchLater(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
+        db.watchLaterDao().insert(WatchLaterEntity(
+            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+    }
     fun clearHistory() = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
     fun clearWatchLater() = viewModelScope.launch { db.watchLaterDao().clearAll() }

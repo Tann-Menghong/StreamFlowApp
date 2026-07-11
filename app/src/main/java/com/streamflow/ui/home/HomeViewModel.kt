@@ -115,6 +115,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val hideShorts = prefs.hideShorts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     fun setHideShorts(v: Boolean) = viewModelScope.launch { prefs.setHideShorts(v) }
 
+    val showCategoryBar = prefs.showCategoryBar.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    fun setShowCategoryBar(v: Boolean) = viewModelScope.launch { prefs.setShowCategoryBar(v) }
+
     fun blockVideo(v: VideoItem) = viewModelScope.launch {
         db.blockedDao().insert(BlockedItemEntity(itemKey = v.url, type = "VIDEO", name = v.title))
     }

@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +40,7 @@ import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatDuration
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +64,23 @@ fun LibraryScreen(
     val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }
 
+    // Swipe-to-delete with Undo
+    val snackbarHostState = remember { SnackbarHostState() }
+    val undoScope = rememberCoroutineScope()
+    fun deleteWithUndo(video: VideoItem, remove: (String) -> Unit, restore: (VideoItem) -> Unit) {
+        remove(video.url)
+        undoScope.launch {
+            val r = snackbarHostState.showSnackbar(
+                message = "Removed \"${video.title.take(28)}${if (video.title.length > 28) "…" else ""}\"",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short
+            )
+            if (r == SnackbarResult.ActionPerformed) restore(video)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Library", fontWeight = FontWeight.Bold) },
@@ -141,7 +161,11 @@ fun LibraryScreen(
                     0 -> VideoListWithSearch(
                             items = favorites.map { it.toVideoItem() },
                             onVideoClick = onVideoClick,
-                            onRemove = vm::removeFavorite,
+                            onRemove = { url ->
+                                favorites.find { it.url == url }?.let {
+                                    deleteWithUndo(it.toVideoItem(), vm::removeFavorite, vm::restoreFavorite)
+                                }
+                            },
                             emptyTitle = "No favorites yet",
                             emptySubtitle = "Tap heart on any video to save it here.",
                             emptyIcon = Icons.Default.FavoriteBorder
@@ -157,7 +181,11 @@ fun LibraryScreen(
                         VideoListWithSearch(
                             items = history.map { it.toVideoItem() },
                             onVideoClick = onVideoClick,
-                            onRemove = vm::removeHistory,
+                            onRemove = { url ->
+                                history.find { it.url == url }?.let {
+                                    deleteWithUndo(it.toVideoItem(), vm::removeHistory, vm::restoreHistory)
+                                }
+                            },
                             emptyTitle = "No history yet",
                             emptySubtitle = "Videos you watch will appear here.",
                             emptyIcon = Icons.Default.History,
@@ -169,7 +197,11 @@ fun LibraryScreen(
                     2 -> VideoListWithSearch(
                             items = watchLater.map { it.toVideoItem() },
                             onVideoClick = onVideoClick,
-                            onRemove = vm::removeWatchLater,
+                            onRemove = { url ->
+                                watchLater.find { it.url == url }?.let {
+                                    deleteWithUndo(it.toVideoItem(), vm::removeWatchLater, vm::restoreWatchLater)
+                                }
+                            },
                             emptyTitle = "No videos saved",
                             emptySubtitle = "Tap bookmark while watching to add videos here.",
                             emptyIcon = Icons.Default.BookmarkBorder
@@ -503,7 +535,26 @@ private fun VideoListWithSearch(
         LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
             items(filteredItems, key = { it.url }) { video ->
                 val remaining = remainingSeconds[video.url]
-                Row(verticalAlignment = Alignment.Top) {
+                // Swipe the row sideways to delete (with Undo snackbar)
+                var dragX by remember(video.url) { mutableFloatStateOf(0f) }
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            translationX = dragX
+                            alpha = 1f - (kotlin.math.abs(dragX) / 900f).coerceIn(0f, 0.6f)
+                        }
+                        .pointerInput(video.url) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { _, dx -> dragX += dx },
+                                onDragEnd = {
+                                    if (kotlin.math.abs(dragX) > 240f) onRemove(video.url)
+                                    dragX = 0f
+                                },
+                                onDragCancel = { dragX = 0f }
+                            )
+                        }
+                ) {
                     Box(Modifier.weight(1f)) {
                         VideoCard(
                             video            = video,

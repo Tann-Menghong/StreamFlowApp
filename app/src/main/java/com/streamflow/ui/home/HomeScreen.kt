@@ -102,6 +102,7 @@ fun HomeScreen(
     val historyProgress  by vm.historyProgress.collectAsState()
     val incognitoOn      by vm.incognito.collectAsState()
     val searchType       by vm.searchType.collectAsState()
+    val showCategoryBar  by vm.showCategoryBar.collectAsState()
     val channelResults   by vm.channelResults.collectAsState()
     val playlistResults  by vm.playlistResults.collectAsState()
     val typeLoading      by vm.typeLoading.collectAsState()
@@ -505,9 +506,9 @@ fun HomeScreen(
                         }
                     }
                 }
-                // Category chips — hidden when typing a search
+                // Category chips — hidden when typing a search or disabled in Customize
                 AnimatedVisibility(
-                    visible = !searchExpanded || activeSearch.isEmpty(),
+                    visible = showCategoryBar && (!searchExpanded || activeSearch.isEmpty()),
                     enter   = fadeIn(tween(180)) + expandVertically(tween(180)),
                     exit    = fadeOut(tween(130)) + shrinkVertically(tween(130))
                 ) {
@@ -726,6 +727,7 @@ fun HomeScreen(
                 showHero           = showHero,
                 hideWatched        = hideWatched,
                 hideShorts         = hideShorts,
+                showCategoryBar    = showCategoryBar,
                 selectedCategories = selectedCats,
                 categoryPool       = vm.categoryPool,
                 onLayout           = vm::setLayout,
@@ -735,6 +737,7 @@ fun HomeScreen(
                 onShowHero         = vm::setShowFeatured,
                 onHideWatched      = vm::setHideWatched,
                 onHideShorts       = vm::setHideShorts,
+                onShowCategoryBar  = vm::setShowCategoryBar,
                 onToggleCategory   = vm::toggleCategory,
                 onResetCategories  = vm::resetCategories,
                 onDismiss          = { showCustomizeSheet = false }
@@ -822,6 +825,7 @@ private fun CustomizeHomeSheet(
     showHero: Boolean,
     hideWatched: Boolean,
     hideShorts: Boolean,
+    showCategoryBar: Boolean,
     selectedCategories: List<String>,
     categoryPool: List<String>,
     onLayout: (String) -> Unit,
@@ -831,6 +835,7 @@ private fun CustomizeHomeSheet(
     onShowHero: (Boolean) -> Unit,
     onHideWatched: (Boolean) -> Unit,
     onHideShorts: (Boolean) -> Unit,
+    onShowCategoryBar: (Boolean) -> Unit,
     onToggleCategory: (String) -> Unit,
     onResetCategories: () -> Unit,
     onDismiss: () -> Unit
@@ -886,6 +891,7 @@ private fun CustomizeHomeSheet(
             SheetSectionLabel("SECTIONS")
             SheetSwitchRow("Continue Watching", "Resume videos you started", showCW, onShowCW)
             SheetSwitchRow("Featured row", "Horizontal top-trending strip", showHero, onShowHero)
+            SheetSwitchRow("Category chips", "Topic bar under the search field", showCategoryBar, onShowCategoryBar)
             SheetSwitchRow("Hide watched videos", "Skip videos already in your history", hideWatched, onHideWatched)
             SheetSwitchRow("Hide Shorts", "Skip videos under 60 seconds", hideShorts, onHideShorts)
 
@@ -1081,7 +1087,7 @@ private fun FeaturedCard(video: VideoItem, onClick: () -> Unit) {
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(com.streamflow.ui.theme.LocalThumbCorner.current.dp))
         ) {
             AsyncImage(
                 model = video.thumbnailUrl,

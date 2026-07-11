@@ -250,6 +250,8 @@ fun PlayerScreen(
     LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
     var skipMs by remember { mutableLongStateOf(10_000L) }
     LaunchedEffect(Unit) { skipMs = (prefs.skipSeconds.first().toLongOrNull() ?: 10L) * 1000L }
+    // Swipe brightness/volume zones can be turned off in Settings > Playback
+    val playerGesturesOn by prefs.playerGestures.collectAsState(initial = true)
 
     // Double-tap seek feedback: repeated taps accumulate (10s, 20s, 30s…)
     var seekAccumMs by remember { mutableLongStateOf(0L) }
@@ -685,7 +687,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SeekFeedback() }
 
             // ── FAR LEFT brightness zone ─────────────────────────────────
-            if (!isLocked) {
+            if (!isLocked && playerGesturesOn) {
                 Box(
                     Modifier
                         .width(50.dp)
