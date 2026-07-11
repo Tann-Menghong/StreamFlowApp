@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -223,7 +223,7 @@ fun VideoCard(
                         onClick  = { showMenu = true },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.MoreVert, null,
+                        Icon(Icons.Rounded.MoreVert, null,
                             tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                             modifier = Modifier.size(18.dp))
                     }
@@ -231,34 +231,34 @@ fun VideoCard(
                         if (onAddToWatchLater != null) {
                             DropdownMenuItem(
                                 text = { Text("Watch later") },
-                                leadingIcon = { Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(18.dp)) },
+                                leadingIcon = { Icon(Icons.Rounded.BookmarkBorder, null, modifier = Modifier.size(18.dp)) },
                                 onClick = { onAddToWatchLater(); showMenu = false }
                             )
                         }
                         if (onAddToFavorites != null) {
                             DropdownMenuItem(
                                 text = { Text("Add to favorites") },
-                                leadingIcon = { Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
+                                leadingIcon = { Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
                                 onClick = { onAddToFavorites(); showMenu = false }
                             )
                         }
                         if (onNotInterested != null) {
                             DropdownMenuItem(
                                 text = { Text("Not interested") },
-                                leadingIcon = { Icon(Icons.Default.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                                leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
                                 onClick = { onNotInterested(); showMenu = false }
                             )
                         }
                         if (onBlockChannel != null) {
                             DropdownMenuItem(
                                 text = { Text("Don't recommend channel") },
-                                leadingIcon = { Icon(Icons.Default.Block, null, modifier = Modifier.size(18.dp)) },
+                                leadingIcon = { Icon(Icons.Rounded.Block, null, modifier = Modifier.size(18.dp)) },
                                 onClick = { onBlockChannel(); showMenu = false }
                             )
                         }
                         DropdownMenuItem(
                             text = { Text("Share") },
-                            leadingIcon = { Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp)) },
+                            leadingIcon = { Icon(Icons.Rounded.Share, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
                                 val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, video.url) }
                                 context.startActivity(Intent.createChooser(i, "Share video"))
@@ -267,7 +267,7 @@ fun VideoCard(
                         )
                         DropdownMenuItem(
                             text = { Text("Open in browser") },
-                            leadingIcon = { Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(18.dp)) },
+                            leadingIcon = { Icon(Icons.Rounded.OpenInBrowser, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
                                 // Chooser needed: StreamFlow itself handles YouTube links now,
                                 // so a plain ACTION_VIEW would just reopen the app
@@ -280,7 +280,7 @@ fun VideoCard(
                         )
                         DropdownMenuItem(
                             text = { Text("Play next") },
-                            leadingIcon = { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
+                            leadingIcon = { Icon(Icons.Rounded.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
                                 PlaybackQueue.addNext(video)
                                 Toast.makeText(context, "Will play next", Toast.LENGTH_SHORT).show()
@@ -289,7 +289,7 @@ fun VideoCard(
                         )
                         DropdownMenuItem(
                             text = { Text("Add to queue") },
-                            leadingIcon = { Icon(Icons.Default.QueueMusic, null, modifier = Modifier.size(18.dp)) },
+                            leadingIcon = { Icon(Icons.Rounded.QueueMusic, null, modifier = Modifier.size(18.dp)) },
                             onClick = {
                                 PlaybackQueue.add(video)
                                 Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
@@ -345,7 +345,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
                 .background(Color.White.copy(0.18f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp))
+            Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp))
         }
         if (video.duration > 0) {
             Box(
@@ -532,7 +532,7 @@ fun CompactVideoCard(
         }
         Box {
             IconButton(onClick = { showMenu = true }, modifier = Modifier.size(26.dp)) {
-                Icon(Icons.Default.MoreVert, null,
+                Icon(Icons.Rounded.MoreVert, null,
                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                     modifier = Modifier.size(16.dp))
             }
@@ -540,34 +540,34 @@ fun CompactVideoCard(
                 if (onAddToWatchLater != null) {
                     DropdownMenuItem(
                         text = { Text("Watch later") },
-                        leadingIcon = { Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.BookmarkBorder, null, modifier = Modifier.size(18.dp)) },
                         onClick = { onAddToWatchLater(); showMenu = false }
                     )
                 }
                 if (onAddToFavorites != null) {
                     DropdownMenuItem(
                         text = { Text("Add to favorites") },
-                        leadingIcon = { Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
                         onClick = { onAddToFavorites(); showMenu = false }
                     )
                 }
                 if (onNotInterested != null) {
                     DropdownMenuItem(
                         text = { Text("Not interested") },
-                        leadingIcon = { Icon(Icons.Default.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
                         onClick = { onNotInterested(); showMenu = false }
                     )
                 }
                 if (onBlockChannel != null) {
                     DropdownMenuItem(
                         text = { Text("Don't recommend channel") },
-                        leadingIcon = { Icon(Icons.Default.Block, null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.Block, null, modifier = Modifier.size(18.dp)) },
                         onClick = { onBlockChannel(); showMenu = false }
                     )
                 }
                 DropdownMenuItem(
                     text = { Text("Share") },
-                    leadingIcon = { Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(Icons.Rounded.Share, null, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, video.url) }
                         context.startActivity(Intent.createChooser(i, "Share video"))
@@ -576,7 +576,7 @@ fun CompactVideoCard(
                 )
                 DropdownMenuItem(
                     text = { Text("Play next") },
-                    leadingIcon = { Icon(Icons.Default.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(Icons.Rounded.PlaylistPlay, null, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         PlaybackQueue.addNext(video)
                         Toast.makeText(context, "Will play next", Toast.LENGTH_SHORT).show()
@@ -585,7 +585,7 @@ fun CompactVideoCard(
                 )
                 DropdownMenuItem(
                     text = { Text("Add to queue") },
-                    leadingIcon = { Icon(Icons.Default.QueueMusic, null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(Icons.Rounded.QueueMusic, null, modifier = Modifier.size(18.dp)) },
                     onClick = {
                         PlaybackQueue.add(video)
                         Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()

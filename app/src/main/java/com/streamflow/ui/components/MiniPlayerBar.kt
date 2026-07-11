@@ -7,7 +7,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -143,7 +143,7 @@ fun MiniPlayerBar(
                 }
             ) {
                 Icon(
-                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = "Play/Pause",
                     tint = MaterialTheme.colorScheme.onSurface
                 )
@@ -155,7 +155,7 @@ fun MiniPlayerBar(
                 onDismiss()
             }) {
                 Icon(
-                    Icons.Default.Close,
+                    Icons.Rounded.Close,
                     contentDescription = "Close",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)

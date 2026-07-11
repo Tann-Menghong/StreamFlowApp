@@ -9,13 +9,13 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -111,7 +111,7 @@ fun ShortsScreen(
                 Text(error ?: "", color = Color.White.copy(0.7f), fontSize = 13.sp)
                 Spacer(Modifier.height(14.dp))
                 Button(onClick = { vm.loadFeed() }) {
-                    Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
+                    Icon(Icons.Rounded.Refresh, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Retry")
                 }
@@ -198,7 +198,7 @@ fun ShortsScreen(
 
                         if (isActive && isPaused) {
                             Icon(
-                                Icons.Default.PlayArrow, "Paused",
+                                Icons.Rounded.PlayArrow, "Paused",
                                 tint = Color.White.copy(0.85f),
                                 modifier = Modifier.align(Alignment.Center).size(72.dp)
                             )
@@ -238,7 +238,7 @@ fun ShortsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+                Icon(Icons.Rounded.ArrowBack, "Back", tint = Color.White)
             }
             Text("Shorts", color = Color.White, fontWeight = FontWeight.Bold,
                 fontSize = 17.sp)
@@ -287,7 +287,7 @@ private fun ShortsOverlay(
                             .background(Color.White.copy(0.25f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, null, tint = Color.White,
+                        Icon(Icons.Rounded.Person, null, tint = Color.White,
                             modifier = Modifier.size(18.dp))
                     }
                 }
@@ -306,7 +306,7 @@ private fun ShortsOverlay(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             IconButton(onClick = onOpenInPlayer) {
-                Icon(Icons.Default.OpenInFull, "Open in player",
+                Icon(Icons.Rounded.OpenInFull, "Open in player",
                     tint = Color.White, modifier = Modifier.size(22.dp))
             }
             IconButton(onClick = {
@@ -317,7 +317,7 @@ private fun ShortsOverlay(
                 context.startActivity(
                     android.content.Intent.createChooser(send, "Share video"))
             }) {
-                Icon(Icons.Default.Share, "Share",
+                Icon(Icons.Rounded.Share, "Share",
                     tint = Color.White, modifier = Modifier.size(22.dp))
             }
         }

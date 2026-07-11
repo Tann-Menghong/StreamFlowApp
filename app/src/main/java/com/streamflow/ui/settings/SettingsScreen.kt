@@ -17,7 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -178,7 +178,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                             androidx.compose.ui.graphics.Color.White.copy(0.22f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, null,
+                        Icon(Icons.Rounded.PlayArrow, null,
                             tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(28.dp))
                     }
@@ -206,7 +206,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary,
+                            Icon(Icons.Rounded.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp))
                             Text(
                                 if (update.downloading) "Downloading update…"
@@ -239,64 +239,64 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Appearance ───────────────────────────────────────────────
             SettingsSection("Appearance")
             SettingsCard {
-                SettingsItem(Icons.Default.Palette, "Theme",
+                SettingsItem(Icons.Rounded.Palette, "Theme",
                     when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                 ) { showThemeDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.ColorLens, "Accent color",
+                SettingsItem(Icons.Rounded.ColorLens, "Accent color",
                     if (accentColor == "DYNAMIC") "Dynamic (Material You)"
                     else accentColor.lowercase().replaceFirstChar { it.uppercase() }
                 ) { showAccentDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Translate, "Language / ភាសា",
+                SettingsItem(Icons.Rounded.Translate, "Language / ភាសា",
                     if (language == "KM") "ភាសាខ្មែរ" else "English"
                 ) { showLanguageDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.FormatSize, "Font size",
+                SettingsItem(Icons.Rounded.FormatSize, "Font size",
                     when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
                 ) { showFontDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.TextFields, "Font style",
+                SettingsItem(Icons.Rounded.TextFields, "Font style",
                     when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
                 ) { showFontFamilyDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.RoundedCorner, "Thumbnail corners",
+                SettingsItem(Icons.Rounded.RoundedCorner, "Thumbnail corners",
                     when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
                 ) { showCornerDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Label, "Bottom bar labels",
+                SettingsItem(Icons.Rounded.Label, "Bottom bar labels",
                     when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
                 ) { showNavLabelDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.Animation, "Reduce motion",
+                SettingsSwitchItem(Icons.Rounded.Animation, "Reduce motion",
                     "Calmer, faster screen transitions", reduceMotion, vm::setReduceMotion)
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.Vibration, "Haptic feedback",
+                SettingsSwitchItem(Icons.Rounded.Vibration, "Haptic feedback",
                     "Vibrate on long-press actions", hapticsEnabled, vm::setHapticsEnabled)
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.ExitToApp, "Confirm before exit",
+                SettingsSwitchItem(Icons.Rounded.ExitToApp, "Confirm before exit",
                     "Press back twice on Home to close the app", confirmExit, vm::setConfirmExit)
             }
 
             // ── Notifications ────────────────────────────────────────────
             SettingsSection("Notifications")
             SettingsCard {
-                SettingsSwitchItem(Icons.Default.NotificationsActive, "New video alerts",
+                SettingsSwitchItem(Icons.Rounded.NotificationsActive, "New video alerts",
                     "Notify when subscribed channels upload", notifyNewVideos
                 ) { vm.setNotifyNewVideos(it) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Schedule, "Check frequency",
+                SettingsItem(Icons.Rounded.Schedule, "Check frequency",
                     when (notifyFreq) {
                         "1" -> "Every hour"; "3" -> "Every 3 hours"; "12" -> "Every 12 hours"
                         "24" -> "Once a day"; else -> "Every 6 hours"
                     }
                 ) { showNotifFreqDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.FilterList, "Alerts per check",
+                SettingsItem(Icons.Rounded.FilterList, "Alerts per check",
                     if (notifyMax == "0") "Unlimited" else "Up to $notifyMax"
                 ) { showNotifMaxDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Bedtime, "Quiet hours",
+                SettingsItem(Icons.Rounded.Bedtime, "Quiet hours",
                     if (quietHours == "OFF") "Off"
                     else quietHours.split("-").let { p ->
                         "%02d:00 – %02d:00".format(p.getOrNull(0)?.toIntOrNull() ?: 22,
@@ -304,11 +304,11 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     }
                 ) { showQuietDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.SystemUpdate, "App update alerts",
+                SettingsSwitchItem(Icons.Rounded.SystemUpdate, "App update alerts",
                     "Notify when a new StreamFlow version is released", notifyAppUpdates
                 ) { vm.setNotifyAppUpdates(it) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Tune, "Sound & vibration",
+                SettingsItem(Icons.Rounded.Tune, "Sound & vibration",
                     "Per-channel options in Android settings"
                 ) {
                     try {
@@ -322,35 +322,35 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Home customization ────────────────────────────────────────
             SettingsSection("Home")
             SettingsCard {
-                SettingsSwitchItem(Icons.Default.GridView, "Grid layout",
+                SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
                     "Show videos in a grid instead of list", homeLayout == "GRID"
                 ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
                 SettingsDivider()
-                SettingsItem(Icons.Default.ViewModule, "Grid columns",
+                SettingsItem(Icons.Rounded.ViewModule, "Grid columns",
                     "$gridColumns columns"
                 ) { showColumnsDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.History, "Continue Watching row",
+                SettingsSwitchItem(Icons.Rounded.History, "Continue Watching row",
                     "Show partially watched videos at the top", showContinueWatching
                 ) { vm.setShowContinueWatching(it) }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.Stars, "Hero featured card",
+                SettingsSwitchItem(Icons.Rounded.Stars, "Hero featured card",
                     "Show first trending video as a large banner", showHeroCard
                 ) { vm.setShowHeroCard(it) }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.LiveTv, "Show Donghua tab",
+                SettingsSwitchItem(Icons.Rounded.LiveTv, "Show Donghua tab",
                     "Hide it from the bottom bar if you don't use it", showDonghua
                 ) { vm.setShowDonghua(it) }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.Search, "Search tab",
+                SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
                     "Add a dedicated Search tab to the bottom bar", showSearchTab
                 ) { vm.setShowSearchTab(it) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Start, "Start screen",
+                SettingsItem(Icons.Rounded.Start, "Start screen",
                     when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
                 ) { showStartTabDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.VideoLibrary, "Default Library tab",
+                SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
                     listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
                         .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
                 ) { showLibTabDialog = true }
@@ -359,29 +359,29 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Playback ─────────────────────────────────────────────────
             SettingsSection("Playback")
             SettingsCard {
-                SettingsItem(Icons.Default.HighQuality, "Video quality",
+                SettingsItem(Icons.Rounded.HighQuality, "Video quality",
                     when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
                 ) { showQualityDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.SignalCellularAlt, "Quality on mobile data",
+                SettingsItem(Icons.Rounded.SignalCellularAlt, "Quality on mobile data",
                     when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
                 ) { showCellularDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Speed, "Default speed",
+                SettingsItem(Icons.Rounded.Speed, "Default speed",
                     when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
                 ) { showSpeedDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.FastForward, "Double-tap skip",
+                SettingsItem(Icons.Rounded.FastForward, "Double-tap skip",
                     "${skipSeconds}s per tap"
                 ) { showSkipDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.Swipe, "Player swipe gestures",
+                SettingsSwitchItem(Icons.Rounded.Swipe, "Player swipe gestures",
                     "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.PictureInPicture, "Pop-up video on exit",
+                SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
                     "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
                 SettingsDivider()
-                SettingsItem(Icons.Default.BatteryChargingFull, "Background play protection",
+                SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
                     "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
                 ) {
                     try {
@@ -409,23 +409,23 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     }
                 }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play",
+                SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
                     "Play related videos automatically", autoPlay
                 ) { vm.setAutoPlay(it) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.VolumeUp, "Volume boost",
+                SettingsItem(Icons.Rounded.VolumeUp, "Volume boost",
                     when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
                 ) { showBoostDialog = true }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.DataSaverOn, "Data saver",
+                SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
                     "Prefer lower quality to save mobile data", dataSaver
                 ) { vm.setDataSaver(it) }
                 SettingsDivider()
-                SettingsSwitchItem(Icons.Default.VisibilityOff, "Incognito mode",
+                SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
                     "Watch without saving to history", incognito
                 ) { vm.setIncognito(it) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Language, "Trending country",
+                SettingsItem(Icons.Rounded.Language, "Trending country",
                     countryOptions.firstOrNull { it.first == country }?.second ?: country
                 ) { showCountryDialog = true }
             }
@@ -434,11 +434,11 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             SettingsSection("AI")
             SettingsCard {
                 if (!AiEngine.isSupported()) {
-                    SettingsItem(Icons.Default.AutoAwesome, "On-device AI",
+                    SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI",
                         "Needs Android 7.0 or newer")
                 } else when (val s = aiState) {
                     is AiEngine.DownloadState.Downloading -> {
-                        SettingsItem(Icons.Default.AutoAwesome, "Downloading AI model…",
+                        SettingsItem(Icons.Rounded.AutoAwesome, "Downloading AI model…",
                             "${(s.progress * 100).toInt()}% of ${AiEngine.MODEL_SIZE_LABEL}")
                         LinearProgressIndicator(
                             progress = { s.progress },
@@ -447,19 +447,19 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                         )
                     }
                     is AiEngine.DownloadState.Ready -> {
-                        SettingsItem(Icons.Default.AutoAwesome, "On-device AI ready",
+                        SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI ready",
                             "${AiEngine.MODEL_LABEL} — tap ✦ in the player for summaries & Q&A")
                         SettingsDivider()
-                        SettingsItem(Icons.Default.DeleteOutline, "Remove AI model",
+                        SettingsItem(Icons.Rounded.DeleteOutline, "Remove AI model",
                             "Frees up ${AiEngine.MODEL_SIZE_LABEL} of storage"
                         ) { showDeleteAiDialog = true }
                     }
                     is AiEngine.DownloadState.Failed -> {
-                        SettingsItem(Icons.Default.AutoAwesome, "Download failed — tap to resume",
+                        SettingsItem(Icons.Rounded.AutoAwesome, "Download failed — tap to resume",
                             s.message) { vm.downloadAiModel() }
                     }
                     else -> {
-                        SettingsItem(Icons.Default.AutoAwesome, "Download AI model",
+                        SettingsItem(Icons.Rounded.AutoAwesome, "Download AI model",
                             "One-time download (${AiEngine.MODEL_SIZE_LABEL}) — video summaries and Q&A, free and fully offline"
                         ) { vm.downloadAiModel() }
                     }
@@ -469,19 +469,19 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Storage ──────────────────────────────────────────────────
             SettingsSection("Storage")
             SettingsCard {
-                SettingsItem(Icons.Default.FavoriteBorder, "Clear favorites",
+                SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
                     "$favCount saved"
                 ) { if (favCount > 0) showClearFav = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.History, "Clear watch history",
+                SettingsItem(Icons.Rounded.History, "Clear watch history",
                     "$histCount entries"
                 ) { if (histCount > 0) showClearHist = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.VisibilityOff, "Hidden videos & channels",
+                SettingsItem(Icons.Rounded.VisibilityOff, "Hidden videos & channels",
                     if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
                 ) { if (blockedCount > 0) showClearBlocked = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.AutoDelete, "Auto-clear history",
+                SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
                     when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
                 ) { showRetentionDialog = true }
             }
@@ -489,15 +489,15 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Backup ───────────────────────────────────────────────────
             SettingsSection("Backup")
             SettingsCard {
-                SettingsItem(Icons.Default.Upload, "Export backup",
+                SettingsItem(Icons.Rounded.Upload, "Export backup",
                     "Subscriptions, favorites, playlists → JSON file"
                 ) { exportLauncher.launch("streamflow-backup.json") }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Download, "Import backup",
+                SettingsItem(Icons.Rounded.Download, "Import backup",
                     "Restore from a StreamFlow backup file"
                 ) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Subscriptions, "Import YouTube subscriptions",
+                SettingsItem(Icons.Rounded.Subscriptions, "Import YouTube subscriptions",
                     "From a Google Takeout CSV or NewPipe export"
                 ) { importSubsLauncher.launch(arrayOf("text/csv", "text/comma-separated-values",
                     "application/json", "text/*", "application/octet-stream")) }
@@ -506,17 +506,17 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── About ────────────────────────────────────────────────────
             SettingsSection("About")
             SettingsCard {
-                SettingsItem(Icons.Default.Info, "App version", "v${vm.appVersion}")
+                SettingsItem(Icons.Rounded.Info, "App version", "v${vm.appVersion}")
                 SettingsDivider()
-                SettingsItem(Icons.Default.NewReleases, "What's new",
+                SettingsItem(Icons.Rounded.NewReleases, "What's new",
                     "See what changed in v${com.streamflow.data.Changelog.VERSION_NAME}"
                 ) { showWhatsNewDialog = true }
                 SettingsDivider()
-                SettingsItem(Icons.Default.SystemUpdate, "Check for updates",
+                SettingsItem(Icons.Rounded.SystemUpdate, "Check for updates",
                     if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
                 ) { vm.checkForUpdate() }
                 SettingsDivider()
-                SettingsItem(Icons.Default.Code, "Source code",
+                SettingsItem(Icons.Rounded.Code, "Source code",
                     "github.com/Tann-Menghong/StreamFlowApp"
                 ) {
                     context.startActivity(Intent(Intent.ACTION_VIEW,
@@ -758,7 +758,7 @@ private fun SettingsItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (onClick != null) Icon(Icons.Default.ChevronRight, null,
+        if (onClick != null) Icon(Icons.Rounded.ChevronRight, null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
             modifier = Modifier.size(18.dp))
     }
@@ -879,7 +879,7 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (selected == "DYNAMIC") Icon(Icons.Default.Check, null,
+                            if (selected == "DYNAMIC") Icon(Icons.Rounded.Check, null,
                                 tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                         Column(Modifier.weight(1f)) {
@@ -925,7 +925,7 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selected.startsWith("CUSTOM:")) Icon(Icons.Default.Check, null,
+                        if (selected.startsWith("CUSTOM:")) Icon(Icons.Rounded.Check, null,
                             tint = Color.White, modifier = Modifier.size(14.dp))
                     }
                     Column(Modifier.weight(1f)) {
@@ -994,7 +994,7 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                                     .then(if (key == selected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
                                     .clickable { onSelect(key) }
                             ) {
-                                if (key == selected) Icon(Icons.Default.Check, null,
+                                if (key == selected) Icon(Icons.Rounded.Check, null,
                                     tint = Color.White, modifier = Modifier.size(20.dp))
                             }
                             Spacer(Modifier.height(4.dp))

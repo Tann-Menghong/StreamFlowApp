@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Subscriptions
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Subscriptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,11 +39,11 @@ fun FeedScreen(
             TopAppBar(
                 title = { Text("New videos", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, "Back") }
                 },
                 actions = {
                     IconButton(onClick = { vm.load(force = true) }) {
-                        Icon(Icons.Default.Refresh, "Refresh",
+                        Icon(Icons.Rounded.Refresh, "Refresh",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
@@ -78,7 +78,7 @@ fun FeedScreen(
                     Modifier.align(Alignment.Center).padding(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.Subscriptions, null,
+                    Icon(Icons.Rounded.Subscriptions, null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
                         modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(16.dp))

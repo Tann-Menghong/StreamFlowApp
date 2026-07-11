@@ -14,7 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -93,17 +93,17 @@ fun LibraryScreen(
                 actions = {
                     AnimatedVisibility(selectedTab == 0 && favorites.isNotEmpty()) {
                         IconButton(onClick = { vm.clearFavorites() }) {
-                            Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 1 && history.isNotEmpty()) {
                         IconButton(onClick = { vm.clearHistory() }) {
-                            Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 2 && watchLater.isNotEmpty()) {
                         IconButton(onClick = { vm.clearWatchLater() }) {
-                            Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -173,7 +173,7 @@ fun LibraryScreen(
                             },
                             emptyTitle = "No favorites yet",
                             emptySubtitle = "Tap heart on any video to save it here.",
-                            emptyIcon = Icons.Default.FavoriteBorder
+                            emptyIcon = Icons.Rounded.FavoriteBorder
                         )
                     1 -> {
                         val progressMap = history.associate { h ->
@@ -193,7 +193,7 @@ fun LibraryScreen(
                             },
                             emptyTitle = "No history yet",
                             emptySubtitle = "Videos you watch will appear here.",
-                            emptyIcon = Icons.Default.History,
+                            emptyIcon = Icons.Rounded.History,
                             progressFractions = progressMap,
                             remainingSeconds = remainingMap,
                             header = { HistoryStatsRow(history) }
@@ -209,7 +209,7 @@ fun LibraryScreen(
                             },
                             emptyTitle = "No videos saved",
                             emptySubtitle = "Tap bookmark while watching to add videos here.",
-                            emptyIcon = Icons.Default.BookmarkBorder
+                            emptyIcon = Icons.Rounded.BookmarkBorder
                         )
                     3 -> SubscriptionList(
                             subscriptions = subscriptions,
@@ -254,12 +254,12 @@ private fun PlaylistList(
             onClick = { showCreate = true },
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
-            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+            Icon(Icons.Rounded.Add, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text("New playlist", fontSize = 13.sp)
         }
         if (playlists.isEmpty()) {
-            EmptyState(Icons.Default.PlaylistPlay, "No playlists yet",
+            EmptyState(Icons.Rounded.PlaylistPlay, "No playlists yet",
                 "Create one here, or save videos from the player.")
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -280,7 +280,7 @@ private fun PlaylistList(
                                 AsyncImage(pl.firstThumb, null,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                             } else {
-                                Icon(Icons.Default.PlaylistPlay, null,
+                                Icon(Icons.Rounded.PlaylistPlay, null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -292,7 +292,7 @@ private fun PlaylistList(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { onDelete(pl.id) }) {
-                            Icon(Icons.Default.DeleteOutline, "Delete playlist",
+                            Icon(Icons.Rounded.DeleteOutline, "Delete playlist",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
                                 modifier = Modifier.size(20.dp))
                         }
@@ -329,7 +329,7 @@ private fun DownloadList(
     onRemove: (String) -> Unit
 ) {
     if (downloads.isEmpty()) {
-        EmptyState(Icons.Default.Download, "No downloads",
+        EmptyState(Icons.Rounded.Download, "No downloads",
             "Use the download button in the player to save videos for offline watching.")
         return
     }
@@ -349,7 +349,7 @@ private fun DownloadList(
                         Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)
                             .background(androidx.compose.ui.graphics.Color.Black.copy(0.7f), RoundedCornerShape(4.dp))
                             .padding(3.dp)) {
-                            Icon(Icons.Default.MusicNote, null,
+                            Icon(Icons.Rounded.MusicNote, null,
                                 tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(12.dp))
                         }
@@ -375,7 +375,7 @@ private fun DownloadList(
                     )
                 }
                 IconButton(onClick = { onRemove(d.url) }) {
-                    Icon(Icons.Default.DeleteOutline, "Remove download",
+                    Icon(Icons.Rounded.DeleteOutline, "Remove download",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
                         modifier = Modifier.size(20.dp))
                 }
@@ -474,7 +474,7 @@ private fun VideoListWithSearch(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Search, null,
+                    Icon(Icons.Rounded.Search, null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp))
                     BasicTextField(
@@ -494,7 +494,7 @@ private fun VideoListWithSearch(
                     )
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(18.dp)) {
-                            Icon(Icons.Default.Close, null,
+                            Icon(Icons.Rounded.Close, null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(14.dp))
                         }
@@ -503,7 +503,7 @@ private fun VideoListWithSearch(
             }
             Box {
                 IconButton(onClick = { showSort = true }) {
-                    Icon(Icons.Default.Sort, "Sort",
+                    Icon(Icons.Rounded.Sort, "Sort",
                         tint = if (sortBy != "Date") MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -571,7 +571,7 @@ private fun VideoListWithSearch(
                         )
                     }
                     IconButton(onClick = { onRemove(video.url) }, modifier = Modifier.padding(top = 4.dp)) {
-                        Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -618,7 +618,7 @@ private fun SubscriptionList(
     if (subscriptions.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
-                Icon(Icons.Default.Subscriptions, null,
+                Icon(Icons.Rounded.Subscriptions, null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
                     modifier = Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
@@ -660,7 +660,7 @@ private fun SubscriptionList(
                         onClick = onFeedClick,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     ) {
-                        Icon(Icons.Default.Subscriptions, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.Subscriptions, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("New videos from your channels", fontWeight = FontWeight.SemiBold)
                     }
@@ -705,8 +705,8 @@ private fun SubscriptionList(
                     if (onSetNotify != null) {
                         IconButton(onClick = { onSetNotify(sub.channelUrl, !sub.notify) }) {
                             Icon(
-                                if (sub.notify) Icons.Default.NotificationsActive
-                                else Icons.Default.NotificationsOff,
+                                if (sub.notify) Icons.Rounded.NotificationsActive
+                                else Icons.Rounded.NotificationsOff,
                                 "Toggle notifications",
                                 tint = if (sub.notify) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
@@ -715,7 +715,7 @@ private fun SubscriptionList(
                     }
                     if (onSetGroup != null) {
                         IconButton(onClick = { groupTarget = sub }) {
-                            Icon(Icons.Default.Folder, "Set group",
+                            Icon(Icons.Rounded.Folder, "Set group",
                                 tint = if (sub.groupName.isNotBlank()) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                                 modifier = Modifier.size(18.dp))

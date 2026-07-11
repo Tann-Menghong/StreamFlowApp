@@ -10,12 +10,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,12 +86,12 @@ fun PlaylistDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(onClick = { playAll(false) }) {
-                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Play all (${items.size})")
                     }
                     OutlinedButton(onClick = { playAll(true) }) {
-                        Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Shuffle, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Shuffle")
                     }
@@ -100,7 +100,7 @@ fun PlaylistDetailScreen(
             if (items.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
-                        Icon(Icons.Default.PlaylistPlay, null,
+                        Icon(Icons.Rounded.PlaylistPlay, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
                             modifier = Modifier.size(64.dp))
                         Spacer(Modifier.height(12.dp))
@@ -151,7 +151,7 @@ fun PlaylistDetailScreen(
                                     },
                                     enabled = index > 0, modifier = Modifier.size(22.dp)
                                 ) {
-                                    Icon(Icons.Default.KeyboardArrowUp, "Move up",
+                                    Icon(Icons.Rounded.KeyboardArrowUp, "Move up",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (index > 0) 0.7f else 0.25f),
                                         modifier = Modifier.size(16.dp))
                                 }
@@ -165,7 +165,7 @@ fun PlaylistDetailScreen(
                                     },
                                     enabled = index < items.size - 1, modifier = Modifier.size(22.dp)
                                 ) {
-                                    Icon(Icons.Default.KeyboardArrowDown, "Move down",
+                                    Icon(Icons.Rounded.KeyboardArrowDown, "Move down",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (index < items.size - 1) 0.7f else 0.25f),
                                         modifier = Modifier.size(16.dp))
                                 }
@@ -173,7 +173,7 @@ fun PlaylistDetailScreen(
                             IconButton(onClick = {
                                 scope.launch { db.playlistDao().removeItem(playlistId, item.url) }
                             }) {
-                                Icon(Icons.Default.Close, "Remove",
+                                Icon(Icons.Rounded.Close, "Remove",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
                                     modifier = Modifier.size(18.dp))
                             }
@@ -280,7 +280,7 @@ fun RemotePlaylistScreen(
                                         videos.drop(1).forEach { PlaybackQueue.add(it) }
                                         onVideoClick(videos.first().url)
                                     }) {
-                                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(6.dp))
                                         Text("Play all")
                                     }
@@ -290,7 +290,7 @@ fun RemotePlaylistScreen(
                                         order.drop(1).forEach { PlaybackQueue.add(it) }
                                         onVideoClick(order.first().url)
                                     }) {
-                                        Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Rounded.Shuffle, null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
                                         Text("Shuffle")
                                     }

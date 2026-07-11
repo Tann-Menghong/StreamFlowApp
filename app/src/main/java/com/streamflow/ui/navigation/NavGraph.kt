@@ -10,7 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,25 +53,25 @@ import android.content.ComponentName
 import kotlinx.coroutines.flow.first
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home     : Screen("home",     "Home",    Icons.Default.Home)
-    object Search   : Screen("search",   "Search",  Icons.Default.Search)
-    object Donghua  : Screen("donghua",  "Donghua", Icons.Default.LiveTv)
-    object Library  : Screen("library",  "Library", Icons.Default.VideoLibrary)
-    object Settings : Screen("settings", "Settings",Icons.Default.Settings)
-    object Player   : Screen("player?videoUrl={videoUrl}", "Player", Icons.Default.PlayArrow) {
+    object Home     : Screen("home",     "Home",    Icons.Rounded.Home)
+    object Search   : Screen("search",   "Search",  Icons.Rounded.Search)
+    object Donghua  : Screen("donghua",  "Donghua", Icons.Rounded.LiveTv)
+    object Library  : Screen("library",  "Library", Icons.Rounded.VideoLibrary)
+    object Settings : Screen("settings", "Settings",Icons.Rounded.Settings)
+    object Player   : Screen("player?videoUrl={videoUrl}", "Player", Icons.Rounded.PlayArrow) {
         fun createRoute(url: String) = "player?videoUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
-    object Channel  : Screen("channel?channelUrl={channelUrl}", "Channel", Icons.Default.AccountCircle) {
+    object Channel  : Screen("channel?channelUrl={channelUrl}", "Channel", Icons.Rounded.AccountCircle) {
         fun createRoute(url: String) = "channel?channelUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
-    object Feed     : Screen("feed", "Feed", Icons.Default.Subscriptions)
-    object LocalPlaylist : Screen("localplaylist/{playlistId}", "Playlist", Icons.Default.PlaylistPlay) {
+    object Feed     : Screen("feed", "Feed", Icons.Rounded.Subscriptions)
+    object LocalPlaylist : Screen("localplaylist/{playlistId}", "Playlist", Icons.Rounded.PlaylistPlay) {
         fun createRoute(id: Long) = "localplaylist/$id"
     }
-    object YtPlaylist : Screen("ytplaylist?url={url}", "YouTube Playlist", Icons.Default.PlaylistPlay) {
+    object YtPlaylist : Screen("ytplaylist?url={url}", "YouTube Playlist", Icons.Rounded.PlaylistPlay) {
         fun createRoute(url: String) = "ytplaylist?url=${URLEncoder.encode(url, "UTF-8")}"
     }
-    object Shorts : Screen("shortsfeed", "Shorts", Icons.Default.SlowMotionVideo)
+    object Shorts : Screen("shortsfeed", "Shorts", Icons.Rounded.SlowMotionVideo)
 }
 
 private val allBottomRoutes = listOf(
@@ -391,15 +391,20 @@ private fun AnimatedNavBar(
     reduceMotion: Boolean = false,
     onSelect: (Screen) -> Unit
 ) {
+    // Floating pill nav: inset rounded bar matching the floating mini player
     Surface(
         color        = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
-        shadowElevation = 8.dp
+        shadowElevation = 10.dp,
+        shape = RoundedCornerShape(26.dp),
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
                 .height(60.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,

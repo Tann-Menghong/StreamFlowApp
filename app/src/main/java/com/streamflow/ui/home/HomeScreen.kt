@@ -28,22 +28,22 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SlowMotionVideo
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SlowMotionVideo
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.ViewList
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -210,7 +210,7 @@ fun HomeScreen(
                     shape             = RoundedCornerShape(16.dp),
                     modifier          = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Default.KeyboardArrowUp, "Scroll to top", modifier = Modifier.size(22.dp))
+                    Icon(Icons.Rounded.KeyboardArrowUp, "Scroll to top", modifier = Modifier.size(22.dp))
                 }
             }
         },
@@ -236,7 +236,7 @@ fun HomeScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Search, null,
+                                        Icon(Icons.Rounded.Search, null,
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp))
                                         BasicTextField(
@@ -266,7 +266,7 @@ fun HomeScreen(
                                                 onClick  = { searchText = ""; vm.loadTrending() },
                                                 modifier = Modifier.size(20.dp)
                                             ) {
-                                                Icon(Icons.Default.Close, null,
+                                                Icon(Icons.Rounded.Close, null,
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size(16.dp))
                                             }
@@ -275,7 +275,7 @@ fun HomeScreen(
                                                 onClick  = launchVoiceSearch,
                                                 modifier = Modifier.size(22.dp)
                                             ) {
-                                                Icon(Icons.Default.Mic, "Voice search",
+                                                Icon(Icons.Rounded.Mic, "Voice search",
                                                     tint = MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(17.dp))
                                             }
@@ -294,7 +294,7 @@ fun HomeScreen(
                                             MaterialTheme.colorScheme.primary, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.PlayArrow, null,
+                                        Icon(Icons.Rounded.PlayArrow, null,
                                             tint = Color.White, modifier = Modifier.size(19.dp))
                                     }
                                     // Gradient wordmark (accent → soft accent)
@@ -320,7 +320,7 @@ fun HomeScreen(
                                                     RoundedCornerShape(10.dp))
                                                 .padding(horizontal = 7.dp, vertical = 3.dp)
                                         ) {
-                                            Icon(Icons.Default.VisibilityOff, null,
+                                            Icon(Icons.Rounded.VisibilityOff, null,
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(12.dp))
                                             Text("Incognito", fontSize = 10.sp,
@@ -344,7 +344,7 @@ fun HomeScreen(
                             }
                         }) {
                             Icon(
-                                if (searchExpanded) Icons.Default.Close else Icons.Default.Search,
+                                if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
                                 contentDescription = if (searchExpanded) "Close search" else "Search",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -352,7 +352,7 @@ fun HomeScreen(
                         if (!searchExpanded) {
                             if (onShortsClick != null) {
                                 IconButton(onClick = onShortsClick) {
-                                    Icon(Icons.Default.SlowMotionVideo, contentDescription = "Shorts",
+                                    Icon(Icons.Rounded.SlowMotionVideo, contentDescription = "Shorts",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
@@ -361,24 +361,24 @@ fun HomeScreen(
                             Box {
                                 var showOverflow by remember { mutableStateOf(false) }
                                 IconButton(onClick = { showOverflow = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More",
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 DropdownMenu(expanded = showOverflow,
                                     onDismissRequest = { showOverflow = false }) {
                                     DropdownMenuItem(
                                         text = { Text("Customize home") },
-                                        leadingIcon = { Icon(Icons.Default.Tune, null, modifier = Modifier.size(18.dp)) },
+                                        leadingIcon = { Icon(Icons.Rounded.Tune, null, modifier = Modifier.size(18.dp)) },
                                         onClick = { showOverflow = false; showCustomizeSheet = true }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Refresh feed") },
-                                        leadingIcon = { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp)) },
+                                        leadingIcon = { Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp)) },
                                         onClick = { showOverflow = false; vm.refresh() }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Country: $currentCountry") },
-                                        leadingIcon = { Icon(Icons.Default.Public, null, modifier = Modifier.size(18.dp)) },
+                                        leadingIcon = { Icon(Icons.Rounded.Public, null, modifier = Modifier.size(18.dp)) },
                                         onClick = { showOverflow = false; showCountryPicker = true }
                                     )
                                 }
@@ -432,7 +432,7 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Default.History, null,
+                                Icon(Icons.Rounded.History, null,
                                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
                                     modifier = Modifier.size(16.dp))
                                 Text(
@@ -453,7 +453,7 @@ fun HomeScreen(
                                     onClick = { vm.removeRecentSearch(q) },
                                     modifier = Modifier.size(22.dp)
                                 ) {
-                                    Icon(Icons.Default.Close, "Remove",
+                                    Icon(Icons.Rounded.Close, "Remove",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
                                         modifier = Modifier.size(14.dp))
                                 }
@@ -489,7 +489,7 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Default.Search, null,
+                                Icon(Icons.Rounded.Search, null,
                                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
                                     modifier = Modifier.size(15.dp))
                                 Text(s, style = MaterialTheme.typography.bodyMedium,
@@ -838,7 +838,7 @@ private fun CategoryChipsRow(
                 onClick = onEdit,
                 label   = { Text("Edit", fontSize = 13.sp) },
                 leadingIcon = {
-                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp),
+                    Icon(Icons.Rounded.Edit, null, modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 shape  = RoundedCornerShape(20.dp),
@@ -899,9 +899,9 @@ private fun CustomizeHomeSheet(
             SheetSectionLabel("LAYOUT")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SheetChoiceChip("List", homeLayout == "LIST",
-                    icon = Icons.Default.ViewList) { onLayout("LIST") }
+                    icon = Icons.Rounded.ViewList) { onLayout("LIST") }
                 SheetChoiceChip("Grid", homeLayout == "GRID",
-                    icon = Icons.Default.GridView) { onLayout("GRID") }
+                    icon = Icons.Rounded.GridView) { onLayout("GRID") }
             }
             Spacer(Modifier.height(10.dp))
             AnimatedContent(targetState = homeLayout, label = "layout_options") { layout ->
@@ -967,7 +967,7 @@ private fun CustomizeHomeSheet(
                         onClick  = { onToggleCategory(cat) },
                         label    = { Text(cat, fontSize = 12.sp) },
                         trailingIcon = if (isCustom) ({
-                            Icon(Icons.Default.Close, "Remove $cat",
+                            Icon(Icons.Rounded.Close, "Remove $cat",
                                 modifier = Modifier
                                     .size(14.dp)
                                     .clickable(
@@ -1288,7 +1288,7 @@ private fun SearchTypeResults(
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Person, null,
+                            Icon(Icons.Rounded.Person, null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }

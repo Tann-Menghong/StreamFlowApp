@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.streamflow.data.local.AppPreferences
@@ -38,6 +39,8 @@ class MainActivity : ComponentActivity() {
     private var autoPipEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Branded splash (must be installed before super.onCreate)
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // Request notification permission for media player controls on Android 13+

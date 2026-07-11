@@ -12,7 +12,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -159,16 +159,16 @@ fun DonghuaScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = { webViewRef?.goBack() }, enabled = canGoBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
                 title = { Text(pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconButton(onClick = { webViewRef?.reload() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reload")
+                        Icon(Icons.Rounded.Refresh, contentDescription = "Reload")
                     }
                     IconButton(onClick = { webViewRef?.loadUrl(DONGHUA_HOME) }) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
+                        Icon(Icons.Rounded.Home, contentDescription = "Home")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

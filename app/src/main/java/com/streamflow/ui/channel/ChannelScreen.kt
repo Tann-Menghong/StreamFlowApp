@@ -10,9 +10,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,7 +62,7 @@ fun ChannelScreen(
                 title = { Text(data.name.ifEmpty { "Channel" }, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Rounded.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -72,10 +72,10 @@ fun ChannelScreen(
         }
     ) { padding ->
         when {
-            // Full-screen spinner only on the very first load; when switching
+            // Skeleton shimmer only on the very first load; when switching
             // tabs the header/tab bar stay put and only the list area reloads
-            data.isLoading && data.name.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            data.isLoading && data.name.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding)) {
+                com.streamflow.ui.components.ShimmerList()
             }
             data.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
@@ -137,7 +137,7 @@ fun ChannelScreen(
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Person, null,
+                                Icon(Icons.Rounded.Person, null,
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(32.dp))
                             }
@@ -263,7 +263,7 @@ fun ChannelScreen(
                                         ) {
                                             Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                 verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.PlaylistPlay, null,
+                                                Icon(Icons.Rounded.PlaylistPlay, null,
                                                     tint = Color.White, modifier = Modifier.size(12.dp))
                                                 Spacer(Modifier.width(2.dp))
                                                 Text("${pl.streamCount}", color = Color.White, fontSize = 10.sp)

@@ -35,7 +35,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
@@ -641,7 +641,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 modifier = Modifier.fillMaxSize()
             )
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
         }
         return
@@ -676,7 +676,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     Modifier.align(Alignment.Center).padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.ErrorOutline, null, tint = Color.White.copy(0.7f),
+                    Icon(Icons.Rounded.ErrorOutline, null, tint = Color.White.copy(0.7f),
                         modifier = Modifier.size(40.dp))
                     Spacer(Modifier.height(10.dp))
                     Text(s.message, color = Color.White, fontSize = 14.sp,
@@ -732,7 +732,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             .background(Color.Black.copy(0.55f), RoundedCornerShape(8.dp))
                             .padding(8.dp)
                     ) {
-                        Icon(Icons.Default.Brightness6, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Rounded.Brightness6, null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.height(4.dp))
                         Text("${(brightnessLevel * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
                     }
@@ -771,7 +771,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             .background(Color.Black.copy(0.55f), RoundedCornerShape(8.dp))
                             .padding(8.dp)
                     ) {
-                        Icon(Icons.Default.VolumeUp, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Rounded.VolumeUp, null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.height(4.dp))
                         Text("${((volumeLevel / maxVolume) * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
                     }
@@ -790,7 +790,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         onClick = { isLocked = false },
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        Icon(Icons.Default.Lock, "Unlock", tint = Color.White)
+                        Icon(Icons.Rounded.Lock, "Unlock", tint = Color.White)
                     }
                 }
             }
@@ -813,7 +813,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             IconButton(onClick = { isFullscreen = false }) {
-                                Icon(Icons.Default.FullscreenExit, null, tint = Color.White)
+                                Icon(Icons.Rounded.FullscreenExit, null, tint = Color.White)
                             }
                             val fsTitle = (state as? PlayerUiState.Ready)?.details?.title ?: ""
                             if (fsTitle.isNotEmpty()) {
@@ -855,7 +855,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         DropdownMenuItem(
                                             text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
                                             trailingIcon = {
-                                                if (autoQuality) Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                if (autoQuality) Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
                                             },
                                             onClick = {
                                                 showFsQualityMenu = false
@@ -871,7 +871,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 text = { Text("${h}p", fontWeight = if (!autoQuality && h == fsDetails.currentQuality) FontWeight.Bold else FontWeight.Normal) },
                                                 trailingIcon = {
                                                     if (!autoQuality && h == fsDetails.currentQuality)
-                                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                        Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
                                                 },
                                                 onClick = {
                                                     showFsQualityMenu = false
@@ -888,7 +888,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                             Box {
                                 IconButton(onClick = { showSleepMenu = true }) {
-                                    Icon(Icons.Default.Bedtime, "Sleep timer",
+                                    Icon(Icons.Rounded.Bedtime, "Sleep timer",
                                         tint = if (sleepMinutes > 0) MaterialTheme.colorScheme.primary else Color.White)
                                 }
                                 DropdownMenu(expanded = showSleepMenu, onDismissRequest = { showSleepMenu = false }) {
@@ -901,10 +901,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 }
                             }
                             IconButton(onClick = { isLocked = true }) {
-                                Icon(Icons.Default.LockOpen, "Lock", tint = Color.White)
+                                Icon(Icons.Rounded.LockOpen, "Lock", tint = Color.White)
                             }
                             IconButton(onClick = { showStats = !showStats }) {
-                                Icon(Icons.Default.Analytics, "Stats",
+                                Icon(Icons.Rounded.Analytics, "Stats",
                                     tint = if (showStats) MaterialTheme.colorScheme.primary else Color.White)
                             }
                             IconButton(onClick = {
@@ -913,7 +913,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     activity?.enterPictureInPictureMode(params)
                                 }
                             }) {
-                                Icon(Icons.Default.PictureInPicture, "PiP", tint = Color.White)
+                                Icon(Icons.Rounded.PictureInPicture, "PiP", tint = Color.White)
                             }
                         }
                     }
@@ -955,7 +955,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                         fsTapTimestamp = System.currentTimeMillis()
                     }) {
-                        Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(36.dp))
                     }
                     IconButton(
                         onClick = {
@@ -965,7 +965,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), CircleShape)
                     ) {
                         Icon(
-                            if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             null, tint = Color.White, modifier = Modifier.size(40.dp)
                         )
                     }
@@ -973,7 +973,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                         fsTapTimestamp = System.currentTimeMillis()
                     }) {
-                        Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(36.dp))
                     }
                 }
             }
@@ -1024,7 +1024,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(Icons.Default.FastForward, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.FastForward, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Text("2x", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -1101,7 +1101,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                                 fsTapTimestamp = System.currentTimeMillis()
                             }) {
-                                Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(24.dp))
                             }
                             IconButton(onClick = {
                                 val mc = mediaController ?: return@IconButton
@@ -1109,7 +1109,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 fsTapTimestamp = System.currentTimeMillis()
                             }) {
                                 Icon(
-                                    if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     null, tint = Color.White, modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -1117,11 +1117,11 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                                 fsTapTimestamp = System.currentTimeMillis()
                             }) {
-                                Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(24.dp))
                             }
                             if (queue.isNotEmpty()) {
                                 IconButton(onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } }) {
-                                    Icon(Icons.Default.SkipNext, "Next in queue", tint = Color.White, modifier = Modifier.size(26.dp))
+                                    Icon(Icons.Rounded.SkipNext, "Next in queue", tint = Color.White, modifier = Modifier.size(26.dp))
                                 }
                             }
                             Spacer(Modifier.width(6.dp))
@@ -1210,7 +1210,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     alpha = 0.3f
                                 )
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.MusicNote, null, tint = Color.White,
+                                    Icon(Icons.Rounded.MusicNote, null, tint = Color.White,
                                         modifier = Modifier.size(64.dp))
                                     Spacer(Modifier.height(12.dp))
                                     Text("Audio Only", color = Color.White,
@@ -1245,7 +1245,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                                             fsTapTimestamp = System.currentTimeMillis()
                                         }) {
-                                            Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                            Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(34.dp))
                                         }
                                         IconButton(
                                             onClick = {
@@ -1255,7 +1255,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             modifier = Modifier.size(64.dp).background(Color.Black.copy(0.35f), CircleShape)
                                         ) {
                                             Icon(
-                                                if (playerIsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                                 null, tint = Color.White, modifier = Modifier.size(44.dp)
                                             )
                                         }
@@ -1263,7 +1263,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                                             fsTapTimestamp = System.currentTimeMillis()
                                         }) {
-                                            Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                            Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(34.dp))
                                         }
                                     }
 
@@ -1292,7 +1292,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                     onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } },
                                                     modifier = Modifier.size(32.dp)
                                                 ) {
-                                                    Icon(Icons.Default.SkipNext, "Next in queue",
+                                                    Icon(Icons.Rounded.SkipNext, "Next in queue",
                                                         tint = Color.White, modifier = Modifier.size(22.dp))
                                                 }
                                             }
@@ -1300,7 +1300,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 onClick = { isFullscreen = true },
                                                 modifier = Modifier.size(32.dp)
                                             ) {
-                                                Icon(Icons.Default.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Rounded.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                         if (playerDuration > 0L && !s.details.isLive) {
@@ -1368,7 +1368,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.FastForward, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Rounded.FastForward, null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 Text("2x", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -1380,7 +1380,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     IconButton(onClick = onBack, modifier = Modifier.padding(4.dp)) {
-                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
+                        Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
                     }
                 }
                 if (autoPlayCountdown > 0) {
@@ -1455,7 +1455,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             color = if (onChannelClick != null && details.uploaderUrl.isNotEmpty())
                                                 MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
                                         if (onChannelClick != null && details.uploaderUrl.isNotEmpty()) {
-                                            Icon(Icons.Default.ChevronRight, null,
+                                            Icon(Icons.Rounded.ChevronRight, null,
                                                 tint = MaterialTheme.colorScheme.primary.copy(0.7f),
                                                 modifier = Modifier.size(16.dp))
                                         }
@@ -1475,7 +1475,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     modifier = Modifier.height(30.dp).padding(end = 4.dp)
                                 ) {
                                     if (isSubscribed) {
-                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Rounded.Check, null, modifier = Modifier.size(13.dp))
                                         Spacer(Modifier.width(3.dp))
                                     }
                                     Text(if (isSubscribed) "Subscribed" else "Subscribe",
@@ -1503,7 +1503,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                             val chipHaptic = LocalHapticFeedback.current
                             ActionChip(
-                                icon = if (isFavorite) Icons.Default.ThumbUp else Icons.Default.ThumbUpOffAlt,
+                                icon = if (isFavorite) Icons.Rounded.ThumbUp else Icons.Rounded.ThumbUpOffAlt,
                                 label = if (details.likeCount > 0) formatViews(details.likeCount) else "Like",
                                 active = isFavorite,
                                 modifier = Modifier.scale(likeScale.value)
@@ -1511,7 +1511,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 chipHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 vm.toggleFavorite()
                             }
-                            ActionChip(icon = Icons.Default.Share, label = "Share") {
+                            ActionChip(icon = Icons.Rounded.Share, label = "Share") {
                                 // Share at the current position (YouTube-style ?t= link)
                                 val posSec = playerPosition / 1000
                                 val shareUrl = if (!details.isLive && posSec > 5)
@@ -1521,16 +1521,16 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 context.startActivity(Intent.createChooser(i, "Share video"))
                             }
                             ActionChip(
-                                icon = if (isInWatchLater) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                icon = if (isInWatchLater) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                                 label = "Watch later",
                                 active = isInWatchLater
                             ) { vm.toggleWatchLater() }
                             if (!details.isLive) {
-                                ActionChip(icon = Icons.Default.Download, label = "Download") { showDownloadDialog = true }
+                                ActionChip(icon = Icons.Rounded.Download, label = "Download") { showDownloadDialog = true }
                             }
-                            ActionChip(icon = Icons.Default.PlaylistAdd, label = "Save") { showPlaylistDialog = true }
+                            ActionChip(icon = Icons.Rounded.PlaylistAdd, label = "Save") { showPlaylistDialog = true }
                             if (AiEngine.isSupported() && !details.isLive) {
-                                ActionChip(icon = Icons.Default.AutoAwesome, label = "Ask AI") { showAiSheet = true }
+                                ActionChip(icon = Icons.Rounded.AutoAwesome, label = "Ask AI") { showAiSheet = true }
                             }
                         }
                         Spacer(Modifier.height(4.dp))
@@ -1539,7 +1539,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                         ) {
-                            Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Speed", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Box {
@@ -1577,7 +1577,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         DropdownMenuItem(
                                             text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
                                             trailingIcon = {
-                                                if (autoQuality) Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                if (autoQuality) Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
                                             },
                                             onClick = {
                                                 showQualityMenu = false
@@ -1593,7 +1593,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 text = { Text("${h}p", fontWeight = if (!autoQuality && h == details.currentQuality) FontWeight.Bold else FontWeight.Normal) },
                                                 trailingIcon = {
                                                     if (!autoQuality && h == details.currentQuality)
-                                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                                                        Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
                                                 },
                                                 onClick = {
                                                     showQualityMenu = false
@@ -1615,7 +1615,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 repeatMode = if (repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                             }, modifier = Modifier.size(36.dp)) {
                                 Icon(
-                                    if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                                    if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                                     "Repeat",
                                     tint = if (repeatMode == Player.REPEAT_MODE_ONE) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -1647,7 +1647,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                             // Audio-only toggle
                             IconButton(onClick = { vm.toggleAudioOnly() }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.MusicNote, "Audio only",
+                                Icon(Icons.Rounded.MusicNote, "Audio only",
                                     tint = if (audioOnly) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface.copy(0.6f),
                                     modifier = Modifier.size(20.dp))
@@ -1655,7 +1655,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             // Queue button
                             Box {
                                 IconButton(onClick = { showQueueSheet = true }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.QueueMusic, "Queue",
+                                    Icon(Icons.Rounded.QueueMusic, "Queue",
                                         tint = if (queue.isNotEmpty()) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurface.copy(0.6f),
                                         modifier = Modifier.size(20.dp))
@@ -1668,7 +1668,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             if (details.subtitles.isNotEmpty()) {
                                 Box {
                                     IconButton(onClick = { showSubMenu = true }, modifier = Modifier.size(36.dp)) {
-                                        Icon(Icons.Default.ClosedCaption, "Subtitles",
+                                        Icon(Icons.Rounded.ClosedCaption, "Subtitles",
                                             tint = if (selectedSubUrl.isNotEmpty()) MaterialTheme.colorScheme.primary
                                                    else MaterialTheme.colorScheme.onSurface.copy(0.6f),
                                             modifier = Modifier.size(20.dp))
@@ -1751,13 +1751,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.List, null,
+                                    Icon(Icons.Rounded.List, null,
                                         tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                     Text("Chapters  (${details.chapters.size})",
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground)
                                 }
-                                Icon(if (chapExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                Icon(if (chapExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                                     null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (chapExpanded) {
@@ -1806,7 +1806,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Comment, null,
+                                Icon(Icons.Rounded.Comment, null,
                                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                 Text(
                                     if (comments.isEmpty()) "Comments" else "Comments  (${comments.size})",
@@ -1817,7 +1817,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             if (commentsLoading) {
                                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(if (showComments) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                Icon(if (showComments) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                                     null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -1865,7 +1865,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     Spacer(Modifier.height(4.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Icon(Icons.Default.ThumbUp, null,
+                                        Icon(Icons.Rounded.ThumbUp, null,
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(12.dp))
                                         Text(formatViews(comment.likeCount), fontSize = 11.sp,
@@ -1984,7 +1984,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text("AI", fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -2007,7 +2007,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = { vm.aiSummarize() }, enabled = !aiBusy) {
-                            Icon(Icons.Default.Summarize, null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Summarize, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Summarize video")
                         }
@@ -2055,7 +2055,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             IconButton(
                                 onClick = { vm.aiAsk(aiQuestion); aiQuestion = "" },
                                 enabled = !aiBusy && aiQuestion.isNotBlank()
-                            ) { Icon(Icons.Default.Send, "Ask") }
+                            ) { Icon(Icons.Rounded.Send, "Ask") }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -2085,7 +2085,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.PlaylistPlay, null,
+                            Icon(Icons.Rounded.PlaylistPlay, null,
                                 tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                             Text(pl.name, modifier = Modifier.weight(1f), maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -2131,7 +2131,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     if (queue.isNotEmpty()) {
                         Row {
                             IconButton(onClick = { PlaybackQueue.shuffle() }) {
-                                Icon(Icons.Default.Shuffle, "Shuffle queue",
+                                Icon(Icons.Rounded.Shuffle, "Shuffle queue",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp))
                             }
@@ -2174,21 +2174,21 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             // Reorder
                             IconButton(onClick = { PlaybackQueue.move(idx, idx - 1) },
                                 enabled = idx > 0, modifier = Modifier.size(26.dp)) {
-                                Icon(Icons.Default.KeyboardArrowUp, "Move up",
+                                Icon(Icons.Rounded.KeyboardArrowUp, "Move up",
                                     tint = if (idx > 0) MaterialTheme.colorScheme.onSurfaceVariant
                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
                                     modifier = Modifier.size(18.dp))
                             }
                             IconButton(onClick = { PlaybackQueue.move(idx, idx + 1) },
                                 enabled = idx < queue.size - 1, modifier = Modifier.size(26.dp)) {
-                                Icon(Icons.Default.KeyboardArrowDown, "Move down",
+                                Icon(Icons.Rounded.KeyboardArrowDown, "Move down",
                                     tint = if (idx < queue.size - 1) MaterialTheme.colorScheme.onSurfaceVariant
                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
                                     modifier = Modifier.size(18.dp))
                             }
                             IconButton(onClick = { PlaybackQueue.remove(idx) },
                                 modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Close, null,
+                                Icon(Icons.Rounded.Close, null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp))
                             }

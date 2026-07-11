@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.StreamFlow" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Branded splash: gradient play logo on a near-black backdrop, then hands
+         off to the normal theme. Works on every API level via core-splashscreen. -->
+    <style name="Theme.StreamFlow.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0E0E10</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="windowSplashScreenAnimationDuration">450</item>
+        <item name="postSplashScreenTheme">@style/Theme.StreamFlow</item>
+    </style>
 </resources>
