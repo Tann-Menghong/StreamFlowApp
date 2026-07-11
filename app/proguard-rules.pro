@@ -23,3 +23,7 @@
 # Media3 session
 -keep class androidx.media3.session.** { *; }
 -dontwarn androidx.media3.**
+
+# MediaPipe LLM Inference — JNI + protos must survive R8
+-keep class com.google.mediapipe.** { *; }
+-dontwarn com.google.mediapipe.**

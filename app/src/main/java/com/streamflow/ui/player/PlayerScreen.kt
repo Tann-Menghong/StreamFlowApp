@@ -18,6 +18,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.PressGestureScope
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -70,6 +72,7 @@ import androidx.media3.ui.PlayerView
 import com.streamflow.MainActivity
 import com.streamflow.PlaybackService
 import com.streamflow.data.PlaybackQueue
+import com.streamflow.data.ai.AiEngine
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.components.MiniPlayerData
 import com.streamflow.ui.components.MiniPlayerState
@@ -245,6 +248,9 @@ fun PlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
     var showPlaylistDialog by remember { mutableStateOf(false) }
+    var showAiSheet by remember { mutableStateOf(false) }
+    val aiOutput by vm.aiOutput.collectAsState()
+    val aiBusy by vm.aiBusy.collectAsState()
     var currentSpeed by remember { mutableFloatStateOf(1f) }
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
     LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
@@ -1496,6 +1502,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     Icon(Icons.Default.PlaylistAdd, "Save to playlist",
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                                 }
+                                if (AiEngine.isSupported() && !details.isLive) {
+                                    IconButton(onClick = { showAiSheet = true }) {
+                                        Icon(Icons.Default.AutoAwesome, "AI summary",
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    }
+                                }
                             }
                         }
 
@@ -1918,6 +1930,97 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 }
             }
         )
+    }
+
+    // ── On-device AI sheet: summary + ask about this video ───────────────────
+    if (showAiSheet) {
+        val aiModelReady = remember { AiEngine.isModelReady(context) }
+        var aiQuestion by remember { mutableStateOf("") }
+        ModalBottomSheet(onDismissRequest = { showAiSheet = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("AI", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (aiModelReady) AiEngine.MODEL_LABEL else "On this device — no account, no cloud",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+
+                if (!aiModelReady) {
+                    Text(
+                        "Download the free AI model once (${AiEngine.MODEL_SIZE_LABEL}) in Settings > AI. " +
+                        "After that you can get video summaries and ask questions about any video — fully offline.",
+                        fontSize = 14.sp, lineHeight = 20.sp
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    FilledTonalButton(onClick = { showAiSheet = false }) { Text("Got it") }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { vm.aiSummarize() }, enabled = !aiBusy) {
+                            Icon(Icons.Default.Summarize, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Summarize video")
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+
+                    if (aiBusy && aiOutput.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Thinking… (first run loads the model, can take a minute)",
+                                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    if (aiOutput.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                aiOutput, fontSize = 14.sp, lineHeight = 20.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    OutlinedTextField(
+                        value = aiQuestion,
+                        onValueChange = { aiQuestion = it },
+                        placeholder = { Text("Ask about this video…", fontSize = 13.sp) },
+                        singleLine = true,
+                        enabled = !aiBusy,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { vm.aiAsk(aiQuestion); aiQuestion = "" },
+                                enabled = !aiBusy && aiQuestion.isNotBlank()
+                            ) { Icon(Icons.Default.Send, "Ask") }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Answers come from the video's captions and run entirely on your phone. The small model can make mistakes.",
+                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 
     if (showPlaylistDialog) {

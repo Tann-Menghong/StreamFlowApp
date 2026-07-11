@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.YouTubeRepository
+import com.streamflow.data.ai.AiEngine
 import com.streamflow.data.friendlyError
 import com.streamflow.data.local.entity.DownloadEntity
 import com.streamflow.data.local.entity.FavoriteEntity
@@ -171,6 +172,76 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── On-device AI: summary + Q&A over the transcript ──────────────────────
+    private val _aiOutput = MutableStateFlow("")
+    val aiOutput: StateFlow<String> = _aiOutput
+
+    private val _aiBusy = MutableStateFlow(false)
+    val aiBusy: StateFlow<Boolean> = _aiBusy
+
+    private val summaryCache = HashMap<String, String>()
+    private var transcriptCache: Pair<String, String>? = null // videoUrl to transcript
+
+    // Transcript from subtitles when available (prefer English), else the
+    // description — enough signal for a summary when captions are missing.
+    private suspend fun aiSourceText(d: VideoDetails): String {
+        transcriptCache?.let { if (it.first == d.url) return it.second }
+        val track = d.subtitles.firstOrNull { it.name.contains("english", ignoreCase = true) }
+            ?: d.subtitles.firstOrNull()
+        val transcript = track?.let {
+            try { AiEngine.fetchTranscript(it.url) } catch (_: Exception) { "" }
+        }.orEmpty()
+        val text = transcript.ifBlank { d.description }
+        transcriptCache = d.url to text
+        return text
+    }
+
+    private fun runAi(cacheKey: String?, buildTask: suspend (VideoDetails) -> String) {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        cacheKey?.let { summaryCache[it] }?.let { _aiOutput.value = it; return }
+        if (_aiBusy.value) return
+        viewModelScope.launch {
+            _aiBusy.value = true
+            _aiOutput.value = ""
+            try {
+                val prompt = buildTask(d)
+                val result = AiEngine.generate(getApplication(), prompt) { partial ->
+                    _aiOutput.value = partial
+                }
+                _aiOutput.value = result
+                cacheKey?.let { summaryCache[it] = result }
+            } catch (e: Exception) {
+                _aiOutput.value = "Couldn't run the AI: ${e.message ?: "unknown error"}"
+            } finally {
+                _aiBusy.value = false
+            }
+        }
+    }
+
+    fun aiSummarize() {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        runAi(cacheKey = d.url) { details ->
+            val source = AiEngine.fitToBudget(aiSourceText(details))
+            AiEngine.chatPrompt(
+                "Summarize this YouTube video in 4 to 6 short bullet points.\n\n" +
+                "Title: ${details.title}\nChannel: ${details.uploaderName}\n\nTranscript:\n$source"
+            )
+        }
+    }
+
+    fun aiAsk(question: String) {
+        if (question.isBlank()) return
+        runAi(cacheKey = null) { details ->
+            val source = AiEngine.fitToBudget(aiSourceText(details), AiEngine.PROMPT_CHAR_BUDGET - question.length)
+            AiEngine.chatPrompt(
+                "Using this YouTube video transcript, answer the question briefly.\n\n" +
+                "Title: ${details.title}\n\nTranscript:\n$source\n\nQuestion: ${question.trim()}"
+            )
+        }
+    }
+
+    fun clearAiOutput() { _aiOutput.value = "" }
+
     // ── SponsorBlock ──────────────────────────────────────────────────────────
     private val _sponsorSegments = MutableStateFlow<List<SponsorSegment>>(emptyList())
     val sponsorSegments: StateFlow<List<SponsorSegment>> = _sponsorSegments
@@ -192,6 +263,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         _comments.value = emptyList()
         commentsLoadedFor = ""
         _sponsorSegments.value = emptyList()
+        _aiOutput.value = ""
+        transcriptCache = null
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
             if (isDirectStream(videoUrl)) {

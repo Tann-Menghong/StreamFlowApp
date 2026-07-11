@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- MediaPipe GenAI declares minSdk 24; the app keeps minSdk 21 and gates
+         all AI features at runtime on Android 7.0+ (AiEngine.isSupported) -->
+    <uses-sdk tools:overrideLibrary="com.google.mediapipe.tasks.genai,com.google.mediapipe.tasks.core,com.google.mediapipe.framework,com.google.mediapipe" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

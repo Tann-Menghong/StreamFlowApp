@@ -67,6 +67,21 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
     val libraryTab     = prefs.libraryTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
 
+    // ── On-device AI ──────────────────────────────────────────────
+    val aiState = com.streamflow.data.ai.AiEngine.downloadState
+
+    init {
+        com.streamflow.data.ai.AiEngine.refreshState(app)
+    }
+
+    fun downloadAiModel() {
+        viewModelScope.launch { com.streamflow.data.ai.AiEngine.downloadModel(getApplication()) }
+    }
+
+    fun deleteAiModel() {
+        com.streamflow.data.ai.AiEngine.deleteModel(getApplication())
+    }
+
     // ── DB counts ─────────────────────────────────────────────────
     val favoritesCount = db.favoriteDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val historyCount   = db.historyDao().count().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)

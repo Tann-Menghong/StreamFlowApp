@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.streamflow.data.ai.AiEngine
 
 private val countryOptions = listOf(
     "US" to "United States",
@@ -95,6 +96,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val showSearchTab        by vm.showSearchTab.collectAsState()
     val fontFamily           by vm.fontFamily.collectAsState()
     val libraryTab           by vm.libraryTab.collectAsState()
+    val aiState              by vm.aiState.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -132,6 +134,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showQuietDialog     by remember { mutableStateOf(false) }
     var showFontFamilyDialog by remember { mutableStateOf(false) }
     var showLibTabDialog     by remember { mutableStateOf(false) }
+    var showDeleteAiDialog   by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -356,6 +359,42 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 ) { showCountryDialog = true }
             }
 
+            // ── AI (on-device, free, offline) ────────────────────────────
+            SettingsSection("AI")
+            SettingsCard {
+                if (!AiEngine.isSupported()) {
+                    SettingsItem(Icons.Default.AutoAwesome, "On-device AI",
+                        "Needs Android 7.0 or newer")
+                } else when (val s = aiState) {
+                    is AiEngine.DownloadState.Downloading -> {
+                        SettingsItem(Icons.Default.AutoAwesome, "Downloading AI model…",
+                            "${(s.progress * 100).toInt()}% of ${AiEngine.MODEL_SIZE_LABEL}")
+                        LinearProgressIndicator(
+                            progress = { s.progress },
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+                        )
+                    }
+                    is AiEngine.DownloadState.Ready -> {
+                        SettingsItem(Icons.Default.AutoAwesome, "On-device AI ready",
+                            "${AiEngine.MODEL_LABEL} — tap ✦ in the player for summaries & Q&A")
+                        SettingsDivider()
+                        SettingsItem(Icons.Default.DeleteOutline, "Remove AI model",
+                            "Frees up ${AiEngine.MODEL_SIZE_LABEL} of storage"
+                        ) { showDeleteAiDialog = true }
+                    }
+                    is AiEngine.DownloadState.Failed -> {
+                        SettingsItem(Icons.Default.AutoAwesome, "Download failed — tap to resume",
+                            s.message) { vm.downloadAiModel() }
+                    }
+                    else -> {
+                        SettingsItem(Icons.Default.AutoAwesome, "Download AI model",
+                            "One-time download (${AiEngine.MODEL_SIZE_LABEL}) — video summaries and Q&A, free and fully offline"
+                        ) { vm.downloadAiModel() }
+                    }
+                }
+            }
+
             // ── Storage ──────────────────────────────────────────────────
             SettingsSection("Storage")
             SettingsCard {
@@ -465,6 +504,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     if (showClearBlocked) {
         ConfirmDialog("Unhide all", "Show the $blockedCount hidden videos/channels in your feed again?",
             { vm.clearBlocked(); showClearBlocked = false }, { showClearBlocked = false })
+    }
+    if (showDeleteAiDialog) {
+        ConfirmDialog("Remove AI model", "Delete the downloaded AI model (${AiEngine.MODEL_SIZE_LABEL})? You can download it again anytime.",
+            { vm.deleteAiModel(); showDeleteAiDialog = false }, { showDeleteAiDialog = false })
     }
     if (showBoostDialog) {
         val boostOpts = listOf("0" to "Off", "300" to "Low (+30%)", "600" to "High (+60%)", "1000" to "Max (+100%)")
