@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
             "com.streamflow.shortcut.FEED" -> "feed"
             "com.streamflow.shortcut.LIBRARY" -> "library"
             "com.streamflow.shortcut.SEARCH" -> "search"
+            "com.streamflow.shortcut.SETTINGS" -> "settings"
             else -> null
         }
 

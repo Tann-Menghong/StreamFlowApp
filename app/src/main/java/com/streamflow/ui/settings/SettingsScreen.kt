@@ -82,6 +82,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val incognito            by vm.incognito.collectAsState()
     val qualityCellular      by vm.qualityCellular.collectAsState()
     val historyRetention     by vm.historyRetention.collectAsState()
+    val notifyFreq           by vm.notifyFreq.collectAsState()
+    val notifyMax            by vm.notifyMax.collectAsState()
+    val notifyAppUpdates     by vm.notifyAppUpdates.collectAsState()
+    val quietHours           by vm.quietHours.collectAsState()
     val cornerStyle          by vm.cornerStyle.collectAsState()
     val navLabels            by vm.navLabels.collectAsState()
     val reduceMotion         by vm.reduceMotion.collectAsState()
@@ -120,6 +124,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showRetentionDialog by remember { mutableStateOf(false) }
     var showCornerDialog   by remember { mutableStateOf(false) }
     var showNavLabelDialog by remember { mutableStateOf(false) }
+    var showNotifFreqDialog by remember { mutableStateOf(false) }
+    var showNotifMaxDialog  by remember { mutableStateOf(false) }
+    var showQuietDialog     by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -223,8 +230,41 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             SettingsSection("Notifications")
             SettingsCard {
                 SettingsSwitchItem(Icons.Default.NotificationsActive, "New video alerts",
-                    "Notify when subscribed channels upload (checks every ~6h)", notifyNewVideos
+                    "Notify when subscribed channels upload", notifyNewVideos
                 ) { vm.setNotifyNewVideos(it) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Schedule, "Check frequency",
+                    when (notifyFreq) {
+                        "1" -> "Every hour"; "3" -> "Every 3 hours"; "12" -> "Every 12 hours"
+                        "24" -> "Once a day"; else -> "Every 6 hours"
+                    }
+                ) { showNotifFreqDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.FilterList, "Alerts per check",
+                    if (notifyMax == "0") "Unlimited" else "Up to $notifyMax"
+                ) { showNotifMaxDialog = true }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Bedtime, "Quiet hours",
+                    if (quietHours == "OFF") "Off"
+                    else quietHours.split("-").let { p ->
+                        "%02d:00 – %02d:00".format(p.getOrNull(0)?.toIntOrNull() ?: 22,
+                                                    p.getOrNull(1)?.toIntOrNull() ?: 7)
+                    }
+                ) { showQuietDialog = true }
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.SystemUpdate, "App update alerts",
+                    "Notify when a new StreamFlow version is released", notifyAppUpdates
+                ) { vm.setNotifyAppUpdates(it) }
+                SettingsDivider()
+                SettingsItem(Icons.Default.Tune, "Sound & vibration",
+                    "Per-channel options in Android settings"
+                ) {
+                    try {
+                        val i = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        context.startActivity(i)
+                    } catch (_: Exception) {}
+                }
             }
 
             // ── Home customization ────────────────────────────────────────
@@ -443,6 +483,26 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         PickerDialog("Auto-clear history", retOpts.map { it.second },
             retOpts.indexOfFirst { it.first == historyRetention }.coerceAtLeast(0),
             { vm.setHistoryRetention(retOpts[it].first); showRetentionDialog = false }, { showRetentionDialog = false })
+    }
+    if (showNotifFreqDialog) {
+        val freqOpts = listOf("1" to "Every hour", "3" to "Every 3 hours", "6" to "Every 6 hours",
+            "12" to "Every 12 hours", "24" to "Once a day")
+        PickerDialog("Check frequency", freqOpts.map { it.second },
+            freqOpts.indexOfFirst { it.first == notifyFreq }.coerceAtLeast(0),
+            { vm.setNotifyFreq(freqOpts[it].first); showNotifFreqDialog = false }, { showNotifFreqDialog = false })
+    }
+    if (showNotifMaxDialog) {
+        val maxOpts = listOf("1" to "1 alert", "3" to "Up to 3", "5" to "Up to 5", "0" to "Unlimited")
+        PickerDialog("Alerts per check", maxOpts.map { it.second },
+            maxOpts.indexOfFirst { it.first == notifyMax }.coerceAtLeast(0),
+            { vm.setNotifyMax(maxOpts[it].first); showNotifMaxDialog = false }, { showNotifMaxDialog = false })
+    }
+    if (showQuietDialog) {
+        val quietOpts = listOf("OFF" to "Off", "21-6" to "21:00 – 06:00", "22-7" to "22:00 – 07:00",
+            "23-8" to "23:00 – 08:00", "0-7" to "00:00 – 07:00")
+        PickerDialog("Quiet hours", quietOpts.map { it.second },
+            quietOpts.indexOfFirst { it.first == quietHours }.coerceAtLeast(0),
+            { vm.setQuietHours(quietOpts[it].first); showQuietDialog = false }, { showQuietDialog = false })
     }
     if (showCornerDialog) {
         val cornerOpts = listOf("SQUARE" to "Square", "ROUNDED" to "Rounded", "ROUND" to "Extra round")

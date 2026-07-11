@@ -13,7 +13,20 @@ import androidx.work.WorkerParameters
 import com.streamflow.MainActivity
 import com.streamflow.R
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.local.AppPreferences
 import kotlinx.coroutines.flow.first
+
+// True while the user's quiet-hours window is active ("start-end" in 24h form,
+// e.g. "22-7" = 22:00 tonight until 07:00 tomorrow). "OFF" disables it.
+internal suspend fun inQuietHours(prefs: AppPreferences): Boolean {
+    val range = prefs.quietHours.first()
+    if (range == "OFF") return false
+    val parts = range.split("-")
+    val start = parts.getOrNull(0)?.toIntOrNull() ?: return false
+    val end   = parts.getOrNull(1)?.toIntOrNull() ?: return false
+    val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return if (start <= end) h in start until end else (h >= start || h < end)
+}
 
 // Periodically checks subscribed channels for new uploads and notifies.
 // The pref gate means the periodic job can stay scheduled; disabling the
@@ -26,10 +39,15 @@ class NewVideosWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as? StreamFlowApp ?: return Result.success()
         if (!app.prefs.notifyNewVideos.first()) return Result.success()
+        // During quiet hours skip entirely (baselines untouched, so the
+        // notification arrives on the first check after quiet hours end)
+        if (inQuietHours(app.prefs)) return Result.success()
 
         val repo = YouTubeRepository()
         // Only channels the user left the bell on for
         val subs = app.database.subscriptionDao().getAllOnce().filter { it.notify }.take(20)
+        val maxNotifs = app.prefs.notifyMax.first().toIntOrNull() ?: 5
+        var notified = 0
         var notifId = 2000
 
         subs.forEach { sub ->
@@ -38,7 +56,10 @@ class NewVideosWorker(
                 val latest = info.videos.firstOrNull() ?: return@forEach
                 // First check just records the baseline; notify only on a change
                 if (sub.lastVideoUrl.isNotEmpty() && sub.lastVideoUrl != latest.url) {
-                    notify(notifId++, sub.name, latest.title, latest.url)
+                    if (maxNotifs <= 0 || notified < maxNotifs) {
+                        notify(notifId++, sub.name, latest.title, latest.url)
+                        notified++
+                    }
                 }
                 app.database.subscriptionDao().updateLastVideo(sub.channelUrl, latest.url)
             } catch (_: Exception) {

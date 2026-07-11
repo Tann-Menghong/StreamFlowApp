@@ -51,6 +51,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val qualityCellular = prefs.qualityCellular.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SAME")
     val historyRetention = prefs.historyRetention.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
+    // Notifications
+    val notifyFreq       = prefs.notifyFreq.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "6")
+    val notifyMax        = prefs.notifyMax.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "5")
+    val notifyAppUpdates = prefs.notifyAppUpdates.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val quietHours       = prefs.quietHours.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "OFF")
     // UI customization
     val cornerStyle    = prefs.cornerStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ROUNDED")
     val navLabels      = prefs.navLabels.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SELECTED")
@@ -114,6 +119,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun clearBlocked()   = viewModelScope.launch { db.blockedDao().clearAll() }
     fun setVolumeBoost(v: String)        = viewModelScope.launch { prefs.setVolumeBoost(v) }
     fun setNotifyNewVideos(v: Boolean)   = viewModelScope.launch { prefs.setNotifyNewVideos(v) }
+    // Notifications
+    fun setNotifyMax(v: String)          = viewModelScope.launch { prefs.setNotifyMax(v) }
+    fun setNotifyAppUpdates(v: Boolean)  = viewModelScope.launch { prefs.setNotifyAppUpdates(v) }
+    fun setQuietHours(v: String)         = viewModelScope.launch { prefs.setQuietHours(v) }
+    fun setNotifyFreq(v: String) = viewModelScope.launch {
+        prefs.setNotifyFreq(v)
+        // Reschedule the periodic check immediately with the new interval
+        try {
+            androidx.work.WorkManager.getInstance(getApplication()).enqueueUniquePeriodicWork(
+                com.streamflow.data.NewVideosWorker.WORK_NAME,
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                androidx.work.PeriodicWorkRequestBuilder<com.streamflow.data.NewVideosWorker>(
+                    v.toLongOrNull() ?: 6L, java.util.concurrent.TimeUnit.HOURS
+                ).setConstraints(
+                    androidx.work.Constraints.Builder()
+                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build()
+                ).build()
+            )
+        } catch (_: Exception) {}
+    }
     // UI customization
     fun setCornerStyle(v: String)     = viewModelScope.launch { prefs.setCornerStyle(v) }
     fun setNavLabels(v: String)       = viewModelScope.launch { prefs.setNavLabels(v) }

@@ -12,6 +12,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.streamflow.data.NewVideosWorker
 import com.streamflow.data.OkHttpDownloader
+import com.streamflow.data.UpdateCheckWorker
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.AppDatabase
 import com.streamflow.data.local.AppPreferences
@@ -46,13 +47,30 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
             } catch (_: Exception) {}
         }
 
-        // Periodic new-upload check; the worker itself no-ops when the
-        // notification setting is off
+        // Periodic new-upload check at the user's chosen frequency; the worker
+        // itself no-ops when the notification setting is off. UPDATE policy so
+        // a changed frequency takes effect on next app start too.
+        appScope.launch {
+            try {
+                val hours = prefs.notifyFreq.first().toLongOrNull() ?: 6L
+                WorkManager.getInstance(this@StreamFlowApp).enqueueUniquePeriodicWork(
+                    NewVideosWorker.WORK_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    PeriodicWorkRequestBuilder<NewVideosWorker>(hours, TimeUnit.HOURS)
+                        .setConstraints(
+                            Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+                        )
+                        .build()
+                )
+            } catch (_: Exception) {}
+        }
+
+        // Twice-daily check for a new app release (notifies once per version)
         try {
             WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                NewVideosWorker.WORK_NAME,
+                UpdateCheckWorker.WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<NewVideosWorker>(6, TimeUnit.HOURS)
+                PeriodicWorkRequestBuilder<UpdateCheckWorker>(12, TimeUnit.HOURS)
                     .setConstraints(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                     )

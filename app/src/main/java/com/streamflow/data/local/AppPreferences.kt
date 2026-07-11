@@ -45,6 +45,12 @@ class AppPreferences(private val context: Context) {
         val QUALITY_CELLULAR_KEY = stringPreferencesKey("quality_cellular")
         // Days to keep watch history; "0" = forever
         val HISTORY_RETENTION_KEY = stringPreferencesKey("history_retention")
+        // Notifications
+        val NOTIFY_FREQ_KEY        = stringPreferencesKey("notify_freq")        // hours between checks
+        val NOTIFY_MAX_KEY         = stringPreferencesKey("notify_max")         // max notifications per check, "0" = unlimited
+        val NOTIFY_APP_UPDATES_KEY = booleanPreferencesKey("notify_app_updates")
+        val QUIET_HOURS_KEY        = stringPreferencesKey("quiet_hours")        // "OFF" or "start-end" (24h)
+        val LAST_NOTIFIED_VERSION_KEY = stringPreferencesKey("last_notified_version")
         // UI customization
         val CORNER_STYLE_KEY    = stringPreferencesKey("corner_style")      // SQUARE / ROUNDED / ROUND
         val NAV_LABELS_KEY      = stringPreferencesKey("nav_labels")        // ALWAYS / SELECTED / NEVER
@@ -97,6 +103,12 @@ class AppPreferences(private val context: Context) {
     val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
     val qualityCellular: Flow<String> = context.dataStore.data.map { it[QUALITY_CELLULAR_KEY] ?: "SAME" }
     val historyRetention: Flow<String> = context.dataStore.data.map { it[HISTORY_RETENTION_KEY] ?: "0" }
+    // Notifications
+    val notifyFreq         : Flow<String>  = context.dataStore.data.map { it[NOTIFY_FREQ_KEY] ?: "6" }
+    val notifyMax          : Flow<String>  = context.dataStore.data.map { it[NOTIFY_MAX_KEY] ?: "5" }
+    val notifyAppUpdates   : Flow<Boolean> = context.dataStore.data.map { it[NOTIFY_APP_UPDATES_KEY] ?: true }
+    val quietHours         : Flow<String>  = context.dataStore.data.map { it[QUIET_HOURS_KEY] ?: "OFF" }
+    val lastNotifiedVersion: Flow<String>  = context.dataStore.data.map { it[LAST_NOTIFIED_VERSION_KEY] ?: "" }
     // UI customization
     val cornerStyle    : Flow<String>  = context.dataStore.data.map { it[CORNER_STYLE_KEY] ?: "ROUNDED" }
     val navLabels      : Flow<String>  = context.dataStore.data.map { it[NAV_LABELS_KEY] ?: "SELECTED" }
@@ -158,6 +170,12 @@ class AppPreferences(private val context: Context) {
     suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }
     suspend fun setQualityCellular(v: String) = context.dataStore.edit { it[QUALITY_CELLULAR_KEY] = v }
     suspend fun setHistoryRetention(v: String) = context.dataStore.edit { it[HISTORY_RETENTION_KEY] = v }
+    // Notifications
+    suspend fun setNotifyFreq(v: String)          = context.dataStore.edit { it[NOTIFY_FREQ_KEY] = v }
+    suspend fun setNotifyMax(v: String)           = context.dataStore.edit { it[NOTIFY_MAX_KEY] = v }
+    suspend fun setNotifyAppUpdates(v: Boolean)   = context.dataStore.edit { it[NOTIFY_APP_UPDATES_KEY] = v }
+    suspend fun setQuietHours(v: String)          = context.dataStore.edit { it[QUIET_HOURS_KEY] = v }
+    suspend fun setLastNotifiedVersion(v: String) = context.dataStore.edit { it[LAST_NOTIFIED_VERSION_KEY] = v }
     // UI customization
     suspend fun setCornerStyle(v: String)      = context.dataStore.edit { it[CORNER_STYLE_KEY] = v }
     suspend fun setNavLabels(v: String)        = context.dataStore.edit { it[NAV_LABELS_KEY] = v }
