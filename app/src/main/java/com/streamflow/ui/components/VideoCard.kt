@@ -106,10 +106,13 @@ fun VideoCard(
         label         = "card_scale"
     )
 
-    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = 20.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = 14.dp)) {
+        // Card container: soft tonal surface with generous rounding (pro look)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape((corner + 6).dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.28f))
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = { pressed = true; tryAwaitRelease(); pressed = false },
@@ -120,6 +123,7 @@ fun VideoCard(
                         }
                     )
                 }
+                .padding(8.dp)
         ) {
             // Thumbnail
             Box(

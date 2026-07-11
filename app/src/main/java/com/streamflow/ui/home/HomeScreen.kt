@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -295,11 +297,19 @@ fun HomeScreen(
                                         Icon(Icons.Default.PlayArrow, null,
                                             tint = Color.White, modifier = Modifier.size(19.dp))
                                     }
+                                    // Gradient wordmark (accent → soft accent)
                                     Text(
                                         "StreamFlow",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize   = 21.sp,
-                                        color      = MaterialTheme.colorScheme.onBackground
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.primary,
+                                                    MaterialTheme.colorScheme.tertiary
+                                                )
+                                            ),
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize   = 21.sp
+                                        )
                                     )
                                     if (incognitoOn) {
                                         Row(
@@ -346,12 +356,31 @@ fun HomeScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            // Country quick-picker
+                            // Decluttered top bar: customize / refresh / country live
+                            // in one overflow menu instead of three separate buttons
                             Box {
-                                TextButton(onClick = { showCountryPicker = true }) {
-                                    Text(currentCountry, fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Bold)
+                                var showOverflow by remember { mutableStateOf(false) }
+                                IconButton(onClick = { showOverflow = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                DropdownMenu(expanded = showOverflow,
+                                    onDismissRequest = { showOverflow = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Customize home") },
+                                        leadingIcon = { Icon(Icons.Default.Tune, null, modifier = Modifier.size(18.dp)) },
+                                        onClick = { showOverflow = false; showCustomizeSheet = true }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Refresh feed") },
+                                        leadingIcon = { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp)) },
+                                        onClick = { showOverflow = false; vm.refresh() }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Country: $currentCountry") },
+                                        leadingIcon = { Icon(Icons.Default.Public, null, modifier = Modifier.size(18.dp)) },
+                                        onClick = { showOverflow = false; showCountryPicker = true }
+                                    )
                                 }
                                 DropdownMenu(expanded = showCountryPicker,
                                     onDismissRequest = { showCountryPicker = false }) {
@@ -363,14 +392,6 @@ fun HomeScreen(
                                         )
                                     }
                                 }
-                            }
-                            IconButton(onClick = { showCustomizeSheet = true }) {
-                                Icon(Icons.Default.Tune, contentDescription = "Customize home",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            IconButton(onClick = { vm.refresh() }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Refresh",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     },
@@ -1095,7 +1116,17 @@ private fun ContinueWatchingSection(
     items: List<com.streamflow.data.local.entity.HistoryEntity>,
     onVideoClick: (String) -> Unit
 ) {
-    Column(Modifier.padding(bottom = 4.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            // Soft accent gradient backdrop makes the section feel like a card
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(MaterialTheme.colorScheme.primary.copy(0.07f), Color.Transparent)
+                )
+            )
+            .padding(top = 10.dp, bottom = 4.dp)
+    ) {
         Text(
             "Continue watching",
             style    = MaterialTheme.typography.titleMedium.copy(

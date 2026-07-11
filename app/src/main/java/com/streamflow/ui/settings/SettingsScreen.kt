@@ -153,6 +153,45 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 .padding(bottom = 32.dp)
         ) {
 
+            // ── App hero card: gradient brand banner with version ─────────
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        )
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        Modifier.size(46.dp).background(
+                            androidx.compose.ui.graphics.Color.White.copy(0.22f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null,
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(28.dp))
+                    }
+                    Column {
+                        Text("StreamFlow", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
+                            color = androidx.compose.ui.graphics.Color.White)
+                        Text("Version ${com.streamflow.BuildConfig.VERSION_NAME}",
+                            fontSize = 12.sp,
+                            color = androidx.compose.ui.graphics.Color.White.copy(0.85f))
+                    }
+                }
+            }
+
             // ── Update banner ────────────────────────────────────────────
             AnimatedVisibility(
                 visible = update.info != null || update.downloading,
@@ -659,11 +698,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
 @Composable
 private fun SettingsSection(title: String) {
     Text(
-        text     = title.uppercase(),
-        style    = MaterialTheme.typography.labelSmall.copy(
-            letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold),
-        color    = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp)
+        text     = title,
+        style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+        color    = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(start = 20.dp, top = 22.dp, bottom = 8.dp)
     )
 }
 
@@ -671,7 +709,7 @@ private fun SettingsSection(title: String) {
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape     = RoundedCornerShape(14.dp),
+        shape     = RoundedCornerShape(18.dp),
         colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp)
     ) { Column(content = content) }
