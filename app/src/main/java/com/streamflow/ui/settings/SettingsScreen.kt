@@ -680,9 +680,21 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 52.dp),
-        color    = MaterialTheme.colorScheme.outline.copy(0.3f)
+        modifier = Modifier.padding(start = 62.dp),
+        color    = MaterialTheme.colorScheme.outline.copy(0.25f)
     )
+}
+
+// Icon in a soft tinted rounded square — gives Settings a modern grouped look
+@Composable
+private fun SettingsIconBadge(icon: ImageVector) {
+    Box(
+        Modifier.size(32.dp).background(
+            MaterialTheme.colorScheme.primary.copy(0.12f), RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
+    }
 }
 
 @Composable
@@ -696,10 +708,10 @@ private fun SettingsItem(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        SettingsIconBadge(icon)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge,
@@ -726,10 +738,10 @@ private fun SettingsSwitchItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        SettingsIconBadge(icon)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge,

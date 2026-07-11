@@ -127,6 +127,7 @@ fun VideoCard(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(corner.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             ) {
                 AsyncImage(
                     model              = video.thumbnailUrl,
@@ -313,6 +314,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             .aspectRatio(16f / 9f)
             .scale(scale)
             .clip(RoundedCornerShape((corner + 4).dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress  = { pressed = true; tryAwaitRelease(); pressed = false },
@@ -383,6 +385,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(LocalThumbCorner.current.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
         ) {
             AsyncImage(
                 model              = entity.thumbnailUrl,
@@ -457,6 +460,7 @@ fun CompactVideoCard(
         Box(
             Modifier.width(150.dp).aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape((LocalThumbCorner.current - 2).coerceAtLeast(3).dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
         ) {
             AsyncImage(
                 model              = video.thumbnailUrl,

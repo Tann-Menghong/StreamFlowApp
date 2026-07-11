@@ -1,6 +1,7 @@
 package com.streamflow.ui.channel
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -94,12 +96,22 @@ fun ChannelScreen(
                 // ── Banner ────────────────────────────────────────────────
                 if (data.bannerUrl.isNotEmpty()) {
                     item {
-                        AsyncImage(
-                            model = data.bannerUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth().height(120.dp)
-                        )
+                        Box(Modifier.fillMaxWidth().height(140.dp)) {
+                            AsyncImage(
+                                model = data.bannerUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
+                            )
+                            // Fade the banner into the page so the header text pops
+                            Box(
+                                Modifier.fillMaxWidth().height(56.dp).align(Alignment.BottomCenter)
+                                    .background(Brush.verticalGradient(listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.background.copy(0.9f))))
+                            )
+                        }
                     }
                 }
 
@@ -115,12 +127,13 @@ fun ChannelScreen(
                                 model = data.avatarUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(64.dp).clip(CircleShape)
+                                modifier = Modifier.size(72.dp).clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .border(2.dp, MaterialTheme.colorScheme.primary.copy(0.5f), CircleShape)
                             )
                         } else {
                             Box(
-                                Modifier.size(64.dp).clip(CircleShape)
+                                Modifier.size(72.dp).clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {

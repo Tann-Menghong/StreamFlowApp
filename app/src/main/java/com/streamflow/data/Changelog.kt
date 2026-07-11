@@ -3,11 +3,13 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "2.59.1"
+    const val VERSION_NAME = "2.60.0"
 
     val notes = listOf(
-        "Fixed for real: videos now resume exactly where you left off",
-        "The resume position is handed to the player before playback starts, so it can never be lost",
-        "Position saving is now bulletproof - another video playing in the mini player can no longer overwrite it"
+        "Design refresh across the whole app!",
+        "Settings got a modern look with colorful rounded icons",
+        "Channel pages: bigger banner with a smooth fade, larger avatar with an accent ring",
+        "Thumbnails now show a soft placeholder while loading - no more white flashes",
+        "Cleaned up internal code and verified all screens: home, search, player, channel, library, settings"
     )
 }

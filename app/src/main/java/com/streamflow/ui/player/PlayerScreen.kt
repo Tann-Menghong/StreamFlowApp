@@ -160,18 +160,6 @@ fun PlayerScreen(
 
     BackHandler(enabled = isFullscreen) { isFullscreen = false }
 
-    val heartScale by animateFloatAsState(
-        targetValue   = if (isFavorite) 1.25f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label         = "heart"
-    )
-    val heartColor by animateColorAsState(
-        targetValue   = if (isFavorite) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-        animationSpec = tween(200),
-        label         = "heart_color"
-    )
-
     LaunchedEffect(videoUrl) { vm.loadVideo(videoUrl) }
 
     // ── Controls overlay visibility (portrait + fullscreen) ──────────────────
