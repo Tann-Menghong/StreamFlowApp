@@ -75,11 +75,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun downloadAiModel() {
-        viewModelScope.launch { com.streamflow.data.ai.AiEngine.downloadModel(getApplication()) }
+        // App scope, not viewModelScope: the 550 MB download must keep going
+        // when the user leaves the Settings screen
+        (getApplication<Application>() as StreamFlowApp).appScope.launch {
+            com.streamflow.data.ai.AiEngine.downloadModel(getApplication())
+        }
     }
 
     fun deleteAiModel() {
-        com.streamflow.data.ai.AiEngine.deleteModel(getApplication())
+        if (!com.streamflow.data.ai.AiEngine.deleteModel(getApplication())) {
+            android.widget.Toast.makeText(getApplication(),
+                "AI is answering right now — try again in a moment",
+                android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ── DB counts ─────────────────────────────────────────────────

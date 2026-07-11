@@ -1941,6 +1941,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
+                    .imePadding() // keep the Ask field above the keyboard
                     .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2005,6 +2006,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         placeholder = { Text("Ask about this video…", fontSize = 13.sp) },
                         singleLine = true,
                         enabled = !aiBusy,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onSend = {
+                                if (!aiBusy && aiQuestion.isNotBlank()) { vm.aiAsk(aiQuestion); aiQuestion = "" }
+                            }),
                         trailingIcon = {
                             IconButton(
                                 onClick = { vm.aiAsk(aiQuestion); aiQuestion = "" },

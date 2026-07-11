@@ -181,6 +181,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val summaryCache = HashMap<String, String>()
     private var transcriptCache: Pair<String, String>? = null // videoUrl to transcript
+    private var aiSession = 0 // bumped on video change so in-flight output can't leak into the new video
 
     // Transcript from subtitles when available (prefer English), else the
     // description — enough signal for a summary when captions are missing.
@@ -200,18 +201,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
         cacheKey?.let { summaryCache[it] }?.let { _aiOutput.value = it; return }
         if (_aiBusy.value) return
+        val session = aiSession
         viewModelScope.launch {
             _aiBusy.value = true
             _aiOutput.value = ""
             try {
                 val prompt = buildTask(d)
                 val result = AiEngine.generate(getApplication(), prompt) { partial ->
-                    _aiOutput.value = partial
+                    if (session == aiSession) _aiOutput.value = partial
                 }
-                _aiOutput.value = result
+                if (session == aiSession) _aiOutput.value = result
                 cacheKey?.let { summaryCache[it] = result }
             } catch (e: Exception) {
-                _aiOutput.value = "Couldn't run the AI: ${e.message ?: "unknown error"}"
+                if (session == aiSession) _aiOutput.value = "Couldn't run the AI: ${e.message ?: "unknown error"}"
             } finally {
                 _aiBusy.value = false
             }
@@ -265,6 +267,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         _sponsorSegments.value = emptyList()
         _aiOutput.value = ""
         transcriptCache = null
+        aiSession++
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
             if (isDirectStream(videoUrl)) {

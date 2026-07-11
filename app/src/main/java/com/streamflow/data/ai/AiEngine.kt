@@ -103,7 +103,9 @@ object AiEngine {
         }
     }
 
-    fun deleteModel(context: Context) {
+    /** Returns false (and does nothing) while a generation is running. */
+    fun deleteModel(context: Context): Boolean {
+        if (busy) return false // closing the engine mid-generation crashes natively
         synchronized(this) {
             try { llm?.close() } catch (_: Exception) {}
             llm = null
@@ -111,6 +113,7 @@ object AiEngine {
         modelFile(context).delete()
         File(modelFile(context).parentFile, modelFile(context).name + ".part").delete()
         _downloadState.value = DownloadState.Idle
+        return true
     }
 
     // ── Inference ──────────────────────────────────────────────────────────────
@@ -136,27 +139,42 @@ object AiEngine {
         if (!isModelReady(context)) throw IllegalStateException("AI model not downloaded")
         if (busy) throw IllegalStateException("AI is already working — try again in a moment")
         busy = true
-        return try {
-            withContext(Dispatchers.IO) {
+        // busy is released by the native done callback (or a failed start), NOT by
+        // a finally block: if the caller is cancelled mid-generation the engine is
+        // still running natively, and freeing busy early would let a second
+        // generateResponseAsync overlap the first and crash.
+        try {
+            return withContext(Dispatchers.IO) {
                 val eng = engine(context) // first call loads the 550 MB model — slow, keep off main
                 suspendCancellableCoroutine { cont ->
                     val sb = StringBuilder()
                     val listener = ProgressListener<String> { partial, done ->
                         partial?.let { sb.append(it) }
-                        onPartial(sb.toString())
-                        if (done && cont.isActive) cont.resume(sb.toString().trim())
+                        onPartial(cleanOutput(sb.toString()))
+                        if (done) {
+                            busy = false
+                            if (cont.isActive) cont.resume(cleanOutput(sb.toString()).trim())
+                        }
                     }
                     try {
                         eng.generateResponseAsync(prompt, listener)
                     } catch (e: Exception) {
+                        busy = false
                         if (cont.isActive) cont.resumeWithException(e)
                     }
                 }
             }
-        } finally {
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e // generation continues natively; listener will clear busy
+        } catch (e: Exception) {
             busy = false
+            throw e
         }
     }
+
+    // Small models sometimes echo the chat-template tokens — cut them out
+    private fun cleanOutput(s: String): String =
+        s.substringBefore("<|im_end|>").substringBefore("<|im_start|>")
 
     /** Qwen 2.5 instruct expects the ChatML template. */
     fun chatPrompt(userContent: String): String =
@@ -194,9 +212,10 @@ object AiEngine {
      * of just the intro.
      */
     fun fitToBudget(text: String, budget: Int = PROMPT_CHAR_BUDGET): String {
+        val safeBudget = budget.coerceAtLeast(300) // very long questions must not zero out the transcript
         val clean = text.replace(Regex("\\s+"), " ").trim()
-        if (clean.length <= budget) return clean
-        val slice = budget / 3
+        if (clean.length <= safeBudget) return clean
+        val slice = safeBudget / 3
         val midStart = (clean.length - slice) / 2
         return clean.take(slice) + " […] " +
             clean.substring(midStart, midStart + slice) + " […] " +

@@ -152,7 +152,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), baseCategoryPool)
 
     fun addCustomCategory(name: String) {
-        val cat = name.trim().take(24)
+        // Categories are stored comma-joined, so a comma in the name would corrupt the list
+        val cat = name.replace(",", " ").replace(Regex("\\s+"), " ").trim().take(24)
         if (cat.isBlank()) return
         viewModelScope.launch {
             val custom = prefs.customCategories.first()

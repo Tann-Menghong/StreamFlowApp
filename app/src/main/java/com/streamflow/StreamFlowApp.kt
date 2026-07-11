@@ -27,7 +27,8 @@ import java.util.concurrent.TimeUnit
 class StreamFlowApp : Application(), ImageLoaderFactory {
     val database by lazy { AppDatabase.get(this) }
     val prefs by lazy { AppPreferences.get(this) }
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Public: long-running work (AI model download) must outlive screen ViewModels
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
