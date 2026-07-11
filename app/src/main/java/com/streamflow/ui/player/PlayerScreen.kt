@@ -1469,6 +1469,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                     modifier = Modifier.height(30.dp).padding(end = 4.dp)
                                 ) {
+                                    if (isSubscribed) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(13.dp))
+                                        Spacer(Modifier.width(3.dp))
+                                    }
                                     Text(if (isSubscribed) "Subscribed" else "Subscribe",
                                         fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
@@ -1482,11 +1486,26 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                         ) {
+                            // Springy bounce when the Like pill turns on
+                            val likeScale = remember { Animatable(1f) }
+                            LaunchedEffect(isFavorite) {
+                                if (isFavorite) {
+                                    likeScale.snapTo(0.7f)
+                                    likeScale.animateTo(1f, spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium))
+                                }
+                            }
+                            val chipHaptic = LocalHapticFeedback.current
                             ActionChip(
                                 icon = if (isFavorite) Icons.Default.ThumbUp else Icons.Default.ThumbUpOffAlt,
                                 label = if (details.likeCount > 0) formatViews(details.likeCount) else "Like",
-                                active = isFavorite
-                            ) { vm.toggleFavorite() }
+                                active = isFavorite,
+                                modifier = Modifier.scale(likeScale.value)
+                            ) {
+                                chipHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                vm.toggleFavorite()
+                            }
                             ActionChip(icon = Icons.Default.Share, label = "Share") {
                                 // Share at the current position (YouTube-style ?t= link)
                                 val posSec = playerPosition / 1000
@@ -2287,10 +2306,12 @@ private fun ActionChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     active: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
+        modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)

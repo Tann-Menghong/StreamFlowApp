@@ -34,6 +34,18 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
         super.onCreate()
         NewPipe.init(OkHttpDownloader.instance)
 
+        // Warm the TLS connections to YouTube's hosts right away so the first
+        // feed load / thumbnail / video extraction skips the handshake cost
+        appScope.launch(Dispatchers.IO) {
+            listOf("https://www.youtube.com/generate_204", "https://i.ytimg.com/generate_204").forEach { url ->
+                try {
+                    OkHttpDownloader.instance.client.newCall(
+                        okhttp3.Request.Builder().url(url).head().build()
+                    ).execute().close()
+                } catch (_: Exception) {}
+            }
+        }
+
         // Restore + persist the playback queue across app restarts
         PlaybackQueue.bind(prefs, appScope)
 

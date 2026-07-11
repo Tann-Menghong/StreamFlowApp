@@ -3,13 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "2.57.0"
+    const val VERSION_NAME = "2.58.0"
 
     val notes = listOf(
-        "YouTube-style player redesign!",
-        "Views and upload date now show right under the title, like YouTube",
-        "Action buttons are now labeled pills: Like, Share, Watch later, Download, Save, Ask AI",
-        "The Like pill doubles as your Favorite button and shows the like count",
-        "Description now sits in a rounded card with a \"...more\" expander"
+        "Speed update! The app now opens straight to your feed - no more waiting spinner",
+        "Videos start playing noticeably faster",
+        "The next video is preloaded sooner, so Up Next feels instant",
+        "Like button bounces with a satisfying animation and vibration",
+        "Subscribed button now shows a checkmark",
+        "If the network is slow or offline, you still see your last feed instead of an error"
     )
 }

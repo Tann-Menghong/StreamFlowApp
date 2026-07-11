@@ -286,7 +286,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         return out
     }
 
-    init { loadTrending() }
+    // True while the feed on screen is last session's cached snapshot; keeps
+    // loadTrending from flashing a spinner over content the user can already use
+    private var showingCachedFeed = false
+
+    init {
+        viewModelScope.launch {
+            // Instant startup: show the last session's feed right away, then
+            // let the fresh load replace it in the background
+            try {
+                val cached = prefs.cachedFeed.first()
+                if (cached.isNotEmpty() && _uiState.value is HomeUiState.Loading) {
+                    showingCachedFeed = true
+                    _uiState.value = HomeUiState.Success(cached, hasMore = false)
+                }
+            } catch (_: Exception) {}
+            loadTrending()
+        }
+    }
 
     fun loadTrending() {
         isSearchMode = false
@@ -295,7 +312,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _activeSearchQuery.value = ""
         feedGeneration++
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
+            // Keep showing the cached feed instead of a spinner while refreshing
+            if (!showingCachedFeed) _uiState.value = HomeUiState.Loading
             nextPage = null
             try {
                 val country = prefs.country.first()
@@ -323,9 +341,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 nextPage = trendingRes?.nextPage
                 val mixed = interleave(trendingVideos, seedChunk).filter { seenUrls.add(it.url) }
+                showingCachedFeed = false
                 _uiState.value = HomeUiState.Success(mixed, hasMore = true)
+                // Snapshot for instant startup next launch
+                try { prefs.saveCachedFeed(mixed) } catch (_: Exception) {}
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(friendlyError(e))
+                // Offline / failed refresh: the cached feed is better than an error page
+                if (!showingCachedFeed) _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }
     }
@@ -333,6 +355,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     // Called by the search bar when user submits a text query
     fun search(query: String) {
         if (query.isBlank()) { loadTrending(); return }
+        showingCachedFeed = false
         isSearchMode = true
         currentQuery = query
         _selectedCategory.value = "All"
@@ -367,6 +390,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (cat == "All") {
             loadTrending()
         } else {
+            showingCachedFeed = false
             isSearchMode = true
             currentQuery = cat
             feedGeneration++

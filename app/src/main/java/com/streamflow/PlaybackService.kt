@@ -76,14 +76,14 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        // Start playback with just 1s buffered (default is 2.5s) for faster video start,
-        // while keeping a large max buffer for smooth long-form playback.
+        // Start playback with just 0.8s buffered (default is 2.5s) for faster video
+        // start, while keeping a large max buffer for smooth long-form playback.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 20_000,
                 /* maxBufferMs = */ 60_000,
-                /* bufferForPlaybackMs = */ 1_000,
-                /* bufferForPlaybackAfterRebufferMs = */ 2_000
+                /* bufferForPlaybackMs = */ 800,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_500
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()

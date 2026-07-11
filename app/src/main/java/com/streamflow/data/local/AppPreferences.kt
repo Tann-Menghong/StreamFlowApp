@@ -70,6 +70,8 @@ class AppPreferences(private val context: Context) {
         // Playback queue persisted across app restarts (JSON)
         val SAVED_QUEUE_KEY = stringPreferencesKey("saved_queue")
 
+        val CACHED_FEED_KEY = stringPreferencesKey("cached_feed") // last home feed snapshot for instant startup
+
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
             AppPreferences(context.applicationContext).also { INSTANCE = it }
@@ -151,6 +153,27 @@ class AppPreferences(private val context: Context) {
             }
         } catch (_: Exception) { emptyList() }
     }
+    // Last home feed snapshot: shown the instant the app opens, replaced when
+    // fresh videos arrive — no more spinner on every launch
+    val cachedFeed: Flow<List<com.streamflow.data.model.VideoItem>> = context.dataStore.data.map { prefsMap ->
+        try {
+            val arr = org.json.JSONArray(prefsMap[CACHED_FEED_KEY] ?: "[]")
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                com.streamflow.data.model.VideoItem(
+                    url = o.getString("url"),
+                    title = o.optString("title"),
+                    thumbnailUrl = o.optString("thumbnailUrl"),
+                    uploaderName = o.optString("uploaderName"),
+                    uploaderUrl = o.optString("uploaderUrl"),
+                    uploaderAvatarUrl = o.optString("uploaderAvatarUrl"),
+                    viewCount = o.optLong("viewCount"),
+                    duration = o.optLong("duration"),
+                    uploadedAgo = o.optString("uploadedAgo")
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+    }
 
     suspend fun setTheme(v: String)    = context.dataStore.edit { it[THEME_KEY]    = v }
     suspend fun setQuality(v: String)  = context.dataStore.edit { it[QUALITY_KEY]  = v }
@@ -212,6 +235,18 @@ class AppPreferences(private val context: Context) {
                 .put("viewCount", v.viewCount).put("duration", v.duration))
         }
         prefsMap[SAVED_QUEUE_KEY] = arr.toString()
+    }
+    suspend fun saveCachedFeed(items: List<com.streamflow.data.model.VideoItem>) = context.dataStore.edit { prefsMap ->
+        val arr = org.json.JSONArray()
+        items.take(30).forEach { v ->
+            arr.put(org.json.JSONObject()
+                .put("url", v.url).put("title", v.title)
+                .put("thumbnailUrl", v.thumbnailUrl).put("uploaderName", v.uploaderName)
+                .put("uploaderUrl", v.uploaderUrl).put("uploaderAvatarUrl", v.uploaderAvatarUrl)
+                .put("viewCount", v.viewCount).put("duration", v.duration)
+                .put("uploadedAgo", v.uploadedAgo))
+        }
+        prefsMap[CACHED_FEED_KEY] = arr.toString()
     }
     // Search
     suspend fun addRecentSearch(query: String) = context.dataStore.edit { prefs ->

@@ -8,7 +8,7 @@ object VideoDetailsCache {
     private data class Entry(val details: VideoDetails, val at: Long)
 
     private const val TTL_MS = 30 * 60 * 1000L
-    private const val MAX_ENTRIES = 20
+    private const val MAX_ENTRIES = 40
 
     private val map = object : LinkedHashMap<String, Entry>(MAX_ENTRIES, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) =
