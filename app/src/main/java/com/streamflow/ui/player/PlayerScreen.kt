@@ -148,7 +148,13 @@ fun PlayerScreen(
     val latestController = rememberUpdatedState(mediaController)
     DisposableEffect(videoUrl) {
         onDispose {
-            vm.savePosition(videoUrl, latestController.value?.currentPosition ?: 0L)
+            // Save only when the controller is really on this video and past the
+            // start — otherwise a not-yet-loaded or different item would wipe the
+            // stored resume position with 0
+            val mc = latestController.value ?: return@onDispose
+            val pos = try { mc.currentPosition } catch (_: Exception) { 0L }
+            val onThisVideo = try { mc.currentMediaItem?.mediaId == videoUrl } catch (_: Exception) { false }
+            if (onThisVideo && pos > 1_000L) vm.savePosition(videoUrl, pos)
         }
     }
 
@@ -196,6 +202,9 @@ fun PlayerScreen(
         }
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(d.streamUrl)
+            // mediaId = video URL, so position saves can verify which video the
+            // controller is actually playing (stream URLs change per quality)
+            .setMediaId(videoUrl)
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(d.title)
@@ -211,16 +220,17 @@ fun PlayerScreen(
                     MimeTypes.APPLICATION_MPD else MimeTypes.APPLICATION_M3U8
             )
         }
-        mc.setMediaItem(mediaItemBuilder.build())
+        // Resume where the user left off — read BEFORE setMediaItem and hand the
+        // position to the player atomically; a seekTo() after play() can be lost
+        // if this effect restarts or another command lands in between.
+        // Skip resuming when they'd basically finished (>95%): start over like YouTube.
+        val savedPos = if (d.isLive) 0L else vm.getSavedPosition(videoUrl)
+        val nearEnd = d.duration > 0L && savedPos >= d.duration * 1000L * 95 / 100
+        val startPos = if (savedPos > 3_000L && !nearEnd) savedPos else 0L
+        if (startPos > 0L) mc.setMediaItem(mediaItemBuilder.build(), startPos)
+        else mc.setMediaItem(mediaItemBuilder.build())
         mc.prepare()
         mc.play()
-        if (!d.isLive) {
-            // Resume where the user left off — unless they'd basically finished
-            // the video (>95%), in which case start over like YouTube does
-            val savedPos = vm.getSavedPosition(videoUrl)
-            val nearEnd = d.duration > 0L && savedPos >= d.duration * 1000L * 95 / 100
-            if (savedPos > 3_000L && !nearEnd) mc.seekTo(savedPos)
-        }
 
         val speedStr = prefs.defaultSpeed.first()
         mc.setPlaybackSpeed(speedStr.toFloatOrNull() ?: 1f)
@@ -336,7 +346,11 @@ fun PlayerScreen(
         while (true) {
             delay(5_000L)
             val mc = mediaController ?: continue
-            if (mc.isPlaying && mc.currentPosition > 0L) {
+            // mediaId check: while this screen is loading, the controller may
+            // still be playing the previous video (mini player) — don't write
+            // its position under this video's URL
+            if (mc.isPlaying && mc.currentPosition > 1_000L &&
+                mc.currentMediaItem?.mediaId == videoUrl) {
                 vm.savePosition(videoUrl, mc.currentPosition)
             }
         }
