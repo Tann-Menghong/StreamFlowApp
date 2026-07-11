@@ -62,6 +62,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val reduceMotion   = prefs.reduceMotion.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val hapticsEnabled = prefs.hapticsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val playerGestures = prefs.playerGestures.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val autoPip        = prefs.autoPip.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val confirmExit    = prefs.confirmExit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val showSearchTab  = prefs.showSearchTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
@@ -171,6 +172,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setReduceMotion(v: Boolean)   = viewModelScope.launch { prefs.setReduceMotion(v) }
     fun setHapticsEnabled(v: Boolean) = viewModelScope.launch { prefs.setHapticsEnabled(v) }
     fun setPlayerGestures(v: Boolean) = viewModelScope.launch { prefs.setPlayerGestures(v) }
+    fun setAutoPip(v: Boolean)        = viewModelScope.launch { prefs.setAutoPip(v) }
     fun setConfirmExit(v: Boolean)    = viewModelScope.launch { prefs.setConfirmExit(v) }
     fun setShowSearchTab(v: Boolean)  = viewModelScope.launch { prefs.setShowSearchTab(v) }
     fun setFontFamily(v: String)      = viewModelScope.launch { prefs.setFontFamily(v) }

@@ -58,6 +58,7 @@ class AppPreferences(private val context: Context) {
         val HAPTICS_KEY         = booleanPreferencesKey("haptics_enabled")
         val SHOW_CATEGORY_BAR_KEY = booleanPreferencesKey("show_category_bar")
         val PLAYER_GESTURES_KEY = booleanPreferencesKey("player_gestures")
+        val AUTO_PIP_KEY        = booleanPreferencesKey("auto_pip") // floating mini video on Home press
         val CONFIRM_EXIT_KEY    = booleanPreferencesKey("confirm_exit")
         val CUSTOM_CATEGORIES_KEY = stringPreferencesKey("custom_categories") // user-added topic chips
         val SHOW_SEARCH_TAB_KEY = booleanPreferencesKey("show_search_tab")
@@ -122,6 +123,9 @@ class AppPreferences(private val context: Context) {
     val hapticsEnabled : Flow<Boolean> = context.dataStore.data.map { it[HAPTICS_KEY] ?: true }
     val showCategoryBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CATEGORY_BAR_KEY] ?: true }
     val playerGestures : Flow<Boolean> = context.dataStore.data.map { it[PLAYER_GESTURES_KEY] ?: true }
+    // Off by default: leaving the app keeps playing in the media notification
+    // only, instead of a floating mini video (PiP) over other apps
+    val autoPip        : Flow<Boolean> = context.dataStore.data.map { it[AUTO_PIP_KEY] ?: false }
     val confirmExit    : Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_EXIT_KEY] ?: false }
     val customCategories: Flow<List<String>> = context.dataStore.data.map {
         it[CUSTOM_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() } ?: emptyList()
@@ -216,6 +220,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setHapticsEnabled(v: Boolean)  = context.dataStore.edit { it[HAPTICS_KEY] = v }
     suspend fun setShowCategoryBar(v: Boolean) = context.dataStore.edit { it[SHOW_CATEGORY_BAR_KEY] = v }
     suspend fun setPlayerGestures(v: Boolean)  = context.dataStore.edit { it[PLAYER_GESTURES_KEY] = v }
+    suspend fun setAutoPip(v: Boolean)         = context.dataStore.edit { it[AUTO_PIP_KEY] = v }
     suspend fun setConfirmExit(v: Boolean)     = context.dataStore.edit { it[CONFIRM_EXIT_KEY] = v }
     suspend fun setCustomCategories(v: List<String>) = context.dataStore.edit { it[CUSTOM_CATEGORIES_KEY] = v.joinToString(",") }
     suspend fun setShowSearchTab(v: Boolean)   = context.dataStore.edit { it[SHOW_SEARCH_TAB_KEY] = v }

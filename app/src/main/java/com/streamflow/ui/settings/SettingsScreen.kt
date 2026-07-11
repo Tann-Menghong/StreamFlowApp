@@ -92,6 +92,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val reduceMotion         by vm.reduceMotion.collectAsState()
     val hapticsEnabled       by vm.hapticsEnabled.collectAsState()
     val playerGestures       by vm.playerGestures.collectAsState()
+    val autoPip              by vm.autoPip.collectAsState()
     val confirmExit          by vm.confirmExit.collectAsState()
     val showSearchTab        by vm.showSearchTab.collectAsState()
     val fontFamily           by vm.fontFamily.collectAsState()
@@ -337,6 +338,9 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                 SettingsDivider()
                 SettingsSwitchItem(Icons.Default.Swipe, "Player swipe gestures",
                     "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
+                SettingsDivider()
+                SettingsSwitchItem(Icons.Default.PictureInPicture, "Pop-up video on exit",
+                    "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
                 SettingsDivider()
                 SettingsSwitchItem(Icons.Default.PlayCircle, "Auto-play",
                     "Play related videos automatically", autoPlay

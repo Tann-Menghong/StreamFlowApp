@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.streamflow.data.local.AppPreferences
 import com.streamflow.ui.navigation.NavGraph
 import com.streamflow.ui.theme.LocalHapticsEnabled
@@ -31,6 +33,9 @@ class MainActivity : ComponentActivity() {
         private set
 
     var isPlayerActive by mutableStateOf(false)
+
+    // Mirrors the autoPip pref for the synchronous onUserLeaveHint callback
+    private var autoPipEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +52,9 @@ class MainActivity : ComponentActivity() {
         }
 
         val prefs = AppPreferences.get(this)
+        lifecycleScope.launch {
+            prefs.autoPip.collect { autoPipEnabled = it }
+        }
 
         val sharedUrl = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
@@ -92,7 +100,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isPlayerActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // Only float a mini video over other apps when the user opted in;
+        // otherwise playback continues in the media notification only
+        if (isPlayerActive && autoPipEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9)).build()
             enterPictureInPictureMode(params)

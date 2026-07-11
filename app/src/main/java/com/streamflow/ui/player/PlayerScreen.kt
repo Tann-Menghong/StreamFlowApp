@@ -215,8 +215,11 @@ fun PlayerScreen(
         mc.prepare()
         mc.play()
         if (!d.isLive) {
+            // Resume where the user left off — unless they'd basically finished
+            // the video (>95%), in which case start over like YouTube does
             val savedPos = vm.getSavedPosition(videoUrl)
-            if (savedPos > 0L) mc.seekTo(savedPos)
+            val nearEnd = d.duration > 0L && savedPos >= d.duration * 1000L * 95 / 100
+            if (savedPos > 3_000L && !nearEnd) mc.seekTo(savedPos)
         }
 
         val speedStr = prefs.defaultSpeed.first()

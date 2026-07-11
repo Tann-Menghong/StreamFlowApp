@@ -434,13 +434,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun recordHistory(details: VideoDetails, url: String) {
         if (prefs.incognito.first()) return // incognito: leave no history
+        // REPLACE would wipe the saved resume position back to 0 (the "history
+        // videos restart from the beginning" bug) — carry the old position over
+        val prevPos = try { db.historyDao().getPosition(url) } catch (_: Exception) { 0L }
         db.historyDao().insert(HistoryEntity(
             url = url,
             title = details.title,
             thumbnailUrl = details.thumbnailUrl,
             uploaderName = details.uploaderName,
             viewCount = details.viewCount,
-            duration = details.duration
+            duration = details.duration,
+            position = prevPos
         ))
     }
 
