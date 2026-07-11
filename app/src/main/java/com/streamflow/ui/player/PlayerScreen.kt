@@ -1402,13 +1402,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Text(
                             details.title,
                             style = MaterialTheme.typography.titleSmall.copy(lineHeight = 21.sp),
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(4.dp))
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1587,10 +1587,11 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 }
                             }
                             Spacer(Modifier.width(4.dp))
-                            // Repeat button
+                            // Repeat button (36dp — default IconButtons are 48dp tall and
+                            // made this whole row look like a big empty band)
                             IconButton(onClick = {
                                 repeatMode = if (repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-                            }) {
+                            }, modifier = Modifier.size(36.dp)) {
                                 Icon(
                                     if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
                                     "Repeat",
@@ -1608,7 +1609,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         else -> { loopA = null; loopB = null }
                                     }
                                 },
-                                contentPadding = PaddingValues(horizontal = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 6.dp),
+                                modifier = Modifier.height(34.dp)
                             ) {
                                 Text(
                                     when {
@@ -1622,7 +1624,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 )
                             }
                             // Audio-only toggle
-                            IconButton(onClick = { vm.toggleAudioOnly() }) {
+                            IconButton(onClick = { vm.toggleAudioOnly() }, modifier = Modifier.size(36.dp)) {
                                 Icon(Icons.Default.MusicNote, "Audio only",
                                     tint = if (audioOnly) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface.copy(0.6f),
@@ -1630,7 +1632,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                             // Queue button
                             Box {
-                                IconButton(onClick = { showQueueSheet = true }) {
+                                IconButton(onClick = { showQueueSheet = true }, modifier = Modifier.size(36.dp)) {
                                     Icon(Icons.Default.QueueMusic, "Queue",
                                         tint = if (queue.isNotEmpty()) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurface.copy(0.6f),
@@ -1643,7 +1645,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             // Subtitle (CC)
                             if (details.subtitles.isNotEmpty()) {
                                 Box {
-                                    IconButton(onClick = { showSubMenu = true }) {
+                                    IconButton(onClick = { showSubMenu = true }, modifier = Modifier.size(36.dp)) {
                                         Icon(Icons.Default.ClosedCaption, "Subtitles",
                                             tint = if (selectedSubUrl.isNotEmpty()) MaterialTheme.colorScheme.primary
                                                    else MaterialTheme.colorScheme.onSurface.copy(0.6f),
@@ -1664,9 +1666,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         }
 
                         if (details.description.isNotBlank()) {
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
                             var expanded by remember { mutableStateOf(false) }
                             // Timestamps seek the video; links open externally
                             val accent = MaterialTheme.colorScheme.primary
