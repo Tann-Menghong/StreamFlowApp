@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ fun ChannelScreen(
     onBack: () -> Unit,
     onVideoClick: (String) -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
+    onPlaylistClick: ((String) -> Unit)? = null,
     vm: ChannelViewModel = viewModel()
 ) {
     LaunchedEffect(channelUrl) { vm.loadChannel(channelUrl) }
@@ -40,12 +42,14 @@ fun ChannelScreen(
     val data by vm.channel.collectAsState()
     val isSubscribed by vm.isSubscribed.collectAsState()
     val listState = rememberLazyListState()
+    // About is a local tab — it shows data we already have, no network call
+    var showAbout by remember(channelUrl) { mutableStateOf(false) }
 
     val shouldLoadMore by remember {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             val total = listState.layoutInfo.totalItemsCount
-            total > 0 && last >= total - 3 && data.nextPage != null && !data.isLoadingMore
+            total > 0 && last >= total - 3 && data.nextPage != null && !data.isLoadingMore && !showAbout
         }
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.loadMore() }
@@ -66,7 +70,9 @@ fun ChannelScreen(
         }
     ) { padding ->
         when {
-            data.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // Full-screen spinner only on the very first load; when switching
+            // tabs the header/tab bar stay put and only the list area reloads
+            data.isLoading && data.name.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             data.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -146,75 +152,142 @@ fun ChannelScreen(
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                    // About: channel description (tap to expand)
-                    if (data.description.isNotBlank()) {
-                        var aboutExpanded by remember { mutableStateOf(false) }
-                        Text(
-                            data.description,
-                            fontSize = 12.sp, lineHeight = 17.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = if (aboutExpanded) Int.MAX_VALUE else 2,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .padding(bottom = 10.dp)
-                                .clickable { aboutExpanded = !aboutExpanded }
-                        )
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
                 }
 
-                // ── Content tabs (Videos / Shorts / Live) ─────────────────
+                // ── YouTube-style tabs: Videos / Shorts / Live / Playlists / About ──
                 item {
-                    if (data.availableTabs.size > 1) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            data.availableTabs.forEach { tab ->
-                                val label = when (tab) {
-                                    "shorts" -> "Shorts"
-                                    "livestreams" -> "Live"
-                                    else -> "Videos"
-                                }
-                                FilterChip(
-                                    selected = data.selectedTab == tab,
-                                    onClick  = { vm.selectTab(tab) },
-                                    label    = { Text(label, fontSize = 12.sp) },
-                                    colors   = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
-                                        containerColor         = MaterialTheme.colorScheme.surface,
-                                        labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                    val order = listOf("videos", "shorts", "livestreams", "playlists")
+                    val contentTabs = order.filter { it in data.availableTabs }.ifEmpty { listOf("videos") }
+                    val tabs = contentTabs + "about"
+                    val selectedIndex =
+                        if (showAbout) tabs.lastIndex
+                        else contentTabs.indexOf(data.selectedTab).coerceAtLeast(0)
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedIndex,
+                        edgePadding = 4.dp,
+                        containerColor = MaterialTheme.colorScheme.background
+                    ) {
+                        tabs.forEachIndexed { i, tab ->
+                            Tab(
+                                selected = i == selectedIndex,
+                                onClick = {
+                                    if (tab == "about") showAbout = true
+                                    else { showAbout = false; vm.selectTab(tab) }
+                                },
+                                text = {
+                                    Text(
+                                        when (tab) {
+                                            "shorts" -> "Shorts"
+                                            "livestreams" -> "Live"
+                                            "playlists" -> "Playlists"
+                                            "about" -> "About"
+                                            else -> "Videos"
+                                        },
+                                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold
                                     )
-                                )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                when {
+                    // ── About tab ─────────────────────────────────────────
+                    showAbout -> item {
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            if (data.subscriberCount > 0) {
+                                Text("${formatViews(data.subscriberCount)} subscribers",
+                                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground)
+                                Spacer(Modifier.height(10.dp))
+                            }
+                            Text(
+                                data.description.ifBlank { "This channel has no description." },
+                                fontSize = 13.sp, lineHeight = 19.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // ── Tab switch in progress ────────────────────────────
+                    data.isLoading -> item {
+                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                        }
+                    }
+
+                    // ── Playlists tab ─────────────────────────────────────
+                    data.selectedTab == "playlists" -> {
+                        if (data.playlists.isEmpty()) {
+                            item {
+                                Text("No playlists", fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp))
                             }
                         }
-                    } else {
-                        Text("Videos",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+                        items(data.playlists, key = { it.url }) { pl ->
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .clickable { onPlaylistClick?.invoke(pl.url) }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box {
+                                    AsyncImage(
+                                        model = pl.thumbnailUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(120.dp, 68.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    )
+                                    if (pl.streamCount >= 0) {
+                                        Surface(
+                                            color = Color.Black.copy(alpha = 0.75f),
+                                            shape = RoundedCornerShape(topStart = 6.dp),
+                                            modifier = Modifier.align(Alignment.BottomEnd)
+                                        ) {
+                                            Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.PlaylistPlay, null,
+                                                    tint = Color.White, modifier = Modifier.size(12.dp))
+                                                Spacer(Modifier.width(2.dp))
+                                                Text("${pl.streamCount}", color = Color.White, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(pl.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        color = MaterialTheme.colorScheme.onBackground)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        if (pl.streamCount >= 0) "${pl.streamCount} videos" else "Playlist",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
-                }
 
-                // ── Video list ────────────────────────────────────────────
-                items(data.videos, key = { it.url }) { video ->
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        VideoCard(
-                            video = video,
-                            onClick = { onVideoClick(video.url) },
-                            onChannelClick = onChannelClick
-                        )
+                    // ── Videos / Shorts / Live list ───────────────────────
+                    else -> items(data.videos, key = { it.url }) { video ->
+                        Box(Modifier.padding(horizontal = 14.dp)) {
+                            VideoCard(
+                                video = video,
+                                onClick = { onVideoClick(video.url) },
+                                onChannelClick = onChannelClick
+                            )
+                        }
                     }
                 }
 
                 // ── Loading more ──────────────────────────────────────────
-                if (data.isLoadingMore) {
+                if (data.isLoadingMore && !showAbout) {
                     item {
                         Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)

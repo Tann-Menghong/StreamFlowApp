@@ -372,6 +372,9 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
                     onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
                     onChannelClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
+                    },
+                    onPlaylistClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.YtPlaylist.createRoute(url))
                     }
                 )
             }

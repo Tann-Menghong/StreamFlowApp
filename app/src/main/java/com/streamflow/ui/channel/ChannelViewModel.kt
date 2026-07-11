@@ -30,7 +30,8 @@ data class ChannelData(
     val error: String? = null,
     val availableTabs: List<String> = emptyList(),
     val selectedTab: String = "videos",
-    val description: String = ""
+    val description: String = "",
+    val playlists: List<YouTubeRepository.PlaylistItem> = emptyList()
 )
 
 class ChannelViewModel(app: Application) : AndroidViewModel(app) {
@@ -84,7 +85,8 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                     nextPage = result.nextPage,
                     availableTabs = result.availableTabs,
                     selectedTab = tab,
-                    description = result.description
+                    description = result.description,
+                    playlists = result.playlists
                 )
             } catch (e: Exception) {
                 _channel.value = ChannelData(error = friendlyError(e))
@@ -110,6 +112,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                 if (currentTab != tab) return@launch // tab switched mid-load
                 _channel.value = _channel.value.copy(
                     videos = _channel.value.videos + result.videos,
+                    playlists = (_channel.value.playlists + result.playlists).distinctBy { it.url },
                     nextPage = result.nextPage,
                     isLoadingMore = false
                 )

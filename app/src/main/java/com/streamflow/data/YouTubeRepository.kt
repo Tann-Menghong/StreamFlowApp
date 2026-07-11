@@ -31,7 +31,8 @@ class YouTubeRepository {
 
     data class PagedResult(
         val videos: List<VideoItem>,
-        val nextPage: Page?
+        val nextPage: Page?,
+        val playlists: List<PlaylistItem> = emptyList()
     )
 
     data class ChannelResult(
@@ -41,8 +42,9 @@ class YouTubeRepository {
         val subscriberCount: Long,
         val videos: List<VideoItem>,
         val nextPage: Page?,
-        val availableTabs: List<String> = emptyList(), // "videos", "shorts", "livestreams"
-        val description: String = ""
+        val availableTabs: List<String> = emptyList(), // "videos", "shorts", "livestreams", "playlists"
+        val description: String = "",
+        val playlists: List<PlaylistItem> = emptyList()
     )
 
     // Search results for the Channels / Playlists filter tabs
@@ -331,11 +333,12 @@ class YouTubeRepository {
 
         val availableTabs = try {
             info.tabs.mapNotNull { it.contentFilters.firstOrNull()?.lowercase() }
-                .filter { it in listOf("videos", "shorts", "livestreams") }
+                .filter { it in listOf("videos", "shorts", "livestreams", "playlists") }
                 .distinct()
         } catch (_: Exception) { emptyList() }
 
         var videos = emptyList<VideoItem>()
+        var playlists = emptyList<PlaylistItem>()
         var nextPage: Page? = null
 
         try {
@@ -346,6 +349,9 @@ class YouTubeRepository {
             if (videoTab != null) {
                 val tabInfo = ChannelTabInfo.getInfo(youtube, videoTab)
                 videos = tabInfo.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }
+                playlists = tabInfo.relatedItems
+                    .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
+                    .map { it.toPlaylistItem() }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
                 nextPage = tabInfo.nextPage
             }
         } catch (_: Exception) {}
@@ -358,9 +364,18 @@ class YouTubeRepository {
             videos = videos,
             nextPage = nextPage,
             availableTabs = availableTabs,
-            description = try { info.description ?: "" } catch (_: Exception) { "" }
+            description = try { info.description ?: "" } catch (_: Exception) { "" },
+            playlists = playlists
         )
     }
+
+    private fun org.schabi.newpipe.extractor.playlist.PlaylistInfoItem.toPlaylistItem() = PlaylistItem(
+        name = name ?: "",
+        url = url ?: "",
+        thumbnailUrl = try { thumbnails.lastOrNull()?.url ?: "" } catch (_: Exception) { "" },
+        uploaderName = try { uploaderName ?: "" } catch (_: Exception) { "" },
+        streamCount = try { streamCount } catch (_: Exception) { -1L }
+    )
 
     suspend fun getChannelNextPage(channelUrl: String, nextPage: Page, tabFilter: String = "videos"): PagedResult = withContext(Dispatchers.IO) {
         try {
@@ -372,7 +387,10 @@ class YouTubeRepository {
             val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
             PagedResult(
                 videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
-                nextPage = page.nextPage
+                nextPage = page.nextPage,
+                playlists = page.items
+                    .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
+                    .map { it.toPlaylistItem() }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
             )
         } catch (e: Exception) {
             e.printStackTrace()

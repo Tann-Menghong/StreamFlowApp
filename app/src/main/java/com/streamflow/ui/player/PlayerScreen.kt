@@ -1141,7 +1141,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
     }
 
     // ── Portrait layout ───────────────────────────────────────────────────────
-    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // statusBarsPadding: keep the portrait player below the clock/battery/wifi
+    // status bar (fullscreen mode uses its own immersive Box and is unaffected)
+    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
@@ -1400,13 +1402,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                         Text(
                             details.title,
                             style = MaterialTheme.typography.titleSmall.copy(lineHeight = 21.sp),
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1470,6 +1472,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     }
                                     Spacer(Modifier.width(8.dp))
                                 }
+                                // Compact 38dp buttons: default IconButtons are 48dp tall and
+                                // were adding a lot of empty space around this row
                                 IconButton(onClick = {
                                     // Share at the current position (YouTube-style ?t= link)
                                     val posSec = playerPosition / 1000
@@ -1478,46 +1482,48 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     else videoUrl
                                     val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareUrl) }
                                     context.startActivity(Intent.createChooser(i, "Share video"))
-                                }) { Icon(Icons.Default.Share, "Share", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)) }
-                                IconButton(onClick = { vm.toggleWatchLater() }) {
+                                }, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Share, "Share", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp)) }
+                                IconButton(onClick = { vm.toggleWatchLater() }, modifier = Modifier.size(38.dp)) {
                                     Icon(
                                         if (isInWatchLater) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                         "Watch Later",
-                                        tint = if (isInWatchLater) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        tint = if (isInWatchLater) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
-                                IconButton(onClick = { vm.toggleFavorite() }) {
+                                IconButton(onClick = { vm.toggleFavorite() }, modifier = Modifier.size(38.dp)) {
                                     Icon(
                                         if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                        "Favourite", tint = heartColor, modifier = Modifier.size(24.dp).scale(heartScale)
+                                        "Favourite", tint = heartColor, modifier = Modifier.size(22.dp).scale(heartScale)
                                     )
                                 }
                                 if (!details.isLive) {
-                                    IconButton(onClick = { showDownloadDialog = true }) {
+                                    IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(38.dp)) {
                                         Icon(Icons.Default.Download, "Download",
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                                     }
                                 }
-                                IconButton(onClick = { showPlaylistDialog = true }) {
+                                IconButton(onClick = { showPlaylistDialog = true }, modifier = Modifier.size(38.dp)) {
                                     Icon(Icons.Default.PlaylistAdd, "Save to playlist",
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                                 }
                                 if (AiEngine.isSupported() && !details.isLive) {
-                                    IconButton(onClick = { showAiSheet = true }) {
+                                    IconButton(onClick = { showAiSheet = true }, modifier = Modifier.size(38.dp)) {
                                         Icon(Icons.Default.AutoAwesome, "AI summary",
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                                     }
                                 }
                             }
                         }
 
-                        Spacer(Modifier.height(6.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Speed", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Box {
-                                TextButton(onClick = { showSpeedMenu = true }) {
+                                TextButton(onClick = { showSpeedMenu = true },
+                                    modifier = Modifier.height(34.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp)) {
                                     Text("${currentSpeed}x", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                                 }
                                 DropdownMenu(expanded = showSpeedMenu, onDismissRequest = { showSpeedMenu = false }) {
@@ -1532,7 +1538,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             // Quality selector
                             if (details.availableQualities.isNotEmpty()) {
                                 Box {
-                                    TextButton(onClick = { showQualityMenu = true }) {
+                                    TextButton(onClick = { showQualityMenu = true },
+                                        modifier = Modifier.height(34.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp)) {
                                         Text(
                                             when {
                                                 autoQuality && details.currentQuality > 0 -> "Auto (${details.currentQuality}p)"
