@@ -151,6 +151,12 @@ fun PlayerScreen(
                 val ic = WindowCompat.getInsetsController(act.window, act.window.decorView)
                 ic.show(WindowInsetsCompat.Type.systemBars())
                 act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                // Release the brightness override from the swipe gesture — it lives on
+                // the (single) Activity window, so without this the dimming bled into
+                // Home/Library/everywhere and stuck until the app process restarted.
+                act.window.attributes = act.window.attributes.also {
+                    it.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                }
             }
         }
     }
@@ -1298,7 +1304,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 keepScreenOn = !audioOnly
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                             } },
-                            update  = { pv -> pv.player = mediaController; pv.useController = false },
+                            // keepScreenOn must track audio-only at runtime: the factory
+                            // only runs once, so without setting it here too, toggling
+                            // audio-only left the screen awake in audio mode (wasting
+                            // battery) or let it sleep mid-video after toggling back.
+                            update  = { pv ->
+                                pv.player = mediaController
+                                pv.useController = false
+                                pv.keepScreenOn = !audioOnly
+                            },
                             modifier = Modifier.fillMaxSize()
                         )
                         if (audioOnly) {

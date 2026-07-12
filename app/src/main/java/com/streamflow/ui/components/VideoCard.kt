@@ -654,8 +654,11 @@ fun CompactVideoCard(
 }
 
 internal fun formatViews(count: Long): String = when {
-    count >= 1_000_000 -> "%.1fM".format(count / 1_000_000.0).trimEnd('0').trimEnd('.')
-    count >= 1_000     -> "%.1fK".format(count / 1_000.0).trimEnd('0').trimEnd('.')
+    // Trim the trailing ".0" BEFORE appending the suffix — with the "M"/"K" inside
+    // the format string the string ends in a letter, so trimEnd('0') matched nothing
+    // and every round count rendered as "2.0M" / "5.0K" instead of "2M" / "5K".
+    count >= 1_000_000 -> "%.1f".format(count / 1_000_000.0).trimEnd('0').trimEnd('.') + "M"
+    count >= 1_000     -> "%.1f".format(count / 1_000.0).trimEnd('0').trimEnd('.') + "K"
     else               -> count.toString()
 }
 

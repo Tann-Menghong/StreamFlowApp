@@ -142,8 +142,11 @@ fun MiniPlayerBar(
             IconButton(
                 onClick = {
                     val mc = mediaController ?: return@IconButton
-                    if (mc.isPlaying) mc.pause() else mc.play()
-                    isPlaying = mc.isPlaying
+                    // isPlaying flips asynchronously, so reading mc.isPlaying right
+                    // after the call returns the OLD value and the icon shows the
+                    // wrong glyph until the next poll — drive it from the intent.
+                    if (mc.isPlaying) { mc.pause(); isPlaying = false }
+                    else { mc.play(); isPlaying = true }
                 }
             ) {
                 Icon(
