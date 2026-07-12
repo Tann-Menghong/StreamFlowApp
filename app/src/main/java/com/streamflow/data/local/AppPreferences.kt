@@ -64,6 +64,7 @@ class AppPreferences(private val context: Context) {
         val UNSEEN_FEED_KEY     = stringPreferencesKey("unseen_feed")  // new-upload count for the Feed badge
         val AUTO_DL_WL_KEY      = booleanPreferencesKey("auto_dl_watch_later") // download Watch Later on Wi-Fi
         val BATTERY_SAVER_KEY   = booleanPreferencesKey("battery_saver") // cap 480p, no ambient glow, no prefetch
+        val ONBOARDING_DONE_KEY = booleanPreferencesKey("onboarding_done")
         val CONFIRM_EXIT_KEY    = booleanPreferencesKey("confirm_exit")
         val CUSTOM_CATEGORIES_KEY = stringPreferencesKey("custom_categories") // user-added topic chips
         val SHOW_SEARCH_TAB_KEY = booleanPreferencesKey("show_search_tab")
@@ -136,6 +137,7 @@ class AppPreferences(private val context: Context) {
     val unseenFeed     : Flow<Int>     = context.dataStore.data.map { it[UNSEEN_FEED_KEY]?.toIntOrNull() ?: 0 }
     val autoDlWatchLater: Flow<Boolean> = context.dataStore.data.map { it[AUTO_DL_WL_KEY] ?: false }
     val batterySaver   : Flow<Boolean> = context.dataStore.data.map { it[BATTERY_SAVER_KEY] ?: false }
+    val onboardingDone : Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_DONE_KEY] ?: false }
     val confirmExit    : Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_EXIT_KEY] ?: false }
     val customCategories: Flow<List<String>> = context.dataStore.data.map {
         it[CUSTOM_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() } ?: emptyList()
@@ -239,6 +241,7 @@ class AppPreferences(private val context: Context) {
     suspend fun clearUnseenFeed()              = context.dataStore.edit { it[UNSEEN_FEED_KEY] = "0" }
     suspend fun setAutoDlWatchLater(v: Boolean) = context.dataStore.edit { it[AUTO_DL_WL_KEY] = v }
     suspend fun setBatterySaver(v: Boolean)    = context.dataStore.edit { it[BATTERY_SAVER_KEY] = v }
+    suspend fun setOnboardingDone(v: Boolean)  = context.dataStore.edit { it[ONBOARDING_DONE_KEY] = v }
     suspend fun setConfirmExit(v: Boolean)     = context.dataStore.edit { it[CONFIRM_EXIT_KEY] = v }
     suspend fun setCustomCategories(v: List<String>) = context.dataStore.edit { it[CUSTOM_CATEGORIES_KEY] = v.joinToString(",") }
     suspend fun setShowSearchTab(v: Boolean)   = context.dataStore.edit { it[SHOW_SEARCH_TAB_KEY] = v }

@@ -110,7 +110,15 @@ class MainActivity : ComponentActivity() {
                     LocalHapticsEnabled provides hapticsOn,
                     com.streamflow.ui.theme.LocalDesignStyle provides designStyle
                 ) {
-                    NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
+                    // First launch: quick setup (country, interests, theme) before the feed
+                    val onboardingDone by androidx.compose.runtime.produceState<Boolean?>(null) {
+                        prefs.onboardingDone.collect { value = it }
+                    }
+                    when (onboardingDone) {
+                        null  -> Unit // waiting for DataStore, hidden behind the splash
+                        false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
+                        else  -> NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
+                    }
                 }
             }
         }

@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class PlaybackService : MediaSessionService() {
@@ -158,6 +159,44 @@ class PlaybackService : MediaSessionService() {
                         sessionCommands,
                         Player.Commands.Builder().addAllCommands().build()
                     )
+                }
+
+                // Bluetooth/headset "play" after the app was killed: re-extract the
+                // last watched video and resume from its saved position
+                override fun onPlaybackResumption(
+                    mediaSession: MediaSession,
+                    controller: MediaSession.ControllerInfo
+                ): com.google.common.util.concurrent.ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                    val future = com.google.common.util.concurrent
+                        .SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+                    serviceScope.launch {
+                        try {
+                            val app = application as StreamFlowApp
+                            val last = app.database.historyDao().getAll()
+                                .first().firstOrNull() ?: throw Exception("no history")
+                            val details = com.streamflow.data.YouTubeRepository()
+                                .getVideoDetails(last.url)
+                            val extras = Bundle().apply {
+                                details.audioUrl?.let { putString("audioUrl", it) }
+                            }
+                            val item = MediaItem.Builder()
+                                .setUri(details.streamUrl)
+                                .setMediaId(details.url)
+                                .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder()
+                                    .setTitle(details.title)
+                                    .setArtist(details.uploaderName)
+                                    .setArtworkUri(android.net.Uri.parse(details.thumbnailUrl))
+                                    .build())
+                                .setRequestMetadata(MediaItem.RequestMetadata.Builder()
+                                    .setExtras(extras).build())
+                                .build()
+                            future.set(MediaSession.MediaItemsWithStartPosition(
+                                listOf(item), 0, last.position))
+                        } catch (e: Exception) {
+                            future.setException(e)
+                        }
+                    }
+                    return future
                 }
             })
             .build()

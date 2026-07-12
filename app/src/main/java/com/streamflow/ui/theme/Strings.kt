@@ -16,7 +16,34 @@ object KmStrings {
         "Playlists" to "បញ្ជីចាក់",
         "Downloads" to "ទាញយក",
         "For You" to "សម្រាប់អ្នក",
-        "Trending" to "ពេញនិយម"
+        "Trending" to "ពេញនិយម",
+        "Bookmarks" to "ចំណាំ",
+        // Settings sections + dashboard tiles
+        "Appearance" to "រូបរាង",
+        "Playback" to "ការចាក់",
+        "Notifications" to "ការជូនដំណឹង",
+        "AI" to "AI",
+        "Storage" to "ឃ្លាំងផ្ទុក",
+        "Backup" to "បម្រុងទុក",
+        "About" to "អំពី",
+        // Common labels
+        "Subscribe" to "តាមដាន",
+        "Subscribed" to "កំពុងតាមដាន",
+        "Share" to "ចែករំលែក",
+        "Download" to "ទាញយក",
+        "Save" to "រក្សាទុក",
+        "Like" to "ចូលចិត្ត",
+        "Watch later" to "មើលពេលក្រោយ",
+        "Continue watching" to "បន្តមើល",
+        "Featured" to "ពិសេស",
+        "Retry" to "ព្យាយាមម្តងទៀត",
+        "Cancel" to "បោះបង់",
+        "Next" to "បន្ទាប់",
+        "Theme" to "ផ្ទៃរូបរាង",
+        "Equalizer" to "អេហ្គុយ",
+        "Battery saver" to "សន្សំថ្ម",
+        "Data saver" to "សន្សំទិន្នន័យ",
+        "Up Next" to "បន្ទាប់"
     )
 
     fun t(label: String, lang: String): String =

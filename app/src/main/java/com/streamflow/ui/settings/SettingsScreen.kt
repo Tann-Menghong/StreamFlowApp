@@ -256,7 +256,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                                     ) {
                                         Icon(tileIcon, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     }
-                                    Text(name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                    Text(com.streamflow.ui.theme.KmStrings.t(name, language),
+                                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                                         maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
@@ -618,6 +619,17 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     context.startActivity(Intent(Intent.ACTION_VIEW,
                         Uri.parse("https://github.com/Tann-Menghong/StreamFlowApp")))
                 }
+                SettingsDivider()
+                SettingsItem(Icons.Rounded.BugReport, "Report a problem",
+                    "Opens a pre-filled GitHub issue"
+                ) {
+                    val title = Uri.encode("Problem in v${vm.appVersion}")
+                    val body = Uri.encode("**What happened:**\n\n\n**Steps to reproduce:**\n1. \n\n**Device:** \n**App version:** v${vm.appVersion}")
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                            "https://github.com/Tann-Menghong/StreamFlowApp/issues/new?title=$title&body=$body")))
+                    }
+                }
             }
         }
     }
@@ -804,8 +816,12 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
 
 @Composable
 private fun SettingsSection(title: String) {
+    val sectionCtx = androidx.compose.ui.platform.LocalContext.current
+    val sectionLang by com.streamflow.data.local.AppPreferences.get(sectionCtx)
+        .language.collectAsState(initial = "EN")
     Text(
-        text     = title,
+        // Display translated; the offsets map stays keyed by the English name
+        text     = com.streamflow.ui.theme.KmStrings.t(title, sectionLang),
         style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color    = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier

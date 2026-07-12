@@ -3,12 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "2.66.2"
+    const val VERSION_NAME = "3.0.0"
 
     val notes = listOf(
-        "Auto-download! Turn on Settings > Storage > Auto-download Watch Later - videos save themselves on Wi-Fi",
-        "Download quality picker: choose Best / 720p / 480p / Audio when downloading",
-        "Battery saver mode: caps quality at 480p and disables extras (Settings > Playback)",
-        "NEW badge: the Feed button in Library shows how many new uploads your channels posted"
+        "StreamFlow 3.0 - the Final release!",
+        "Welcome setup: pick your country, interests and theme on first launch",
+        "Bluetooth resume: press play on your earbuds and your last video continues - even after the app was closed",
+        "More Khmer: settings sections and dashboard now translate when Khmer is selected",
+        "Report a problem: Settings > About opens a pre-filled GitHub issue",
+        "Plus everything from 2.67-2.68: clip moments, equalizer, channel search, auto-download, battery saver"
     )
 }
