@@ -82,6 +82,7 @@ fun ChannelAvatar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoCard(
     video: VideoItem,
@@ -227,7 +228,31 @@ fun VideoCard(
                             tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                             modifier = Modifier.size(18.dp))
                     }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    // Telegram-style action sheet: rounded bottom sheet with a
+                    // video preview header and big spaced action rows
+                    if (showMenu) ModalBottomSheet(
+                        onDismissRequest = { showMenu = false },
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            AsyncImage(
+                                model = video.thumbnailUrl, contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(width = 96.dp, height = 54.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
+                            )
+                            Text(video.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        HorizontalDivider(Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(0.15f))
+                        Column(Modifier.padding(bottom = 28.dp)) {
                         if (onAddToWatchLater != null) {
                             DropdownMenuItem(
                                 text = { Text("Watch later") },
@@ -296,6 +321,7 @@ fun VideoCard(
                                 showMenu = false
                             }
                         )
+                        }
                     }
                 }
             }
@@ -422,6 +448,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
 }
 
 // Compact list row: thumbnail on the left, details on the right (YouTube search-result style)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompactVideoCard(
     video: VideoItem,
@@ -536,7 +563,30 @@ fun CompactVideoCard(
                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                     modifier = Modifier.size(16.dp))
             }
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            // Telegram-style action sheet (same as VideoCard)
+            if (showMenu) ModalBottomSheet(
+                onDismissRequest = { showMenu = false },
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AsyncImage(
+                        model = video.thumbnailUrl, contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(width = 96.dp, height = 54.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
+                    )
+                    Text(video.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface)
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(0.15f))
+                Column(Modifier.padding(bottom = 28.dp)) {
                 if (onAddToWatchLater != null) {
                     DropdownMenuItem(
                         text = { Text("Watch later") },
@@ -592,6 +642,7 @@ fun CompactVideoCard(
                         showMenu = false
                     }
                 )
+                }
             }
         }
     }

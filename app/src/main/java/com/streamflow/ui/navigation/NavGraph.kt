@@ -244,23 +244,27 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             navController    = navController,
             startDestination = Screen.Home.route,
             modifier         = if (showBottom) Modifier.padding(innerPadding) else Modifier.fillMaxSize(),
+            // Telegram-style: screens slide in from the right with a subtle
+            // parallax push, and slide back out when popping
             enterTransition  = {
                 if (reduceMotion) fadeIn(tween(120))
-                else fadeIn(tween(270, easing = EaseInOut)) +
-                    scaleIn(initialScale = 0.96f, animationSpec = tween(270, easing = EaseInOut))
+                else fadeIn(tween(220)) +
+                    slideInHorizontally(tween(260, easing = EaseInOut)) { it / 4 }
             },
             exitTransition   = {
-                fadeOut(tween(if (reduceMotion) 100 else 200, easing = EaseInOut))
+                if (reduceMotion) fadeOut(tween(100))
+                else fadeOut(tween(180)) +
+                    slideOutHorizontally(tween(260, easing = EaseInOut)) { -it / 8 }
             },
             popEnterTransition  = {
                 if (reduceMotion) fadeIn(tween(120))
-                else fadeIn(tween(270)) +
-                    scaleIn(initialScale = 0.96f, animationSpec = tween(270))
+                else fadeIn(tween(220)) +
+                    slideInHorizontally(tween(260, easing = EaseInOut)) { -it / 8 }
             },
             popExitTransition   = {
                 if (reduceMotion) fadeOut(tween(100))
-                else fadeOut(tween(200)) +
-                    scaleOut(targetScale = 0.96f, animationSpec = tween(200))
+                else fadeOut(tween(180)) +
+                    slideOutHorizontally(tween(260, easing = EaseInOut)) { it / 4 }
             }
         ) {
             composable(Screen.Home.route) {

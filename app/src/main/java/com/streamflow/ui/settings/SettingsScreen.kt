@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -137,11 +138,17 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showLibTabDialog     by remember { mutableStateOf(false) }
     var showDeleteAiDialog   by remember { mutableStateOf(false) }
 
+    // Telegram-style big title that collapses into the bar as you scroll
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title  = { Text("Settings", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            LargeTopAppBar(
+                title  = { Text("Settings", fontWeight = FontWeight.ExtraBold) },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -320,6 +327,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             }
 
             // ── Home customization ────────────────────────────────────────
+            SettingsFooter("New-video alerts follow the schedule above and stay silent during quiet hours.")
+
             SettingsSection("Home")
             SettingsCard {
                 SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
@@ -431,6 +440,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             }
 
             // ── AI (on-device, free, offline) ────────────────────────────
+            SettingsFooter("Playback keeps running in the notification when you leave the app. If your phone kills it, turn on Background play protection.")
+
             SettingsSection("AI")
             SettingsCard {
                 if (!AiEngine.isSupported()) {
@@ -467,6 +478,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             }
 
             // ── Storage ──────────────────────────────────────────────────
+            SettingsFooter("The AI runs fully on your device — nothing you ask ever leaves your phone.")
+
             SettingsSection("Storage")
             SettingsCard {
                 SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
@@ -723,16 +736,33 @@ private fun SettingsDivider() {
     )
 }
 
-// Icon in a soft tinted rounded square — gives Settings a modern grouped look
+// Telegram-style icon badges: each row gets its own solid color square with a
+// white icon, picked deterministically so a row keeps its color forever
+private val badgePalette = listOf(
+    Color(0xFF4C8DFF), Color(0xFF34C759), Color(0xFFFF9500), Color(0xFFAF52DE),
+    Color(0xFFFF3B5C), Color(0xFF00BCD4), Color(0xFF7E57C2), Color(0xFFFF7043),
+    Color(0xFF26A69A), Color(0xFFEC407A), Color(0xFF5C6BC0), Color(0xFF8BC34A)
+)
+
 @Composable
-private fun SettingsIconBadge(icon: ImageVector) {
+private fun SettingsIconBadge(icon: ImageVector, title: String) {
+    val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
     Box(
-        Modifier.size(32.dp).background(
-            MaterialTheme.colorScheme.primary.copy(0.12f), RoundedCornerShape(9.dp)),
+        Modifier.size(32.dp).background(color, RoundedCornerShape(9.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
     }
+}
+
+// Small gray explanation under a settings card, Telegram-style
+@Composable
+private fun SettingsFooter(text: String) {
+    Text(
+        text, fontSize = 12.sp, lineHeight = 16.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f),
+        modifier = Modifier.padding(horizontal = 24.dp).padding(top = 6.dp)
+    )
 }
 
 @Composable
@@ -749,7 +779,7 @@ private fun SettingsItem(
             .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsIconBadge(icon)
+        SettingsIconBadge(icon, title)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge,
@@ -779,7 +809,7 @@ private fun SettingsSwitchItem(
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsIconBadge(icon)
+        SettingsIconBadge(icon, title)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge,

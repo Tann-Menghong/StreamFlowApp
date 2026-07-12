@@ -3,13 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "2.64.0"
+    const val VERSION_NAME = "2.65.0"
 
     val notes = listOf(
-        "Experience update!",
-        "New brand typeface (Manrope) across the whole app - crisp, geometric, professional",
-        "Ambient mode: the video's colors softly glow behind the player, like YouTube",
-        "Library now opens with a stats dashboard: watch time, videos watched, favorites",
-        "Tip: when a video ends, the Up Next countdown gives you time to cancel"
+        "Telegram-style design update!",
+        "Long-press or tap the three dots on any video: actions now open in a beautiful bottom sheet with a video preview",
+        "Settings icons are now colorful squares, each row with its own color - just like Telegram",
+        "Library and Settings have big bold titles that collapse as you scroll",
+        "Screens now slide in smoothly with a parallax push instead of fading",
+        "Helpful gray hints added under key settings sections"
     )
 }
