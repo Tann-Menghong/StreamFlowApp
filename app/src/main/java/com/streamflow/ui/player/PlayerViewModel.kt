@@ -448,6 +448,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun savePosition(url: String, positionMs: Long) {
         viewModelScope.launch {
+            // Incognito must leave no trace: without this, re-watching a video that
+            // already has a history row kept updating its saved progress (leak).
+            if (prefs.incognito.first()) return@launch
             db.historyDao().updatePosition(url, positionMs)
         }
     }

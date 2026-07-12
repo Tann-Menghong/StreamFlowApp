@@ -667,15 +667,20 @@ fun CompactVideoCard(
 }
 
 internal fun formatViews(count: Long): String = when {
-    // Trim the trailing ".0" BEFORE appending the suffix — with the "M"/"K" inside
+    // Trim the trailing ".0" BEFORE appending the suffix — with the "B"/"M"/"K" inside
     // the format string the string ends in a letter, so trimEnd('0') matched nothing
     // and every round count rendered as "2.0M" / "5.0K" instead of "2M" / "5K".
-    count >= 1_000_000 -> "%.1f".format(count / 1_000_000.0).trimEnd('0').trimEnd('.') + "M"
-    count >= 1_000     -> "%.1f".format(count / 1_000.0).trimEnd('0').trimEnd('.') + "K"
-    else               -> count.toString()
+    // Locale.US forces a '.' decimal separator so trimEnd('.') also works on
+    // comma-decimal locales (a French/German device otherwise showed "2,0M").
+    count >= 1_000_000_000 -> "%.1f".format(java.util.Locale.US, count / 1_000_000_000.0).trimEnd('0').trimEnd('.') + "B"
+    count >= 1_000_000     -> "%.1f".format(java.util.Locale.US, count / 1_000_000.0).trimEnd('0').trimEnd('.') + "M"
+    count >= 1_000         -> "%.1f".format(java.util.Locale.US, count / 1_000.0).trimEnd('0').trimEnd('.') + "K"
+    else                   -> count.toString()
 }
 
 internal fun formatDuration(seconds: Long): String {
-    val h = seconds / 3600; val m = (seconds % 3600) / 60; val s = seconds % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    val t = seconds.coerceAtLeast(0)  // guard: a negative remaining/seek value rendered "0:-5"
+    val h = t / 3600; val m = (t % 3600) / 60; val s = t % 60
+    return if (h > 0) "%d:%02d:%02d".format(java.util.Locale.US, h, m, s)
+           else "%d:%02d".format(java.util.Locale.US, m, s)
 }

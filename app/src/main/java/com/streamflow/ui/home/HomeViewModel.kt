@@ -310,7 +310,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         currentQuery = ""
         _selectedCategory.value = "All"
         _activeSearchQuery.value = ""
-        feedGeneration++
+        val gen = ++feedGeneration
         viewModelScope.launch {
             // Keep showing the cached feed instead of a spinner while refreshing
             if (!showingCachedFeed) _uiState.value = HomeUiState.Loading
@@ -335,6 +335,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     t.await() to s.await()
                 }
+                if (gen != feedGeneration) return@launch // superseded by a newer feed/search/category
                 val trendingVideos = trendingRes?.videos?.shuffled() ?: emptyList()
                 if (trendingVideos.isEmpty() && seedChunk.isEmpty()) {
                     throw (trendingErr ?: Exception("No videos found"))
@@ -365,7 +366,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _channelResults.value = emptyList()
         _playlistResults.value = emptyList()
         clearSuggestions()
-        feedGeneration++
+        val gen = ++feedGeneration
         viewModelScope.launch {
             // Incognito: leave no trace in recent searches
             if (!prefs.incognito.first()) prefs.addRecentSearch(query)
@@ -373,6 +374,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             nextPage = null
             try {
                 val result = repo.search(query)
+                if (gen != feedGeneration) return@launch // superseded by a newer query
                 nextPage   = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
@@ -393,12 +395,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             showingCachedFeed = false
             isSearchMode = true
             currentQuery = cat
-            feedGeneration++
+            val gen = ++feedGeneration
             viewModelScope.launch {
                 _uiState.value = HomeUiState.Loading
                 nextPage = null
                 try {
                     val result = repo.search(cat)
+                    if (gen != feedGeneration) return@launch // superseded by a newer category/search
                     nextPage   = result.nextPage
                     _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
                 } catch (e: Exception) {
@@ -414,11 +417,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             loadTrending()
             return
         }
-        feedGeneration++
+        val gen = ++feedGeneration
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
                 val result = repo.search(currentQuery)
+                if (gen != feedGeneration) return@launch // superseded by a newer refresh/search
                 nextPage   = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {

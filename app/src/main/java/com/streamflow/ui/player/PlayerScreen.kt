@@ -1044,7 +1044,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         }
                         Text("Buffer: $bufferPct%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Text("Position: ${pos / 1000}s / ${dur / 1000}s", color = Color.White, fontSize = 11.sp)
-                        Text("Zoom: ${"%.1f".format(zoom)}x", color = Color.White, fontSize = 11.sp)
+                        Text("Zoom: ${"%.1f".format(java.util.Locale.US, zoom)}x", color = Color.White, fontSize = 11.sp)
                     }
                 }
             }

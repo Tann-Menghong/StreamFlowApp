@@ -26,20 +26,25 @@ class SearchViewModel : ViewModel() {
 
     private val repo = YouTubeRepository()
     private var nextPage: Page? = null
+    // Bumped per search so a slow older query can't clobber a newer one (stale-response race)
+    private var searchGeneration = 0
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val uiState: StateFlow<SearchUiState> = _uiState
 
     fun search(query: String) {
         if (query.isBlank()) return
+        val gen = ++searchGeneration
         viewModelScope.launch {
             _uiState.value = SearchUiState.Loading
             nextPage = null
             try {
                 val result = repo.search(query)
+                if (gen != searchGeneration) return@launch // superseded by a newer query
                 nextPage = result.nextPage
                 _uiState.value = SearchUiState.Success(query, result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
+                if (gen != searchGeneration) return@launch
                 _uiState.value = SearchUiState.Error(friendlyError(e))
             }
         }
@@ -49,10 +54,12 @@ class SearchViewModel : ViewModel() {
         val current = _uiState.value as? SearchUiState.Success ?: return
         val page = nextPage ?: return
         if (current.isLoadingMore) return
+        val gen = searchGeneration
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
             try {
                 val result = repo.searchNextPage(current.query, page)
+                if (gen != searchGeneration) return@launch // a new search replaced this one
                 nextPage = result.nextPage
                 // Dedupe at append time — NewPipe pagination can repeat a video
                 // across pages, and the LazyColumn's key = { it.url } crashes on
