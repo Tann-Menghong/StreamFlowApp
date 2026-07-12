@@ -30,13 +30,16 @@ fun String.toAppTheme(): AppTheme = when (this) {
     else     -> AppTheme.DARK
 }
 
-// Typography scaled by the user's font-size preference, in their chosen face
+// Typography scaled by the user's font-size preference, in their chosen face.
+// Headings carry slight negative tracking (tighter letter-spacing) — the editorial
+// look that reads as "designed" rather than default — while body text keeps neutral
+// tracking and small labels keep positive tracking for legibility at size.
 private fun appTypography(s: Float, f: FontFamily?) = Typography(
-    displaySmall = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s),
-    headlineMedium= TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s),
-    titleLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s),
-    titleMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s),
-    titleSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s),
+    displaySmall = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s, letterSpacing = (-0.5).sp),
+    headlineMedium= TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s, letterSpacing = (-0.4).sp),
+    titleLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s, letterSpacing = (-0.3).sp),
+    titleMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s, letterSpacing = (-0.2).sp),
+    titleSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s, letterSpacing = (-0.1).sp),
     bodyLarge    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 15.sp * s, lineHeight = 22.sp * s),
     bodyMedium   = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 13.sp * s, lineHeight = 19.sp * s),
     bodySmall    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 12.sp * s, lineHeight = 16.sp * s),
@@ -93,8 +96,8 @@ private fun buildDarkColors(p: AccentPalette) = darkColorScheme(
     onBackground       = OnSurfaceDark,
     onSurface          = OnSurfaceDark,
     onSurfaceVariant   = SubtextDark,
-    outline            = Color(0xFF282838),
-    outlineVariant     = Color(0xFF1E1E2C),
+    outline            = Color(0xFF2B2C38),
+    outlineVariant     = Color(0xFF1C1D26),
 )
 
 private fun buildAmoledColors(p: AccentPalette) = darkColorScheme(
@@ -105,12 +108,12 @@ private fun buildAmoledColors(p: AccentPalette) = darkColorScheme(
     secondary          = p.darkSecondary,
     background         = BackgroundAmoled,
     surface            = SurfaceAmoled,
-    surfaceVariant     = Color(0xFF12121C),
+    surfaceVariant     = Color(0xFF16161E),
     onBackground       = Color.White,
     onSurface          = Color.White,
-    onSurfaceVariant   = Color(0xFF6A6A88),
-    outline            = Color(0xFF18181E),
-    outlineVariant     = Color(0xFF10101A),
+    onSurfaceVariant   = Color(0xFF7C7E8E),
+    outline            = Color(0xFF1C1D24),
+    outlineVariant     = Color(0xFF121218),
 )
 
 private fun buildLightColors(p: AccentPalette) = lightColorScheme(
@@ -125,8 +128,8 @@ private fun buildLightColors(p: AccentPalette) = lightColorScheme(
     onBackground       = OnSurfaceLight,
     onSurface          = OnSurfaceLight,
     onSurfaceVariant   = SubtextLight,
-    outline            = Color(0xFFD8D8E8),
-    outlineVariant     = Color(0xFFEAEAF2),
+    outline            = Color(0xFFDDDFE8),
+    outlineVariant     = Color(0xFFEBECF2),
 )
 
 @Composable

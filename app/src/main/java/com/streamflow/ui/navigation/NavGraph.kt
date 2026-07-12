@@ -481,10 +481,10 @@ private fun AnimatedNavBar(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(width = 48.dp, height = 32.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .size(width = 52.dp, height = 32.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                                 else          androidx.compose.ui.graphics.Color.Transparent
                             ),
                         contentAlignment = Alignment.Center
@@ -494,7 +494,7 @@ private fun AnimatedNavBar(
                             contentDescription = screen.label,
                             modifier = Modifier.size(22.dp).scale(iconScale),
                             tint = if (selected) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     }
                     val labelVisible = when (labelStyle) {

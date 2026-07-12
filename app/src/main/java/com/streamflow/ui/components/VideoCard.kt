@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -116,7 +117,14 @@ fun VideoCard(
                 .then(
                     if (modernStyle) Modifier
                         .clip(RoundedCornerShape((corner + 6).dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.28f))
+                        .background(MaterialTheme.colorScheme.surface.copy(0.55f))
+                        // Hairline border: crisp card definition without a heavy fill —
+                        // the clean, "product-grade" look vs a muddy tinted block
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(0.5f),
+                            RoundedCornerShape((corner + 6).dp)
+                        )
                     else Modifier
                 )
                 .pointerInput(Unit) {
