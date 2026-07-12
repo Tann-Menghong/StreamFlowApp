@@ -446,9 +446,12 @@ class YouTubeRepository {
     )
 
     // Streams suitable for saving as a single file (muxed video, or audio-only)
-    suspend fun getDownloadStreams(videoUrl: String): DownloadStreams = withContext(Dispatchers.IO) {
+    suspend fun getDownloadStreams(videoUrl: String, maxHeight: Int = Int.MAX_VALUE): DownloadStreams = withContext(Dispatchers.IO) {
         val info = StreamInfo.getInfo(youtube, videoUrl)
-        val muxed = info.videoStreams.filter { !it.content.isNullOrEmpty() }.maxByOrNull { it.height }
+        val muxed = info.videoStreams.filter { !it.content.isNullOrEmpty() && it.height <= maxHeight }
+            .maxByOrNull { it.height }
+            // If nothing fits under the cap, fall back to the smallest available
+            ?: info.videoStreams.filter { !it.content.isNullOrEmpty() }.minByOrNull { it.height }
         val audio = info.audioStreams.filter { !it.content.isNullOrEmpty() }.maxByOrNull { it.averageBitrate }
         DownloadStreams(
             videoUrl = muxed?.content,

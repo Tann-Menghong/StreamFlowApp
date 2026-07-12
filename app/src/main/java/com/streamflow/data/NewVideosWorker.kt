@@ -49,6 +49,7 @@ class NewVideosWorker(
         val maxNotifs = app.prefs.notifyMax.first().toIntOrNull() ?: 5
         var notified = 0
         var notifId = 2000
+        var newCount = 0
 
         subs.forEach { sub ->
             try {
@@ -56,6 +57,7 @@ class NewVideosWorker(
                 val latest = info.videos.firstOrNull() ?: return@forEach
                 // First check just records the baseline; notify only on a change
                 if (sub.lastVideoUrl.isNotEmpty() && sub.lastVideoUrl != latest.url) {
+                    newCount++
                     if (maxNotifs <= 0 || notified < maxNotifs) {
                         notify(notifId++, sub.name, latest.title, latest.url)
                         notified++
@@ -65,6 +67,8 @@ class NewVideosWorker(
             } catch (_: Exception) {
             }
         }
+        // Feeds the "NEW" badge on the Feed button; cleared when the feed opens
+        if (newCount > 0) app.prefs.addUnseenFeed(newCount)
         return Result.success()
     }
 

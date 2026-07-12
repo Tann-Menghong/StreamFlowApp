@@ -1150,7 +1150,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
     // Ambient glow: the thumbnail's average color bleeds softly from behind the
     // player, like YouTube's ambient mode
     var ambientColor by remember(videoUrl) { mutableStateOf(Color.Transparent) }
-    LaunchedEffect(state) {
+    val batterySaverOn by prefs.batterySaver.collectAsState(initial = false)
+    LaunchedEffect(state, batterySaverOn) {
+        if (batterySaverOn) { ambientColor = Color.Transparent; return@LaunchedEffect }
         val d = (state as? PlayerUiState.Ready)?.details ?: return@LaunchedEffect
         if (d.thumbnailUrl.isNotEmpty()) {
             ambientColor = averageThumbColor(context, d.thumbnailUrl) ?: Color.Transparent
@@ -1976,19 +1978,34 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
         AlertDialog(
             onDismissRequest = { showDownloadDialog = false },
             title = { Text("Download") },
-            text = { Text("Saved to Downloads/StreamFlow. Find it in Library > Downloads.") },
-            confirmButton = {
-                TextButton(onClick = { vm.download(isAudio = false); showDownloadDialog = false }) {
-                    Text("Video")
+            text = {
+                Column {
+                    Text("Pick a quality — saved to Downloads/StreamFlow, playable from Library > Downloads.",
+                        fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    listOf(
+                        "Best quality" to Int.MAX_VALUE,
+                        "720p" to 720,
+                        "480p (small size)" to 480
+                    ).forEach { (label, cap) ->
+                        TextButton(onClick = { vm.download(isAudio = false, maxHeight = cap); showDownloadDialog = false },
+                            modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                        }
+                    }
+                    TextButton(onClick = { vm.download(isAudio = true); showDownloadDialog = false },
+                        modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Audio only", modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
-                Row {
-                    TextButton(onClick = { vm.download(isAudio = true); showDownloadDialog = false }) {
-                        Text("Audio only")
-                    }
-                    TextButton(onClick = { showDownloadDialog = false }) { Text("Cancel") }
-                }
+                TextButton(onClick = { showDownloadDialog = false }) { Text("Cancel") }
             }
         )
     }

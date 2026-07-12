@@ -105,6 +105,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val designStyle          by vm.designStyle.collectAsState()
     val eqPreset             by vm.eqPreset.collectAsState()
     var showEqDialog         by remember { mutableStateOf(false) }
+    val batterySaver         by vm.batterySaver.collectAsState()
+    val autoDlWatchLater     by vm.autoDlWatchLater.collectAsState()
     val confirmExit          by vm.confirmExit.collectAsState()
     val showSearchTab        by vm.showSearchTab.collectAsState()
     val fontFamily           by vm.fontFamily.collectAsState()
@@ -503,6 +505,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     "Prefer lower quality to save mobile data", dataSaver
                 ) { vm.setDataSaver(it) }
                 SettingsDivider()
+                SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
+                    "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
+                ) { vm.setBatterySaver(it) }
+                SettingsDivider()
                 SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
                     "Watch without saving to history", incognito
                 ) { vm.setIncognito(it) }
@@ -555,6 +561,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
 
             SettingsSection("Storage")
             SettingsCard {
+                SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
+                    "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
+                ) { vm.setAutoDlWatchLater(it) }
+                SettingsDivider()
                 SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
                     "$favCount saved"
                 ) { if (favCount > 0) showClearFav = true }

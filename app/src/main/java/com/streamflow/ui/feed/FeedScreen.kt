@@ -30,6 +30,11 @@ fun FeedScreen(
     vm: FeedViewModel = viewModel()
 ) {
     LaunchedEffect(Unit) { vm.load() }
+    // Opening the feed clears the NEW badge on the Library Feed button
+    val feedCtx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        com.streamflow.data.local.AppPreferences.get(feedCtx).clearUnseenFeed()
+    }
     val state by vm.uiState.collectAsState()
     val groups by vm.groups.collectAsState()
     val groupFilter by vm.groupFilter.collectAsState()

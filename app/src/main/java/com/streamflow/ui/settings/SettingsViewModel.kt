@@ -65,6 +65,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val autoPip        = prefs.autoPip.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val designStyle    = prefs.designStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "MODERN")
     val eqPreset       = prefs.eqPreset.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "OFF")
+    val batterySaver   = prefs.batterySaver.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val autoDlWatchLater = prefs.autoDlWatchLater.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val confirmExit    = prefs.confirmExit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val showSearchTab  = prefs.showSearchTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
@@ -177,6 +179,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoPip(v: Boolean)        = viewModelScope.launch { prefs.setAutoPip(v) }
     fun setDesignStyle(v: String)     = viewModelScope.launch { prefs.setDesignStyle(v) }
     fun setEqPreset(v: String)        = viewModelScope.launch { prefs.setEqPreset(v) }
+    fun setBatterySaver(v: Boolean)   = viewModelScope.launch { prefs.setBatterySaver(v) }
+    fun setAutoDlWatchLater(v: Boolean) = viewModelScope.launch { prefs.setAutoDlWatchLater(v) }
     fun setConfirmExit(v: Boolean)    = viewModelScope.launch { prefs.setConfirmExit(v) }
     fun setShowSearchTab(v: Boolean)  = viewModelScope.launch { prefs.setShowSearchTab(v) }
     fun setFontFamily(v: String)      = viewModelScope.launch { prefs.setFontFamily(v) }

@@ -78,6 +78,20 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
             } catch (_: Exception) {}
         }
 
+        // Auto-download Watch Later videos, Wi-Fi only (the worker itself no-ops
+        // when the setting is off)
+        try {
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                com.streamflow.data.AutoDownloadWorker.WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                PeriodicWorkRequestBuilder<com.streamflow.data.AutoDownloadWorker>(6, TimeUnit.HOURS)
+                    .setConstraints(
+                        Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+                    )
+                    .build()
+            )
+        } catch (_: Exception) {}
+
         // Twice-daily check for a new app release (notifies once per version)
         try {
             WorkManager.getInstance(this).enqueueUniquePeriodicWork(

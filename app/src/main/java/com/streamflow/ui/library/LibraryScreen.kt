@@ -670,6 +670,9 @@ private fun SubscriptionList(
         LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
             if (onFeedClick != null) {
                 item {
+                    val badgeCtx = androidx.compose.ui.platform.LocalContext.current
+                    val unseen by remember { com.streamflow.data.local.AppPreferences.get(badgeCtx).unseenFeed }
+                        .collectAsState(initial = 0)
                     Button(
                         onClick = onFeedClick,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -677,6 +680,17 @@ private fun SubscriptionList(
                         Icon(Icons.Rounded.Subscriptions, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("New videos from your channels", fontWeight = FontWeight.SemiBold)
+                        if (unseen > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            // NEW badge: uploads found since the feed was last opened
+                            Surface(shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.onPrimary) {
+                                Text(if (unseen > 99) "99+" else "$unseen",
+                                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                            }
+                        }
                     }
                 }
             }

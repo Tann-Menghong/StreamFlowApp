@@ -116,12 +116,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ── Downloads ─────────────────────────────────────────────────────────────
-    fun download(isAudio: Boolean) {
+    fun download(isAudio: Boolean, maxHeight: Int = Int.MAX_VALUE) {
         val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
         val app = getApplication<Application>()
         viewModelScope.launch {
             try {
-                val streams = repo.getDownloadStreams(d.url)
+                val streams = repo.getDownloadStreams(d.url, maxHeight)
                 val streamUrl = (if (isAudio) streams.audioUrl else streams.videoUrl)
                 if (streamUrl == null) {
                     android.widget.Toast.makeText(app, "No downloadable stream found", android.widget.Toast.LENGTH_SHORT).show()
@@ -293,12 +293,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     val qualityPref = if (isOnCellular() && cellularPref != "SAME") cellularPref
                                       else prefs.quality.first()
                     _autoQuality.value = qualityPref == "AUTO"
-                    // Data saver caps Auto at 480p
-                    val quality = if (qualityPref == "AUTO" && prefs.dataSaver.first()) "480P" else qualityPref
+                    // Data saver caps Auto at 480p; battery saver caps everything
+                    val saverOn = prefs.batterySaver.first()
+                    val quality = when {
+                        saverOn -> "480P"
+                        qualityPref == "AUTO" && prefs.dataSaver.first() -> "480P"
+                        else -> qualityPref
+                    }
                     val details = repo.getVideoDetails(videoUrl, quality)
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
-                    prefetchNext(details, quality)
+                    if (!saverOn) prefetchNext(details, quality) // saver: no background prefetch
                 } catch (e: Exception) {
                     _uiState.value = PlayerUiState.Error(friendlyError(e))
                 }
