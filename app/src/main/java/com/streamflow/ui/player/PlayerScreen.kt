@@ -1543,6 +1543,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 active = isInWatchLater
                             ) { vm.toggleWatchLater() }
                             if (!details.isLive) {
+                                // Save this exact moment for later (Library > Bookmarks)
+                                ActionChip(icon = Icons.Rounded.BookmarkAdd, label = "Clip moment") {
+                                    vm.addBookmark(playerPosition)
+                                }
                                 ActionChip(icon = Icons.Rounded.Download, label = "Download") { showDownloadDialog = true }
                             }
                             ActionChip(icon = Icons.Rounded.PlaylistAdd, label = "Save") { showPlaylistDialog = true }

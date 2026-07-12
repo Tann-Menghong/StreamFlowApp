@@ -65,10 +65,11 @@ fun LibraryScreen(
     val uiLang by libPrefs.language.collectAsState(initial = "EN")
     // Open on the user's preferred tab (Settings > Home > Default Library tab)
     LaunchedEffect(Unit) {
-        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 5) ?: 1
+        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 6) ?: 1
     }
-    val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+    val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }
+    val bookmarksList by vm.bookmarks.collectAsState()
 
     // Swipe-to-delete with Undo
     val snackbarHostState = remember { SnackbarHostState() }
@@ -119,7 +120,7 @@ fun LibraryScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             LibraryStatsHeader(favoritesCount = favorites.size, history = history)
-            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size)
+            val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size, bookmarksList.size)
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = MaterialTheme.colorScheme.background,
@@ -232,6 +233,11 @@ fun LibraryScreen(
                             onPlaylistClick = onPlaylistClick,
                             onDelete = vm::deletePlaylist,
                             onCreate = vm::createPlaylist
+                        )
+                    6 -> BookmarkList(
+                            bookmarks = bookmarksList,
+                            onOpen = { b -> vm.primeBookmarkPosition(b) { onVideoClick(b.videoUrl) } },
+                            onDelete = vm::deleteBookmark
                         )
                     else -> DownloadList(
                             downloads = downloads,
@@ -821,6 +827,68 @@ private fun StatTile(title: String, value: String, sub: String, modifier: Modifi
                 color = MaterialTheme.colorScheme.onSurface.copy(0.85f), maxLines = 1)
             Text(sub, fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}
+
+// Saved video moments: tap to play from that exact timestamp
+@Composable
+private fun BookmarkList(
+    bookmarks: List<com.streamflow.data.local.entity.BookmarkEntity>,
+    onOpen: (com.streamflow.data.local.entity.BookmarkEntity) -> Unit,
+    onDelete: (Long) -> Unit
+) {
+    if (bookmarks.isEmpty()) {
+        EmptyState(Icons.Rounded.BookmarkAdd, "No saved moments",
+            "Tap \"Clip moment\" while watching to save the exact time here.")
+        return
+    }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+        items(bookmarks, key = { it.id }) { b ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onOpen(b) }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box {
+                    AsyncImage(
+                        model = b.thumbnailUrl, contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(width = 120.dp, height = 68.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
+                    )
+                    // Timestamp chip over the thumbnail
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.align(Alignment.BottomStart).padding(5.dp)
+                    ) {
+                        Text(
+                            formatDuration(b.positionMs / 1000),
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(b.title, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                        maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(2.dp))
+                    Text(b.uploaderName, fontSize = 11.sp,
+                        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { onDelete(b.id) }, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Rounded.Close, "Delete bookmark",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
+                        modifier = Modifier.size(16.dp))
+                }
+            }
         }
     }
 }

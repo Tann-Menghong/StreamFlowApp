@@ -12,7 +12,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +48,7 @@ fun ChannelScreen(
     val listState = rememberLazyListState()
     // About is a local tab — it shows data we already have, no network call
     var showAbout by remember(channelUrl) { mutableStateOf(false) }
+    var channelQuery by remember(channelUrl) { mutableStateOf("") }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -287,14 +290,47 @@ fun ChannelScreen(
                         }
                     }
 
-                    // ── Videos / Shorts / Live list ───────────────────────
-                    else -> items(data.videos, key = { it.url }) { video ->
-                        Box(Modifier.padding(horizontal = 14.dp)) {
-                            VideoCard(
-                                video = video,
-                                onClick = { onVideoClick(video.url) },
-                                onChannelClick = onChannelClick
+                    // ── Videos / Shorts / Live list (with in-channel search) ──
+                    else -> {
+                        item(key = "channel_search") {
+                            OutlinedTextField(
+                                value = channelQuery,
+                                onValueChange = { channelQuery = it },
+                                placeholder = { Text("Search this channel…", fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Rounded.Search, null,
+                                    modifier = Modifier.size(18.dp)) },
+                                trailingIcon = {
+                                    if (channelQuery.isNotEmpty()) {
+                                        IconButton(onClick = { channelQuery = "" }) {
+                                            Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
                             )
+                        }
+                        val shown = if (channelQuery.isBlank()) data.videos
+                            else data.videos.filter { it.title.contains(channelQuery, ignoreCase = true) }
+                        items(shown, key = { it.url }) { video ->
+                            Box(Modifier.padding(horizontal = 14.dp)) {
+                                VideoCard(
+                                    video = video,
+                                    onClick = { onVideoClick(video.url) },
+                                    onChannelClick = onChannelClick
+                                )
+                            }
+                        }
+                        if (channelQuery.isNotBlank() && shown.isEmpty()) {
+                            item {
+                                Text("No results in loaded videos — scroll to load more first",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp))
+                            }
                         }
                     }
                 }

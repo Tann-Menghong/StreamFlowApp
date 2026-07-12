@@ -37,6 +37,24 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val playlists: StateFlow<List<PlaylistWithCount>> = db.playlistDao().getPlaylistsWithCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val bookmarks: StateFlow<List<com.streamflow.data.local.entity.BookmarkEntity>> = db.bookmarkDao().getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deleteBookmark(id: Long) = viewModelScope.launch { db.bookmarkDao().delete(id) }
+
+    // Opening a bookmark: write its position into history so the player's
+    // normal resume logic starts the video at the saved moment
+    fun primeBookmarkPosition(b: com.streamflow.data.local.entity.BookmarkEntity, then: () -> Unit) {
+        viewModelScope.launch {
+            db.historyDao().insert(HistoryEntity(
+                url = b.videoUrl, title = b.title, thumbnailUrl = b.thumbnailUrl,
+                uploaderName = b.uploaderName, viewCount = 0L, duration = 0L,
+                position = b.positionMs
+            ))
+            then()
+        }
+    }
+
     fun removeDownload(url: String) = viewModelScope.launch { db.downloadDao().delete(url) }
     fun deletePlaylist(id: Long) = viewModelScope.launch {
         db.playlistDao().clearItems(id)

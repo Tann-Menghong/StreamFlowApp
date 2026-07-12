@@ -60,6 +60,7 @@ class AppPreferences(private val context: Context) {
         val PLAYER_GESTURES_KEY = booleanPreferencesKey("player_gestures")
         val AUTO_PIP_KEY        = booleanPreferencesKey("auto_pip") // floating mini video on Home press
         val DESIGN_STYLE_KEY    = stringPreferencesKey("design_style") // MODERN / CLASSIC
+        val EQ_PRESET_KEY       = stringPreferencesKey("eq_preset")    // "OFF" or a device preset name
         val CONFIRM_EXIT_KEY    = booleanPreferencesKey("confirm_exit")
         val CUSTOM_CATEGORIES_KEY = stringPreferencesKey("custom_categories") // user-added topic chips
         val SHOW_SEARCH_TAB_KEY = booleanPreferencesKey("show_search_tab")
@@ -128,6 +129,7 @@ class AppPreferences(private val context: Context) {
     // only, instead of a floating mini video (PiP) over other apps
     val autoPip        : Flow<Boolean> = context.dataStore.data.map { it[AUTO_PIP_KEY] ?: false }
     val designStyle    : Flow<String>  = context.dataStore.data.map { it[DESIGN_STYLE_KEY] ?: "MODERN" }
+    val eqPreset       : Flow<String>  = context.dataStore.data.map { it[EQ_PRESET_KEY] ?: "OFF" }
     val confirmExit    : Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_EXIT_KEY] ?: false }
     val customCategories: Flow<List<String>> = context.dataStore.data.map {
         it[CUSTOM_CATEGORIES_KEY]?.split(",")?.filter { c -> c.isNotBlank() } ?: emptyList()
@@ -224,6 +226,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setPlayerGestures(v: Boolean)  = context.dataStore.edit { it[PLAYER_GESTURES_KEY] = v }
     suspend fun setAutoPip(v: Boolean)         = context.dataStore.edit { it[AUTO_PIP_KEY] = v }
     suspend fun setDesignStyle(v: String)      = context.dataStore.edit { it[DESIGN_STYLE_KEY] = v }
+    suspend fun setEqPreset(v: String)         = context.dataStore.edit { it[EQ_PRESET_KEY] = v }
     suspend fun setConfirmExit(v: Boolean)     = context.dataStore.edit { it[CONFIRM_EXIT_KEY] = v }
     suspend fun setCustomCategories(v: List<String>) = context.dataStore.edit { it[CUSTOM_CATEGORIES_KEY] = v.joinToString(",") }
     suspend fun setShowSearchTab(v: Boolean)   = context.dataStore.edit { it[SHOW_SEARCH_TAB_KEY] = v }

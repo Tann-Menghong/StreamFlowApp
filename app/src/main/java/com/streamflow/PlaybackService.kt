@@ -27,6 +27,25 @@ class PlaybackService : MediaSessionService() {
     private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
     private var boostGainMb = 0
     private var audioSessionId = 0
+    private var equalizer: android.media.audiofx.Equalizer? = null
+    private var eqPresetName = "OFF"
+
+    // Apply the user's chosen equalizer preset (matched by name — indices vary per device)
+    private fun applyEq() {
+        try {
+            equalizer?.release()
+            equalizer = null
+            if (eqPresetName == "OFF" || audioSessionId == 0) return
+            val eq = android.media.audiofx.Equalizer(0, audioSessionId)
+            val idx = (0 until eq.numberOfPresets).firstOrNull {
+                eq.getPresetName(it.toShort()).equals(eqPresetName, ignoreCase = true)
+            }
+            if (idx == null) { eq.release(); return }
+            eq.usePreset(idx.toShort())
+            eq.enabled = true
+            equalizer = eq
+        } catch (_: Exception) { equalizer = null }
+    }
 
     // Amplify quiet videos beyond 100% via LoudnessEnhancer (gain in millibels)
     private fun applyBoost() {
@@ -103,12 +122,19 @@ class PlaybackService : MediaSessionService() {
             ) {
                 audioSessionId = sessionId
                 applyBoost()
+                applyEq()
             }
         })
         serviceScope.launch {
             (application as StreamFlowApp).prefs.volumeBoost.collect { v ->
                 boostGainMb = v.toIntOrNull() ?: 0
                 applyBoost()
+            }
+        }
+        serviceScope.launch {
+            (application as StreamFlowApp).prefs.eqPreset.collect { v ->
+                eqPresetName = v
+                applyEq()
             }
         }
 
@@ -143,6 +169,8 @@ class PlaybackService : MediaSessionService() {
         serviceScope.cancel()
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
         loudnessEnhancer = null
+        try { equalizer?.release() } catch (_: Exception) {}
+        equalizer = null
         mediaSession?.run {
             player.release()
             release()

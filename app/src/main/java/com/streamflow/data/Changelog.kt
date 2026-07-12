@@ -6,8 +6,9 @@ object Changelog {
     const val VERSION_NAME = "2.66.2"
 
     val notes = listOf(
-        "Settings is now a dashboard! Colorful section tiles at the top - tap any tile to jump straight to that section",
-        "Settings cards have a clearer grouped look",
-        "Library now opens on the History tab by default (change it in Settings > Home > Default Library tab)"
+        "Clip moments! Tap \"Clip moment\" in the player to save the exact time - find them in Library > Bookmarks and jump right back",
+        "Equalizer! Settings > Playback > Equalizer with presets: Rock, Pop, Jazz, Bass and more",
+        "Search inside any channel - a search box now sits above the channel's videos",
+        "Bookmarks tab added to Library with timestamp chips on thumbnails"
     )
 }

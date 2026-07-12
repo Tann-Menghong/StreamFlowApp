@@ -103,6 +103,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val playerGestures       by vm.playerGestures.collectAsState()
     val autoPip              by vm.autoPip.collectAsState()
     val designStyle          by vm.designStyle.collectAsState()
+    val eqPreset             by vm.eqPreset.collectAsState()
+    var showEqDialog         by remember { mutableStateOf(false) }
     val confirmExit          by vm.confirmExit.collectAsState()
     val showSearchTab        by vm.showSearchTab.collectAsState()
     val fontFamily           by vm.fontFamily.collectAsState()
@@ -493,6 +495,10 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
                 ) { showBoostDialog = true }
                 SettingsDivider()
+                SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
+                    if (eqPreset == "OFF") "Off" else eqPreset
+                ) { showEqDialog = true }
+                SettingsDivider()
                 SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
                     "Prefer lower quality to save mobile data", dataSaver
                 ) { vm.setDataSaver(it) }
@@ -625,6 +631,17 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             { vm.setCountry(countryOptions[it].first); showCountryDialog = false },
             { showCountryDialog = false }
         )
+    }
+    if (showEqDialog) {
+        // Standard Android preset names; the playback service matches by name
+        // and silently ignores presets a device doesn't have
+        val eqOpts = listOf("OFF" to "Off", "Normal" to "Normal", "Classical" to "Classical",
+            "Dance" to "Dance", "Flat" to "Flat", "Folk" to "Folk",
+            "Heavy Metal" to "Heavy metal", "Hip Hop" to "Hip hop",
+            "Jazz" to "Jazz", "Pop" to "Pop", "Rock" to "Rock")
+        PickerDialog("Equalizer", eqOpts.map { it.second },
+            eqOpts.indexOfFirst { it.first == eqPreset }.coerceAtLeast(0),
+            { vm.setEqPreset(eqOpts[it].first); showEqDialog = false }, { showEqDialog = false })
     }
     if (showAccentDialog) {
         AccentPickerDialog(accentColor, { vm.setAccentColor(it); showAccentDialog = false }, { showAccentDialog = false })

@@ -418,6 +418,22 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Save the current moment as a bookmark (Library > Bookmarks)
+    fun addBookmark(positionMs: Long) {
+        val d = (_uiState.value as? PlayerUiState.Ready)?.details ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            db.bookmarkDao().insert(com.streamflow.data.local.entity.BookmarkEntity(
+                videoUrl = d.url, title = d.title, thumbnailUrl = d.thumbnailUrl,
+                uploaderName = d.uploaderName, positionMs = positionMs
+            ))
+            val s = positionMs / 1000
+            val label = if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
+                        else "%d:%02d".format(s / 60, s % 60)
+            android.widget.Toast.makeText(app, "Moment saved at $label", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun savePosition(url: String, positionMs: Long) {
         viewModelScope.launch {
             db.historyDao().updatePosition(url, positionMs)
