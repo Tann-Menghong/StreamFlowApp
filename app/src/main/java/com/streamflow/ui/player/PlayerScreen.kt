@@ -426,9 +426,14 @@ fun PlayerScreen(
     // pull-to-reveal actions, so the gesture has a tactile "lock-in" moment
     // instead of just a threshold you have to guess.
     var minimizeArmed by remember { mutableStateOf(false) }
+    // Bumped on every fresh drag input so a spring-back from a PREVIOUS release
+    // can detect a new grab starting mid-animation and bail out instead of
+    // fighting the new drag for control of minimizeDrag.
+    var minimizeGeneration by remember { mutableIntStateOf(0) }
     val minimizeScrollConnection = remember {
         object : NestedScrollConnection {
             fun applyDrag(delta: Float) {
+                minimizeGeneration++
                 minimizeDrag = (minimizeDrag + delta).coerceAtLeast(0f)
                 val nowArmed = minimizeDrag > MINIMIZE_THRESHOLD_PX
                 if (nowArmed != minimizeArmed) {
@@ -467,7 +472,10 @@ fun PlayerScreen(
                         minimizeDrag = 0f
                         onBack()
                     } else {
-                        // Smooth spring back instead of an instant snap to 0
+                        // Smooth spring back instead of an instant snap to 0 — bails
+                        // out early if the user already grabbed a new drag before
+                        // this animation finished, instead of racing it.
+                        val myGeneration = minimizeGeneration
                         animate(
                             initialValue = minimizeDrag,
                             targetValue = 0f,
@@ -475,7 +483,9 @@ fun PlayerScreen(
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessMedium)
-                        ) { value, _ -> minimizeDrag = value }
+                        ) { value, _ ->
+                            if (minimizeGeneration == myGeneration) minimizeDrag = value
+                        }
                     }
                 }
                 return Velocity.Zero

@@ -3,12 +3,11 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.1.2"
+    const val VERSION_NAME = "3.1.3"
 
     val notes = listOf(
-        "Bug fix pass!",
-        "Fixed: opening a saved moment could quietly wipe that video's watch-time stats if it later failed to reload",
-        "Fixed: Battery saver could raise a manually picked lower quality (e.g. 360p) back up to 480p instead of leaving it alone",
-        "Fixed: Bluetooth resume now skips downloaded files and finds your last real YouTube video to continue"
+        "More bug fixes!",
+        "Fixed: Battery saver's quality cap could be bypassed by manually picking a quality from the player's quality menu",
+        "Fixed: a rare glitch where quickly re-grabbing the video right after canceling swipe-to-minimize could cause a visual stutter"
     )
 }

@@ -343,9 +343,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val current = _uiState.value as? PlayerUiState.Ready ?: return
         _autoQuality.value = height == null
         viewModelScope.launch {
+            // Battery saver is a hard cap (Settings literally says "Cap quality at
+            // 480p") — without this, picking a quality from the in-player menu
+            // silently bypassed it, so the setting didn't actually do what it says.
+            val cappedHeight = if (prefs.batterySaver.first() && (height == null || height > 480)) 480 else height
             _uiState.value = PlayerUiState.Loading
             try {
-                val details = repo.getVideoDetails(videoUrl, "AUTO", maxHeightOverride = height)
+                val details = repo.getVideoDetails(videoUrl, "AUTO", maxHeightOverride = cappedHeight)
                 _uiState.value = PlayerUiState.Ready(details)
             } catch (_: Exception) {
                 // Revert to the working stream rather than showing an error
