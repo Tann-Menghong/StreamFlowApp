@@ -88,6 +88,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+// Drag distance (px) past which releasing the swipe-down-to-minimize gesture
+// commits to minimizing; shared by the gesture handler and its visual feedback
+// so the on-screen shrink/fade finishes exactly when the action arms.
+private const val MINIMIZE_THRESHOLD_PX = 220f
+
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -415,11 +420,26 @@ fun PlayerScreen(
     // exactly the same "overscroll at top" signal pull-to-refresh uses elsewhere.
     var minimizeDrag by remember { mutableFloatStateOf(0f) }
     val playerListState = rememberLazyListState()
+    val minimizeHaptic = LocalHapticFeedback.current
+    // Ticks a haptic once as the drag crosses the point where releasing would
+    // commit to minimizing — the same "about to trigger" feedback iOS uses on
+    // pull-to-reveal actions, so the gesture has a tactile "lock-in" moment
+    // instead of just a threshold you have to guess.
+    var minimizeArmed by remember { mutableStateOf(false) }
     val minimizeScrollConnection = remember {
         object : NestedScrollConnection {
+            fun applyDrag(delta: Float) {
+                minimizeDrag = (minimizeDrag + delta).coerceAtLeast(0f)
+                val nowArmed = minimizeDrag > MINIMIZE_THRESHOLD_PX
+                if (nowArmed != minimizeArmed) {
+                    minimizeArmed = nowArmed
+                    minimizeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                }
+            }
+
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (minimizeDrag > 0f && available.y != 0f) {
-                    minimizeDrag = (minimizeDrag + available.y).coerceAtLeast(0f)
+                    applyDrag(available.y)
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
@@ -429,7 +449,7 @@ fun PlayerScreen(
                 val atTop = playerListState.firstVisibleItemIndex == 0 &&
                     playerListState.firstVisibleItemScrollOffset == 0
                 if (atTop && available.y > 0f) {
-                    minimizeDrag += available.y
+                    applyDrag(available.y)
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
@@ -437,8 +457,26 @@ fun PlayerScreen(
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                 if (minimizeDrag > 0f) {
-                    if (minimizeDrag > 260f) { minimizeDrag = 0f; onBack() }
-                    else minimizeDrag = 0f
+                    // Commit on a clear pull past the threshold, OR a fast downward
+                    // flick from partway — matches how sheet-dismiss gestures work
+                    // elsewhere on Android instead of relying on distance alone.
+                    val shouldMinimize = minimizeDrag > MINIMIZE_THRESHOLD_PX ||
+                        (minimizeDrag > 70f && available.y > 1200f)
+                    minimizeArmed = false
+                    if (shouldMinimize) {
+                        minimizeDrag = 0f
+                        onBack()
+                    } else {
+                        // Smooth spring back instead of an instant snap to 0
+                        animate(
+                            initialValue = minimizeDrag,
+                            targetValue = 0f,
+                            initialVelocity = available.y.coerceAtMost(0f),
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium)
+                        ) { value, _ -> minimizeDrag = value }
+                    }
                 }
                 return Velocity.Zero
             }
@@ -1216,11 +1254,17 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
                     .graphicsLayer {
-                        translationY = minimizeDrag * 0.35f
-                        val f = (minimizeDrag / 900f).coerceIn(0f, 0.25f)
-                        scaleX = 1f - f
-                        scaleY = 1f - f
-                        alpha = 1f - f
+                        // Progress reaches 1 right at the commit threshold, so what
+                        // the user sees lines up with when the gesture will actually
+                        // trigger — a corner radius grows in too, so the video visibly
+                        // turns into a mini-player-shaped card as it shrinks.
+                        val progress = (minimizeDrag / MINIMIZE_THRESHOLD_PX).coerceIn(0f, 1f)
+                        translationY = minimizeDrag * 0.4f
+                        scaleX = 1f - progress * 0.35f
+                        scaleY = 1f - progress * 0.35f
+                        alpha = 1f - progress * 0.35f
+                        shape = RoundedCornerShape((progress * 14f).dp)
+                        clip = true
                     }
             ) {
                 when (val s = state) {
