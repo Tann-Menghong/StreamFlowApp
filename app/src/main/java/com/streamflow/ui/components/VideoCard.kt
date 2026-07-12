@@ -5,7 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -110,21 +110,17 @@ fun VideoCard(
 
     // MODERN design: soft tonal card container; CLASSIC: original flat layout
     val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
-    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = if (modernStyle) 14.dp else 20.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = if (modernStyle) 18.dp else 20.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
+                    // MODERN: an elevated media card — real depth (shadow + a lighter
+                    // surface than the page) with an edge-to-edge thumbnail, so the feed
+                    // reads as a stack of distinct cards, not a flat wall of thumbnails.
                     if (modernStyle) Modifier
-                        .clip(RoundedCornerShape((corner + 6).dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(0.55f))
-                        // Hairline border: crisp card definition without a heavy fill —
-                        // the clean, "product-grade" look vs a muddy tinted block
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(0.5f),
-                            RoundedCornerShape((corner + 6).dp)
-                        )
+                        .shadow(6.dp, RoundedCornerShape((corner + 10).dp))
+                        .background(MaterialTheme.colorScheme.surface)
                     else Modifier
                 )
                 .pointerInput(Unit) {
@@ -137,14 +133,17 @@ fun VideoCard(
                         }
                     )
                 }
-                .then(if (modernStyle) Modifier.padding(8.dp) else Modifier)
         ) {
-            // Thumbnail
+            // Thumbnail — edge-to-edge in MODERN (only top corners round, flush to the
+            // card above the metadata footer); self-contained rounded tile in CLASSIC.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(corner.dp))
+                    .clip(
+                        if (modernStyle) RoundedCornerShape(topStart = (corner + 10).dp, topEnd = (corner + 10).dp)
+                        else RoundedCornerShape(corner.dp)
+                    )
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             ) {
                 AsyncImage(
@@ -192,9 +191,15 @@ fun VideoCard(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            if (!modernStyle) Spacer(Modifier.height(10.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Metadata footer: padded inside the card for MODERN, flush for CLASSIC
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = if (modernStyle)
+                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 11.dp, bottom = 13.dp)
+                else Modifier.fillMaxWidth()
+            ) {
                 ChannelAvatar(
                     name      = video.uploaderName,
                     avatarUrl = video.uploaderAvatarUrl,

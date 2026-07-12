@@ -3,11 +3,11 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.6.0"
+    const val VERSION_NAME = "3.7.0"
 
     val notes = listOf(
-        "Fresh look: a cleaner, more professional colour palette with better depth and contrast on every screen",
-        "Sharper typography — tighter, more polished headings throughout the app",
-        "Crisper video cards with a subtle defined edge, and a more refined navigation bar"
+        "Redesigned feed: videos now sit in clean, elevated cards with edge-to-edge thumbnails — a more premium, modern layout you'll see across Home, Search, Channels and Up Next",
+        "More breathing room between cards and a padded info area under each thumbnail",
+        "Built on last update's refined palette and sharper typography for one coherent new look"
     )
 }
