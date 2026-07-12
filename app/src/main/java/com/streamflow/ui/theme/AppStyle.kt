@@ -10,6 +10,10 @@ val LocalThumbCorner = staticCompositionLocalOf { 12 }
 // Whether long-press / gesture haptics should fire
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
+// Design style: "MODERN" = card feed, floating pill bars, colorful settings
+// badges (the new look); "CLASSIC" = the original flat full-width design
+val LocalDesignStyle = staticCompositionLocalOf { "MODERN" }
+
 fun cornerDpFor(style: String): Int = when (style) {
     "SQUARE" -> 4
     "ROUND"  -> 18

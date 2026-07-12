@@ -107,13 +107,18 @@ fun VideoCard(
         label         = "card_scale"
     )
 
-    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = 14.dp)) {
-        // Card container: soft tonal surface with generous rounding (pro look)
+    // MODERN design: soft tonal card container; CLASSIC: original flat layout
+    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
+    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = if (modernStyle) 14.dp else 20.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape((corner + 6).dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.28f))
+                .then(
+                    if (modernStyle) Modifier
+                        .clip(RoundedCornerShape((corner + 6).dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.28f))
+                    else Modifier
+                )
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = { pressed = true; tryAwaitRelease(); pressed = false },
@@ -124,7 +129,7 @@ fun VideoCard(
                         }
                     )
                 }
-                .padding(8.dp)
+                .then(if (modernStyle) Modifier.padding(8.dp) else Modifier)
         ) {
             // Thumbnail
             Box(

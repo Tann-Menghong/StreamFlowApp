@@ -395,16 +395,20 @@ private fun AnimatedNavBar(
     reduceMotion: Boolean = false,
     onSelect: (Screen) -> Unit
 ) {
-    // Floating pill nav: inset rounded bar matching the floating mini player
+    // MODERN design: floating pill nav; CLASSIC: original full-width bar
+    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
     Surface(
         color        = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
         shadowElevation = 10.dp,
-        shape = RoundedCornerShape(26.dp),
+        shape = if (modernStyle) RoundedCornerShape(26.dp)
+                else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 8.dp)
+            .then(
+                if (modernStyle) Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp)
+                else Modifier
+            )
     ) {
         Row(
             modifier = Modifier

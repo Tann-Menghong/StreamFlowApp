@@ -94,6 +94,7 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     val hapticsEnabled       by vm.hapticsEnabled.collectAsState()
     val playerGestures       by vm.playerGestures.collectAsState()
     val autoPip              by vm.autoPip.collectAsState()
+    val designStyle          by vm.designStyle.collectAsState()
     val confirmExit          by vm.confirmExit.collectAsState()
     val showSearchTab        by vm.showSearchTab.collectAsState()
     val fontFamily           by vm.fontFamily.collectAsState()
@@ -246,6 +247,11 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             // ── Appearance ───────────────────────────────────────────────
             SettingsSection("Appearance")
             SettingsCard {
+                SettingsSwitchItem(Icons.Rounded.AutoAwesome, "Modern design",
+                    "Card feed, floating bars, colorful icons — off for the classic look",
+                    designStyle == "MODERN"
+                ) { vm.setDesignStyle(if (it) "MODERN" else "CLASSIC") }
+                SettingsDivider()
                 SettingsItem(Icons.Rounded.Palette, "Theme",
                     when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                 ) { showThemeDialog = true }
@@ -746,12 +752,20 @@ private val badgePalette = listOf(
 
 @Composable
 private fun SettingsIconBadge(icon: ImageVector, title: String) {
-    val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
-    Box(
-        Modifier.size(32.dp).background(color, RoundedCornerShape(9.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
+    if (com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN") {
+        val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
+        Box(
+            Modifier.size(32.dp).background(color, RoundedCornerShape(9.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
+        }
+    } else {
+        // CLASSIC: plain tinted icon, no badge
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp))
+        }
     }
 }
 

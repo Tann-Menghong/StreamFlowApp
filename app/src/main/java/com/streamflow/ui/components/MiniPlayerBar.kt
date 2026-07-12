@@ -48,15 +48,19 @@ fun MiniPlayerBar(
         }
     }
 
+    // MODERN design: floating rounded card; CLASSIC: original full-width bar
+    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 8.dp,
         shadowElevation = 6.dp,
-        shape = RoundedCornerShape(16.dp),
+        shape = if (modernStyle) RoundedCornerShape(16.dp)
+                else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier
-            // Floating card look: inset from the edges instead of a full-width bar
-            .padding(horizontal = 10.dp)
-            .padding(bottom = 6.dp)
+            .then(
+                if (modernStyle) Modifier.padding(horizontal = 10.dp).padding(bottom = 6.dp)
+                else Modifier
+            )
             .graphicsLayer {
                 translationX = dragX
                 alpha = 1f - (kotlin.math.abs(dragX) / 700f).coerceIn(0f, 0.6f)
