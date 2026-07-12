@@ -43,14 +43,24 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteBookmark(id: Long) = viewModelScope.launch { db.bookmarkDao().delete(id) }
 
     // Opening a bookmark: write its position into history so the player's
-    // normal resume logic starts the video at the saved moment
+    // normal resume logic starts the video at the saved moment. If a history
+    // row already exists, only its position is touched — a REPLACE insert here
+    // would zero out that row's real viewCount/duration (bookmarks don't carry
+    // them), and if the video later fails to re-extract, loadVideo's own
+    // recordHistory (which would normally repair those fields) never runs,
+    // leaving the corruption permanent.
     fun primeBookmarkPosition(b: com.streamflow.data.local.entity.BookmarkEntity, then: () -> Unit) {
         viewModelScope.launch {
-            db.historyDao().insert(HistoryEntity(
-                url = b.videoUrl, title = b.title, thumbnailUrl = b.thumbnailUrl,
-                uploaderName = b.uploaderName, viewCount = 0L, duration = 0L,
-                position = b.positionMs
-            ))
+            val hasExisting = try { db.historyDao().getPosition(b.videoUrl); true } catch (_: Exception) { false }
+            if (hasExisting) {
+                db.historyDao().updatePosition(b.videoUrl, b.positionMs)
+            } else {
+                db.historyDao().insert(HistoryEntity(
+                    url = b.videoUrl, title = b.title, thumbnailUrl = b.thumbnailUrl,
+                    uploaderName = b.uploaderName, viewCount = 0L, duration = 0L,
+                    position = b.positionMs
+                ))
+            }
             then()
         }
     }

@@ -293,10 +293,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     val qualityPref = if (isOnCellular() && cellularPref != "SAME") cellularPref
                                       else prefs.quality.first()
                     _autoQuality.value = qualityPref == "AUTO"
-                    // Data saver caps Auto at 480p; battery saver caps everything
+                    // Data saver caps Auto at 480p; battery saver caps everything at
+                    // 480p — but a genuine CAP, not a floor: if the user deliberately
+                    // picked 360P (even lower, to save more than 480p would), battery
+                    // saver must not raise it back up to 480p.
                     val saverOn = prefs.batterySaver.first()
                     val quality = when {
-                        saverOn -> "480P"
+                        saverOn -> capQuality(qualityPref, "480P")
                         qualityPref == "AUTO" && prefs.dataSaver.first() -> "480P"
                         else -> qualityPref
                     }
@@ -467,6 +470,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             duration = details.duration,
             position = prevPos
         ))
+    }
+
+    // Caps `pref` at `cap` without ever RAISING a quality the user picked lower
+    // than the cap (e.g. battery saver capping at 480P must leave a manual
+    // 360P choice alone, not bump it up).
+    private fun capQuality(pref: String, cap: String): String {
+        if (pref == "AUTO") return cap
+        val order = listOf("360P", "480P", "720P", "1080P")
+        val prefIdx = order.indexOf(pref)
+        val capIdx = order.indexOf(cap)
+        return if (prefIdx == -1 || capIdx == -1 || prefIdx <= capIdx) pref else cap
     }
 
     private fun isOnCellular(): Boolean = try {

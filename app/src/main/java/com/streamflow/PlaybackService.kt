@@ -21,6 +21,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+// Downloaded files and other direct streams aren't YouTube URLs — running them
+// through the extractor during Bluetooth playback resumption would just throw
+private fun isLocalOrDirectUrl(url: String): Boolean {
+    val lower = url.lowercase()
+    return lower.startsWith("file://") || lower.startsWith("content://") ||
+        lower.contains(".m3u8") || lower.contains(".mp4") ||
+        lower.contains(".m4a") || lower.contains(".webm")
+}
+
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
@@ -172,8 +181,12 @@ class PlaybackService : MediaSessionService() {
                     serviceScope.launch {
                         try {
                             val app = application as StreamFlowApp
-                            val last = app.database.historyDao().getAll()
-                                .first().firstOrNull() ?: throw Exception("no history")
+                            // Skip downloaded/local files — they'd fail the YouTube
+                            // extractor and abort resumption entirely; find the most
+                            // recent entry that's actually a YouTube URL instead.
+                            val last = app.database.historyDao().getAll().first()
+                                .firstOrNull { !isLocalOrDirectUrl(it.url) }
+                                ?: throw Exception("no resumable history")
                             val details = com.streamflow.data.YouTubeRepository()
                                 .getVideoDetails(last.url)
                             val extras = Bundle().apply {
