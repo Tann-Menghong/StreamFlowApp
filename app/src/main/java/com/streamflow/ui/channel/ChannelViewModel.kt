@@ -110,8 +110,12 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val result = repo.getChannelNextPage(url, nextPage, tab)
                 if (currentTab != tab) return@launch // tab switched mid-load
+                // Dedupe at append time — NewPipe pagination can return the same
+                // video across two pages, and the LazyColumn's key = { it.url }
+                // crashes on a duplicate key if that happens unguarded.
+                val existingUrls = _channel.value.videos.mapTo(HashSet()) { it.url }
                 _channel.value = _channel.value.copy(
-                    videos = _channel.value.videos + result.videos,
+                    videos = _channel.value.videos + result.videos.filter { it.url !in existingUrls },
                     playlists = (_channel.value.playlists + result.playlists).distinctBy { it.url },
                     nextPage = result.nextPage,
                     isLoadingMore = false

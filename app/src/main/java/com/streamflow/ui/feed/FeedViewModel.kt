@@ -70,6 +70,8 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
 
                 // Fetch each channel's latest uploads in parallel (cap channels + per-channel count),
                 // keeping which channel each video came from so group filtering works
+                // Dedupe by video url — the FeedScreen list is keyed by it, and a
+                // video can in principle surface from more than one channel fetch
                 videosByChannel = coroutineScope {
                     subs.take(12).map { sub ->
                         async {
@@ -79,7 +81,7 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                             } catch (_: Exception) { emptyList() }
                         }
                     }.awaitAll().flatten()
-                }
+                }.distinctBy { it.second.url }
                 if (videosByChannel.isEmpty()) {
                     _uiState.value = FeedUiState.Error("Couldn't load any videos from your channels.")
                     return@launch

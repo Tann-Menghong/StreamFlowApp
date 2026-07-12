@@ -54,8 +54,12 @@ class SearchViewModel : ViewModel() {
             try {
                 val result = repo.searchNextPage(current.query, page)
                 nextPage = result.nextPage
+                // Dedupe at append time — NewPipe pagination can repeat a video
+                // across pages, and the LazyColumn's key = { it.url } crashes on
+                // a duplicate key if that happens unguarded.
+                val existing = current.videos.mapTo(HashSet()) { it.url }
                 _uiState.value = current.copy(
-                    videos        = current.videos + result.videos,
+                    videos        = current.videos + result.videos.filter { it.url !in existing },
                     isLoadingMore = false,
                     hasMore       = result.nextPage != null
                 )
