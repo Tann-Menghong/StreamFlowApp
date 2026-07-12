@@ -507,8 +507,8 @@ fun CompactVideoCard(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
-            Modifier.width(150.dp).aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape((LocalThumbCorner.current - 2).coerceAtLeast(3).dp))
+            Modifier.width(168.dp).aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape((LocalThumbCorner.current + 2).dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
         ) {
             AsyncImage(
@@ -542,8 +542,8 @@ fun CompactVideoCard(
             }
         }
         Column(Modifier.weight(1f)) {
-            Text(video.title, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
+            Text(video.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp,
                 color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically,

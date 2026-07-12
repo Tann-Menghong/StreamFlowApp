@@ -121,42 +121,48 @@ fun LibraryScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             LibraryStatsHeader(favoritesCount = favorites.size, history = history)
             val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size, bookmarksList.size)
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor   = MaterialTheme.colorScheme.background,
-                contentColor     = MaterialTheme.colorScheme.primary,
-                edgePadding      = 8.dp,
-                divider          = { HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.4f)) }
+            // Pill-style segmented tabs (replaces the flat underline TabRow)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 tabs.forEachIndexed { i, title ->
-                    Tab(
-                        selected = selectedTab == i,
-                        onClick  = { selectedTab = i }
+                    val selected = selectedTab == i
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { selectedTab = i }
                     ) {
                         Row(
-                            Modifier.padding(vertical = 12.dp),
+                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 title,
-                                fontWeight = if (selectedTab == i) FontWeight.SemiBold else FontWeight.Normal,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 fontSize   = 13.sp,
-                                color      = if (selectedTab == i) MaterialTheme.colorScheme.primary
+                                color      = if (selected) MaterialTheme.colorScheme.onPrimary
                                              else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (tabCounts[i] > 0) {
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = if (selectedTab == i) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.surfaceVariant
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(0.22f)
+                                            else MaterialTheme.colorScheme.primary.copy(0.15f)
                                 ) {
                                     Text(
                                         tabCounts[i].toString(),
                                         fontSize   = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color      = if (selectedTab == i) MaterialTheme.colorScheme.onPrimary
-                                                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color      = if (selected) MaterialTheme.colorScheme.onPrimary
+                                                     else MaterialTheme.colorScheme.primary,
                                         modifier   = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                     )
                                 }
@@ -165,6 +171,7 @@ fun LibraryScreen(
                     }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.15f))
 
             AnimatedContent(
                 targetState = selectedTab,

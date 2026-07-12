@@ -1540,7 +1540,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Text(
                             details.title,
-                            style = MaterialTheme.typography.titleSmall.copy(lineHeight = 21.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold, lineHeight = 24.sp),
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         // YouTube-style metadata line: "2.2M views · 2 months ago"
@@ -1553,9 +1554,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             Text(metaLine, fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(10.dp))
+                        // Distinct rounded "channel bar" grouping avatar + name + Subscribe
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                         Row(
-                            Modifier.fillMaxWidth(),
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1611,6 +1618,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
+                        }
                         }
                         Spacer(Modifier.height(8.dp))
                         // YouTube-style labeled pill chips, on their own scrollable row so

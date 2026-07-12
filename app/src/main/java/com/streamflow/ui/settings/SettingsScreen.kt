@@ -511,84 +511,94 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { showLibTabDialog = true }
                 }
 
-                "Playback" -> SettingsCard {
-                    SettingsItem(Icons.Rounded.HighQuality, "Video quality",
-                        when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
-                    ) { showQualityDialog = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.SignalCellularAlt, "Quality on mobile data",
-                        when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
-                    ) { showCellularDialog = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.Speed, "Default speed",
-                        when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
-                    ) { showSpeedDialog = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.FastForward, "Double-tap skip",
-                        "${skipSeconds}s per tap"
-                    ) { showSkipDialog = true }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.Swipe, "Player swipe gestures",
-                        "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
-                        "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
-                        "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
-                    ) {
-                        try {
-                            val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
-                                as android.os.PowerManager
-                            if (android.os.Build.VERSION.SDK_INT >= 23 &&
-                                !pm.isIgnoringBatteryOptimizations(context.packageName)) {
-                                val i = android.content.Intent(
-                                    android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                    android.net.Uri.parse("package:${context.packageName}"))
-                                context.startActivity(i)
-                            } else {
-                                android.widget.Toast.makeText(context,
-                                    "Already protected — playback won't be killed",
-                                    android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (_: Exception) {
-                            // Some OEM builds block the dialog; open the app's battery settings instead
-                            try {
-                                val i = android.content.Intent(
-                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    android.net.Uri.parse("package:${context.packageName}"))
-                                context.startActivity(i)
-                            } catch (_: Exception) {}
-                        }
+                "Playback" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SettingsGroupLabel("Stream quality")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.HighQuality, "Video quality",
+                            when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
+                        ) { showQualityDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.SignalCellularAlt, "Quality on mobile data",
+                            when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
+                        ) { showCellularDialog = true }
                     }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
-                        "Play related videos automatically", autoPlay
-                    ) { vm.setAutoPlay(it) }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.VolumeUp, "Volume boost",
-                        when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
-                    ) { showBoostDialog = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
-                        if (eqPreset == "OFF") "Off" else eqPreset
-                    ) { showEqDialog = true }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
-                        "Prefer lower quality to save mobile data", dataSaver
-                    ) { vm.setDataSaver(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
-                        "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
-                    ) { vm.setBatterySaver(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
-                        "Watch without saving to history", incognito
-                    ) { vm.setIncognito(it) }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.Language, "Trending country",
-                        countryOptions.firstOrNull { it.first == country }?.second ?: country
-                    ) { showCountryDialog = true }
+                    SettingsGroupLabel("Playback")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.Speed, "Default speed",
+                            when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
+                        ) { showSpeedDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.FastForward, "Double-tap skip",
+                            "${skipSeconds}s per tap"
+                        ) { showSkipDialog = true }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.Swipe, "Player swipe gestures",
+                            "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
+                            "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
+                            "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
+                        ) {
+                            try {
+                                val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
+                                    as android.os.PowerManager
+                                if (android.os.Build.VERSION.SDK_INT >= 23 &&
+                                    !pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                                    val i = android.content.Intent(
+                                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                        android.net.Uri.parse("package:${context.packageName}"))
+                                    context.startActivity(i)
+                                } else {
+                                    android.widget.Toast.makeText(context,
+                                        "Already protected — playback won't be killed",
+                                        android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (_: Exception) {
+                                // Some OEM builds block the dialog; open the app's battery settings instead
+                                try {
+                                    val i = android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.parse("package:${context.packageName}"))
+                                    context.startActivity(i)
+                                } catch (_: Exception) {}
+                            }
+                        }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
+                            "Play related videos automatically", autoPlay
+                        ) { vm.setAutoPlay(it) }
+                    }
+                    SettingsGroupLabel("Audio")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.VolumeUp, "Volume boost",
+                            when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
+                        ) { showBoostDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
+                            if (eqPreset == "OFF") "Off" else eqPreset
+                        ) { showEqDialog = true }
+                    }
+                    SettingsGroupLabel("Data & privacy")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
+                            "Prefer lower quality to save mobile data", dataSaver
+                        ) { vm.setDataSaver(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
+                            "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
+                        ) { vm.setBatterySaver(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
+                            "Watch without saving to history", incognito
+                        ) { vm.setIncognito(it) }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Language, "Trending country",
+                            countryOptions.firstOrNull { it.first == country }?.second ?: country
+                        ) { showCountryDialog = true }
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
 
                 "AI" -> {
@@ -935,6 +945,28 @@ private fun SettingsFooter(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f),
         modifier = Modifier.padding(horizontal = 24.dp).padding(top = 6.dp)
     )
+}
+
+// Accent-bar group heading that splits a long settings page into labeled sections
+@Composable
+private fun SettingsGroupLabel(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            Modifier.width(3.dp).height(13.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
 }
 
 @Composable

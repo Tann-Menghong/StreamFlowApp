@@ -3,12 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.8.0"
+    const val VERSION_NAME = "3.9.0"
 
     val notes = listOf(
-        "Redesigned Home: a persistent rounded search bar now sits right under the logo — tap anywhere on it to search, no more hunting for the search icon",
-        "New cinematic Featured strip — big hero cards with the title and channel laid over the thumbnail, in a smooth peeking carousel",
-        "Cleaner section headers with an accent bar, plus a friendlier 'For You' with its own subtitle",
-        "Follows last update's elevated feed cards for one coherent, more premium look"
+        "Redesigned the rest of the app to match: Player, Library, Settings and search results",
+        "Player: bigger, bolder video title and a clean channel bar grouping the avatar, name and Subscribe button",
+        "Library: modern pill-style tabs replace the old underline tabs",
+        "Settings: the busy Playback page is now split into clear labeled sections (Stream quality, Playback, Audio, Data & privacy)",
+        "Search & related: larger, cleaner video rows",
+        "Completes the full-app layout refresh started over the last few updates"
     )
 }
