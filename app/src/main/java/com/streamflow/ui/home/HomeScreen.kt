@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -67,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.model.VideoItem
+import com.streamflow.ui.components.ChannelAvatar
 import com.streamflow.ui.components.CompactVideoCard
 import com.streamflow.ui.components.ContinueWatchingCard
 import com.streamflow.ui.components.HeroVideoCard
@@ -218,179 +220,91 @@ fun HomeScreen(
             Column {
                 TopAppBar(
                     title = {
-                        AnimatedContent(
-                            targetState = searchExpanded,
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
-                            label = "title_search"
-                        ) { expanded ->
-                            if (expanded) {
-                                // Inline search field
-                                Surface(
-                                    modifier      = Modifier.fillMaxWidth().padding(end = 8.dp).height(40.dp),
-                                    shape         = RoundedCornerShape(12.dp),
-                                    color         = MaterialTheme.colorScheme.surfaceVariant,
-                                    tonalElevation = 0.dp
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            // App logo: play glyph in a rounded accent badge
+                            Box(
+                                Modifier.size(30.dp).background(
+                                    MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.PlayArrow, null,
+                                    tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                            // Gradient wordmark (accent → soft accent)
+                            Text(
+                                "StreamFlow",
+                                style = androidx.compose.ui.text.TextStyle(
+                                    brush = Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize   = 22.sp
+                                )
+                            )
+                            if (incognitoOn) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant,
+                                            RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 7.dp, vertical = 3.dp)
                                 ) {
-                                    Row(
-                                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.Search, null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp))
-                                        BasicTextField(
-                                            value          = searchText,
-                                            onValueChange  = { searchText = it; vm.fetchSuggestions(it) },
-                                            modifier       = Modifier.weight(1f)
-                                                .focusRequester(focusRequester),
-                                            singleLine     = true,
-                                            textStyle      = MaterialTheme.typography.bodyMedium.copy(
-                                                color = MaterialTheme.colorScheme.onBackground),
-                                            cursorBrush    = SolidColor(MaterialTheme.colorScheme.primary),
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                            keyboardActions = KeyboardActions(onSearch = {
-                                                vm.search(searchText)
-                                                focusManager.clearFocus()
-                                            }),
-                                            decorationBox  = { inner ->
-                                                if (searchText.isEmpty()) Text(
-                                                    "Search YouTube…",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                inner()
-                                            }
-                                        )
-                                        if (searchText.isNotEmpty()) {
-                                            IconButton(
-                                                onClick  = { searchText = ""; vm.loadTrending() },
-                                                modifier = Modifier.size(20.dp)
-                                            ) {
-                                                Icon(Icons.Rounded.Close, null,
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(16.dp))
-                                            }
-                                        } else {
-                                            IconButton(
-                                                onClick  = launchVoiceSearch,
-                                                modifier = Modifier.size(22.dp)
-                                            ) {
-                                                Icon(Icons.Rounded.Mic, "Voice search",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(17.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                                LaunchedEffect(Unit) {
-                                    delay(80); focusRequester.requestFocus()
-                                }
-                            } else {
-                                Row(verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    // App logo: play glyph in an accent circle
-                                    Box(
-                                        Modifier.size(28.dp).background(
-                                            MaterialTheme.colorScheme.primary, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Rounded.PlayArrow, null,
-                                            tint = Color.White, modifier = Modifier.size(19.dp))
-                                    }
-                                    // Gradient wordmark (accent → soft accent)
-                                    Text(
-                                        "StreamFlow",
-                                        style = androidx.compose.ui.text.TextStyle(
-                                            brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                                listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.tertiary
-                                                )
-                                            ),
-                                            fontWeight = FontWeight.ExtraBold,
-                                            fontSize   = 21.sp
-                                        )
-                                    )
-                                    if (incognitoOn) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                            modifier = Modifier
-                                                .background(MaterialTheme.colorScheme.surfaceVariant,
-                                                    RoundedCornerShape(10.dp))
-                                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                                        ) {
-                                            Icon(Icons.Rounded.VisibilityOff, null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(12.dp))
-                                            Text("Incognito", fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
+                                    Icon(Icons.Rounded.VisibilityOff, null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(12.dp))
+                                    Text("Incognito", fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
-                            if (searchExpanded) {
-                                searchExpanded = false
-                                searchText     = ""
-                                focusManager.clearFocus()
-                                vm.loadTrending()
-                            } else {
-                                searchExpanded = true
+                        if (onShortsClick != null) {
+                            IconButton(onClick = onShortsClick) {
+                                Icon(Icons.Rounded.SlowMotionVideo, contentDescription = "Shorts",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        }) {
-                            Icon(
-                                if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
-                                contentDescription = if (searchExpanded) "Close search" else "Search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                        if (!searchExpanded) {
-                            if (onShortsClick != null) {
-                                IconButton(onClick = onShortsClick) {
-                                    Icon(Icons.Rounded.SlowMotionVideo, contentDescription = "Shorts",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+                        // Decluttered top bar: customize / refresh / country live
+                        // in one overflow menu instead of three separate buttons
+                        Box {
+                            var showOverflow by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showOverflow = true }) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "More",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            // Decluttered top bar: customize / refresh / country live
-                            // in one overflow menu instead of three separate buttons
-                            Box {
-                                var showOverflow by remember { mutableStateOf(false) }
-                                IconButton(onClick = { showOverflow = true }) {
-                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                DropdownMenu(expanded = showOverflow,
-                                    onDismissRequest = { showOverflow = false }) {
+                            DropdownMenu(expanded = showOverflow,
+                                onDismissRequest = { showOverflow = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Customize home") },
+                                    leadingIcon = { Icon(Icons.Rounded.Tune, null, modifier = Modifier.size(18.dp)) },
+                                    onClick = { showOverflow = false; showCustomizeSheet = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Refresh feed") },
+                                    leadingIcon = { Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp)) },
+                                    onClick = { showOverflow = false; vm.refresh() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Country: $currentCountry") },
+                                    leadingIcon = { Icon(Icons.Rounded.Public, null, modifier = Modifier.size(18.dp)) },
+                                    onClick = { showOverflow = false; showCountryPicker = true }
+                                )
+                            }
+                            DropdownMenu(expanded = showCountryPicker,
+                                onDismissRequest = { showCountryPicker = false }) {
+                                countryList.forEach { (code, name) ->
                                     DropdownMenuItem(
-                                        text = { Text("Customize home") },
-                                        leadingIcon = { Icon(Icons.Rounded.Tune, null, modifier = Modifier.size(18.dp)) },
-                                        onClick = { showOverflow = false; showCustomizeSheet = true }
+                                        text = { Text("$name ($code)", fontSize = 13.sp,
+                                            fontWeight = if (code == currentCountry) FontWeight.Bold else FontWeight.Normal) },
+                                        onClick = { vm.setCountry(code); showCountryPicker = false }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("Refresh feed") },
-                                        leadingIcon = { Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp)) },
-                                        onClick = { showOverflow = false; vm.refresh() }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Country: $currentCountry") },
-                                        leadingIcon = { Icon(Icons.Rounded.Public, null, modifier = Modifier.size(18.dp)) },
-                                        onClick = { showOverflow = false; showCountryPicker = true }
-                                    )
-                                }
-                                DropdownMenu(expanded = showCountryPicker,
-                                    onDismissRequest = { showCountryPicker = false }) {
-                                    countryList.forEach { (code, name) ->
-                                        DropdownMenuItem(
-                                            text = { Text("$name ($code)", fontSize = 13.sp,
-                                                fontWeight = if (code == currentCountry) FontWeight.Bold else FontWeight.Normal) },
-                                            onClick = { vm.setCountry(code); showCountryPicker = false }
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -398,6 +312,107 @@ fun HomeScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background)
                 )
+                // Persistent rounded search bar — always visible; tap to focus and type
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 2.dp, bottom = 10.dp),
+                    shape          = RoundedCornerShape(26.dp),
+                    color          = MaterialTheme.colorScheme.surfaceVariant.copy(0.55f),
+                    tonalElevation = 0.dp
+                ) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .then(
+                                if (!searchExpanded) Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication        = null
+                                ) { searchExpanded = true } else Modifier
+                            )
+                            .padding(start = 16.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Rounded.Search, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                        if (searchExpanded) {
+                            BasicTextField(
+                                value          = searchText,
+                                onValueChange  = { searchText = it; vm.fetchSuggestions(it) },
+                                modifier       = Modifier.weight(1f).focusRequester(focusRequester),
+                                singleLine     = true,
+                                textStyle      = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onBackground),
+                                cursorBrush    = SolidColor(MaterialTheme.colorScheme.primary),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = {
+                                    vm.search(searchText)
+                                    focusManager.clearFocus()
+                                }),
+                                decorationBox  = { inner ->
+                                    if (searchText.isEmpty()) Text(
+                                        "Search YouTube…",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    inner()
+                                }
+                            )
+                            if (searchText.isNotEmpty()) {
+                                IconButton(
+                                    onClick  = { searchText = ""; vm.loadTrending() },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Close, "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp))
+                                }
+                            } else {
+                                IconButton(
+                                    onClick  = launchVoiceSearch,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Mic, "Voice search",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(19.dp))
+                                }
+                                IconButton(
+                                    onClick  = {
+                                        searchExpanded = false
+                                        focusManager.clearFocus()
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Close, "Close search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            LaunchedEffect(Unit) {
+                                delay(80); focusRequester.requestFocus()
+                            }
+                        } else {
+                            Text(
+                                "Search YouTube…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick  = launchVoiceSearch,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(Icons.Rounded.Mic, "Voice search",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                }
                 // Recent searches — shown when search bar is open and user hasn't typed yet
                 AnimatedVisibility(
                     visible = searchExpanded && searchText.isEmpty() && recentSearches.isNotEmpty(),
@@ -681,14 +696,9 @@ fun HomeScreen(
                                         selectedCategory != "All" -> selectedCategory
                                         else -> "For You"
                                     }
-                                    Text(
-                                        label,
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color      = MaterialTheme.colorScheme.onBackground
-                                        ),
-                                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, top = 10.dp)
-                                    )
+                                    val sub = if (activeSearch.isEmpty() && selectedCategory == "All")
+                                        "Picked for you today" else null
+                                    SectionHeader(title = label, subtitle = sub)
                                 }
 
                                 // ── Featured horizontal row (top 5 trending) ────
@@ -1127,14 +1137,8 @@ private fun ContinueWatchingSection(
             )
             .padding(top = 10.dp, bottom = 4.dp)
     ) {
-        Text(
-            "Continue watching",
-            style    = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color      = MaterialTheme.colorScheme.onBackground
-            ),
-            modifier = Modifier.padding(start = 16.dp, bottom = 10.dp)
-        )
+        SectionHeader(title = "Continue watching")
+        Spacer(Modifier.height(6.dp))
         LazyRow(
             contentPadding        = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1151,30 +1155,65 @@ private fun ContinueWatchingSection(
     }
 }
 
+// Reusable feed section header: a short accent bar + bold title (+ optional subtitle).
+@Composable
+private fun SectionHeader(
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            Modifier
+                .width(4.dp)
+                .height(if (subtitle != null) 30.dp else 18.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// Featured strip: large cinematic hero cards with the title/channel overlaid on
+// the thumbnail, in a peeking carousel — a step up from the old small flat cards.
 @Composable
 private fun FeaturedVideoRow(
     videos: List<VideoItem>,
     onVideoClick: (String) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Featured", style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground))
-            Text("See all ›", style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        SectionHeader(title = "Featured", subtitle = "Trending right now")
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(bottom = 12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(top = 10.dp, bottom = 16.dp)
         ) {
             items(videos, key = { "feat_${it.url}" }) { video ->
-                FeaturedCard(video = video, onClick = { onVideoClick(video.url) })
+                FeaturedHeroCard(
+                    video    = video,
+                    onClick  = { onVideoClick(video.url) },
+                    modifier = Modifier.fillParentMaxWidth(0.86f)
+                )
             }
         }
         HorizontalDivider(
@@ -1185,50 +1224,95 @@ private fun FeaturedVideoRow(
 }
 
 @Composable
-private fun FeaturedCard(video: VideoItem, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(180.dp)
+private fun FeaturedHeroCard(
+    video: VideoItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val corner = com.streamflow.ui.theme.LocalThumbCorner.current
+    Box(
+        modifier = modifier
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape((corner + 6).dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )
     ) {
+        AsyncImage(
+            model = video.thumbnailUrl,
+            contentDescription = video.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)
+        )
+        // Legibility scrim: clear up top, deep at the bottom under the text
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(com.streamflow.ui.theme.LocalThumbCorner.current.dp))
-        ) {
-            AsyncImage(
-                model = video.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0.0f to Color.Transparent,
+                    0.5f to Color.Transparent,
+                    1.0f to Color.Black.copy(0.85f)
+                )
             )
-            if (video.duration > 0) {
-                Box(
-                    Modifier.align(Alignment.BottomEnd).padding(5.dp)
-                        .background(Color.Black.copy(0.78f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                    Text(formatDuration(video.duration), color = Color.White,
-                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                }
+        )
+        // "Featured" pill, top-start
+        Row(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(13.dp))
+            Text("Featured", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        // Duration, top-end
+        if (video.duration > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .background(Color.Black.copy(0.62f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(formatDuration(video.duration), color = Color.White,
+                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        Spacer(Modifier.height(5.dp))
-        Text(video.title, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-            maxLines = 2, overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onBackground, lineHeight = 16.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(
-            buildString {
-                append(video.uploaderName)
-                if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
-            },
-            fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
+        // Title + channel overlaid on the scrim, bottom-start
+        Column(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp)
+        ) {
+            Text(
+                video.title,
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 19.sp
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                ChannelAvatar(name = video.uploaderName, avatarUrl = video.uploaderAvatarUrl, size = 22.dp)
+                Text(
+                    buildString {
+                        append(video.uploaderName)
+                        if (video.viewCount > 0) append("  ·  ${formatViews(video.viewCount)} views")
+                    },
+                    color = Color.White.copy(0.85f),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
