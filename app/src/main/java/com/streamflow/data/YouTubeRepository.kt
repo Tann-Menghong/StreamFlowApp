@@ -493,10 +493,22 @@ class YouTubeRepository {
         }
     }
 
+    // Matches the standard watch?v= form plus the short/shorts/embed link shapes —
+    // naively slicing after "v=" silently produced garbage (and thus zero sponsor
+    // segments) for any youtu.be or /shorts/ link, e.g. links shared from another app
+    private val videoIdPatterns = listOf(
+        Regex("[?&]v=([a-zA-Z0-9_-]{11})"),
+        Regex("youtu\\.be/([a-zA-Z0-9_-]{11})"),
+        Regex("/shorts/([a-zA-Z0-9_-]{11})"),
+        Regex("/embed/([a-zA-Z0-9_-]{11})")
+    )
+
+    private fun extractVideoId(url: String): String? =
+        videoIdPatterns.firstNotNullOfOrNull { it.find(url)?.groupValues?.get(1) }
+
     suspend fun getSponsorSegments(videoUrl: String): List<SponsorSegment> = withContext(Dispatchers.IO) {
         try {
-            val videoId = videoUrl.substringAfter("v=").substringBefore("&").take(20)
-            if (videoId.length < 11) return@withContext emptyList()
+            val videoId = extractVideoId(videoUrl) ?: return@withContext emptyList()
             val categories = URLEncoder.encode(
                 """["sponsor","selfpromo","interaction","intro","outro","preview","music_offtopic"]""",
                 "UTF-8"

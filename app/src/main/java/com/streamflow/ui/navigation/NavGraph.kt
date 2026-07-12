@@ -384,7 +384,19 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
                 PlayerScreen(
                     videoUrl     = videoUrl,
                     onBack       = { navController.popBackStack() },
-                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onVideoClick = { url ->
+                        // Replace, don't push: this is Player -> Player navigation
+                        // (related video / autoplay / "up next" queue). Pushing a
+                        // new entry per video let a long autoplay session grow the
+                        // back stack — and its ViewModels — without bound, and
+                        // turned the back button into "step through every video
+                        // I've watched this session" instead of returning to
+                        // wherever playback started.
+                        navController.navigate(Screen.Player.createRoute(url)) {
+                            popUpTo(Screen.Player.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
                     onChannelClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
                     }

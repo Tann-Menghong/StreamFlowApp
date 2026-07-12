@@ -63,11 +63,17 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
     private var loadedUrl = ""
     private var currentTab = "videos"
 
+    // Bumped on every loadChannel() call so an in-flight request from a tab (or
+    // channel) the user has since switched away from can't win a race and clobber
+    // the tab/channel they're actually looking at with its stale response.
+    private var loadGeneration = 0
+
     fun loadChannel(url: String, tab: String = "videos") {
         _currentUrl.value = url
         if (loadedUrl == url && currentTab == tab && _channel.value.name.isNotEmpty()) return
         loadedUrl = url
         currentTab = tab
+        val gen = ++loadGeneration
         viewModelScope.launch {
             // Keep the header while switching tabs; full spinner only on first load
             val prev = _channel.value
@@ -76,6 +82,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
             else ChannelData(isLoading = true, selectedTab = tab)
             try {
                 val result = repo.getChannelInfo(url, tab)
+                if (gen != loadGeneration) return@launch // superseded by a newer tab/channel switch
                 _channel.value = ChannelData(
                     name = result.name,
                     avatarUrl = result.avatarUrl,
@@ -89,6 +96,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                     playlists = result.playlists
                 )
             } catch (e: Exception) {
+                if (gen != loadGeneration) return@launch
                 _channel.value = ChannelData(error = friendlyError(e))
             }
         }
@@ -105,11 +113,12 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
         if (data.isLoadingMore) return
         val url = loadedUrl
         val tab = currentTab
+        val gen = loadGeneration
         viewModelScope.launch {
             _channel.value = data.copy(isLoadingMore = true)
             try {
                 val result = repo.getChannelNextPage(url, nextPage, tab)
-                if (currentTab != tab) return@launch // tab switched mid-load
+                if (gen != loadGeneration) return@launch // tab/channel switched mid-load
                 // Dedupe at append time — NewPipe pagination can return the same
                 // video across two pages, and the LazyColumn's key = { it.url }
                 // crashes on a duplicate key if that happens unguarded.
@@ -121,6 +130,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
                     isLoadingMore = false
                 )
             } catch (_: Exception) {
+                if (gen != loadGeneration) return@launch
                 _channel.value = _channel.value.copy(isLoadingMore = false)
             }
         }
