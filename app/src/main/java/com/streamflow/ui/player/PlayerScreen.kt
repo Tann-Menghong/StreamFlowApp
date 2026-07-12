@@ -33,6 +33,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -251,13 +252,24 @@ fun PlayerScreen(
                 ic.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 win.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    win.attributes.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    // Reassign, don't mutate in place: attributes only take effect via
+                    // setAttributes(). Mutating win.attributes.x never called it, so the
+                    // cutout mode silently never applied (notch stayed letterboxed).
+                    win.attributes = win.attributes.also {
+                        it.layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
                 }
             } else {
                 act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 ic.show(WindowInsetsCompat.Type.systemBars())
                 win.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    win.attributes = win.attributes.also {
+                        it.layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                    }
+                }
             }
         }
     }
@@ -1969,7 +1981,11 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             if (showComments) {
                 val sortedComments = if (commentsSortByLikes)
                     comments.sortedByDescending { it.likeCount } else comments
-                items(sortedComments.take(30), key = { "c_${it.author}_${it.text.take(20)}" }) { comment ->
+                // Key by index: two comments can share author + opening text (double
+                // posts, short "🔥"/"First" replies), and a duplicate key hard-crashes
+                // the LazyColumn. Reply-expansion state lives in the VM, so index keys
+                // cost nothing here.
+                itemsIndexed(sortedComments.take(30), key = { index, _ -> index }) { _, comment ->
                     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),

@@ -71,7 +71,7 @@ class YouTubeRepository {
         kiosk.fetchPage()
         val page = kiosk.initialPage
         PagedResult(
-            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
             nextPage = page.nextPage
         )
     }
@@ -82,7 +82,7 @@ class YouTubeRepository {
             kiosk.fetchPage()
             val page = kiosk.getPage(nextPage)
             PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
                 nextPage = page.nextPage
             )
         } catch (e: Exception) {
@@ -96,7 +96,7 @@ class YouTubeRepository {
         extractor.fetchPage()
         val page = extractor.initialPage
         PagedResult(
-            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
             nextPage = page.nextPage
         )
     }
@@ -106,7 +106,7 @@ class YouTubeRepository {
         extractor.fetchPage()
         val page = extractor.getPage(nextPage)
         PagedResult(
-            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
             nextPage = page.nextPage
         )
     }
@@ -158,6 +158,9 @@ class YouTubeRepository {
             val related = info.relatedItems
                 .filterIsInstance<StreamInfoItem>()
                 .map { it.toVideoItem() }
+                // Dedupe by url: the "Up Next" list is keyed by it, and a duplicate
+                // key is a hard LazyColumn crash — YouTube's related list can repeat.
+                .distinctBy { it.url }
 
             // AUTO starts at 720p for fast startup (highest resolutions are often
             // VP9/AV1 — software-decoded on many phones — and need far more
@@ -349,7 +352,7 @@ class YouTubeRepository {
 
             if (videoTab != null) {
                 val tabInfo = ChannelTabInfo.getInfo(youtube, videoTab)
-                videos = tabInfo.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }
+                videos = tabInfo.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url }
                 playlists = tabInfo.relatedItems
                     .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
                     .map { it.toPlaylistItem() }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
@@ -387,7 +390,7 @@ class YouTubeRepository {
 
             val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
             PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
                 nextPage = page.nextPage,
                 playlists = page.items
                     .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
@@ -476,7 +479,7 @@ class YouTubeRepository {
             uploaderName = try { info.uploaderName ?: "" } catch (_: Exception) { "" },
             thumbnailUrl = try { info.thumbnails.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
             videoCount = try { info.streamCount } catch (_: Exception) { -1L },
-            videos = info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+            videos = info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
             nextPage = info.nextPage
         )
     }
@@ -485,7 +488,7 @@ class YouTubeRepository {
         try {
             val result = org.schabi.newpipe.extractor.playlist.PlaylistInfo.getMoreItems(youtube, playlistUrl, page)
             PagedResult(
-                videos = result.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() },
+                videos = result.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
                 nextPage = result.nextPage
             )
         } catch (_: Exception) {

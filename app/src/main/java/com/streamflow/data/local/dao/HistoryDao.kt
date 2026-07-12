@@ -21,7 +21,11 @@ interface HistoryDao {
     @Query("SELECT COUNT(*) FROM history")
     fun count(): Flow<Int>
 
-    @Query("SELECT * FROM history WHERE position > 30000 ORDER BY watchedAt DESC LIMIT :limit")
+    // position is ms, duration is seconds, so duration*950 == 95% of the video in ms.
+    // Exclude videos watched past 95%: the player restarts those from 0 on tap (like
+    // YouTube), so a near-full "Continue watching" card that restarts was misleading.
+    // duration<=0 (unknown/live) still shows so real progress isn't hidden.
+    @Query("SELECT * FROM history WHERE position > 30000 AND (duration <= 0 OR position < duration * 950) ORDER BY watchedAt DESC LIMIT :limit")
     fun getRecentWithProgress(limit: Int): Flow<List<HistoryEntity>>
 
     @Query("UPDATE history SET position = :pos WHERE url = :url")
