@@ -48,7 +48,6 @@ class NewVideosWorker(
         val subs = app.database.subscriptionDao().getAllOnce().filter { it.notify }.take(20)
         val maxNotifs = app.prefs.notifyMax.first().toIntOrNull() ?: 5
         var notified = 0
-        var notifId = 2000
         var newCount = 0
 
         subs.forEach { sub ->
@@ -59,7 +58,13 @@ class NewVideosWorker(
                 if (sub.lastVideoUrl.isNotEmpty() && sub.lastVideoUrl != latest.url) {
                     newCount++
                     if (maxNotifs <= 0 || notified < maxNotifs) {
-                        notify(notifId++, sub.name, latest.title, latest.url)
+                        // Stable per-channel id (not a counter reset every run) so a
+                        // notification from an earlier run can't get silently
+                        // overwritten by an unrelated channel's alert hours later —
+                        // a new upload from the SAME channel correctly replaces its
+                        // own older notification instead of stacking duplicates.
+                        val notifId = 2000 + (sub.channelUrl.hashCode() and 0x7FFFFFFF) % 8000
+                        notify(notifId, sub.name, latest.title, latest.url)
                         notified++
                     }
                 }

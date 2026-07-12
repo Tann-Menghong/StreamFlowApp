@@ -51,7 +51,15 @@ class UpdateManager(private val context: Context) {
     ) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(downloadUrl).build()
         val resp = client.newCall(req).execute()
-        val body = resp.body ?: return@withContext
+        // A failed request (rate-limited, deleted release, transient CDN error)
+        // still returns a non-null body — without this check, that error page
+        // gets written to "StreamFlow-update.apk" and handed to the package
+        // installer as if it were real, instead of surfacing a clear failure.
+        if (!resp.isSuccessful) {
+            resp.close()
+            throw java.io.IOException("Download failed (HTTP ${resp.code})")
+        }
+        val body = resp.body ?: throw java.io.IOException("Empty download response")
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
         val file = File(dir, "StreamFlow-update.apk")
         val total = body.contentLength()

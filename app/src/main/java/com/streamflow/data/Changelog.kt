@@ -3,11 +3,11 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.1.4"
+    const val VERSION_NAME = "3.2.0"
 
     val notes = listOf(
-        "Stability fixes!",
-        "Fixed a crash: scrolling for more videos on a channel page, search results, or your subscriptions feed could occasionally close the app if the same video appeared twice",
-        "All three of those lists are now protected the same way the home feed already was"
+        "New: sort comments by Top or Most liked - tap the sort chip next to Comments",
+        "Fixed: new-upload notifications from different channels could silently overwrite each other if you hadn't checked your notification shade in a while",
+        "Fixed: a failed app-update download could try to install a broken file instead of showing an error"
     )
 }

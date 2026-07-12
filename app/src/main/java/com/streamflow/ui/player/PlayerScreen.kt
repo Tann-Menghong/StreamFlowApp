@@ -298,6 +298,7 @@ fun PlayerScreen(
     val repliesMap       by vm.replies.collectAsState()
     val repliesLoading   by vm.repliesLoading.collectAsState()
     var showComments     by remember { mutableStateOf(false) }
+    var commentsSortByLikes by remember { mutableStateOf(false) }
 
     // ── Queue ─────────────────────────────────────────────────────────────────
     val queue           by vm.queue.collectAsState()
@@ -1920,11 +1921,31 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                             }
-                            if (commentsLoading) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(if (showComments) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                    null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                if (showComments && comments.isNotEmpty()) {
+                                    // Honest, verifiable sort: NewPipe doesn't expose a
+                                    // "newest" order through this API, so this only
+                                    // offers what the data can actually back up.
+                                    Surface(
+                                        onClick = { commentsSortByLikes = !commentsSortByLikes },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(0.6f)
+                                    ) {
+                                        Text(
+                                            if (commentsSortByLikes) "Most liked" else "Top",
+                                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
+                                }
+                                if (commentsLoading) {
+                                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(if (showComments) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                        null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }
@@ -1932,7 +1953,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             }
 
             if (showComments) {
-                items(comments.take(30), key = { "c_${it.author}_${it.text.take(20)}" }) { comment ->
+                val sortedComments = if (commentsSortByLikes)
+                    comments.sortedByDescending { it.likeCount } else comments
+                items(sortedComments.take(30), key = { "c_${it.author}_${it.text.take(20)}" }) { comment ->
                     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
