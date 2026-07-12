@@ -47,7 +47,8 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.loadMore() }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // statusBarsPadding: keep the search bar below the clock/battery/wifi
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
         // Search bar
         Row(
             modifier = Modifier

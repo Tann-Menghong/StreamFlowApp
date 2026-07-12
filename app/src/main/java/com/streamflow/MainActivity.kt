@@ -90,6 +90,19 @@ class MainActivity : ComponentActivity() {
                 "LARGE" -> 1.12f
                 else -> 1f
             }
+            // Status bar icons must follow the APP theme, not the system theme —
+            // otherwise dark icons vanish over our dark background (looks like
+            // the app is "overlaying" the clock/battery/wifi)
+            val sysDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val darkTheme = when (themeStr.toAppTheme()) {
+                com.streamflow.ui.theme.AppTheme.LIGHT  -> false
+                com.streamflow.ui.theme.AppTheme.SYSTEM -> sysDark
+                else -> true
+            }
+            androidx.compose.runtime.LaunchedEffect(darkTheme) {
+                androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                    .isAppearanceLightStatusBars = !darkTheme
+            }
             StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr,
                 fontScale = fontScale, fontFamilyPref = fontFamilyStr) {
                 androidx.compose.runtime.CompositionLocalProvider(
