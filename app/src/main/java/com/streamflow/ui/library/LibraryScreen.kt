@@ -65,7 +65,7 @@ fun LibraryScreen(
     val uiLang by libPrefs.language.collectAsState(initial = "EN")
     // Open on the user's preferred tab (Settings > Home > Default Library tab)
     LaunchedEffect(Unit) {
-        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 5) ?: 0
+        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 5) ?: 1
     }
     val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }

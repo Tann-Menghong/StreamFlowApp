@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,12 +28,19 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.streamflow.data.ai.AiEngine
+
+// Section header Y-positions inside the settings scroll column, recorded by
+// SettingsSection and used by the quick-jump chips (single-instance screen)
+private val settingsSectionOffsets = mutableStateMapOf<String, Int>()
 
 private val countryOptions = listOf(
     "US" to "United States",
@@ -153,10 +161,12 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
             )
         }
     ) { padding ->
+        val sectionScroll = rememberScrollState()
+        val jumpScope = rememberCoroutineScope()
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(sectionScroll)
                 .padding(padding)
                 .padding(bottom = 32.dp)
         ) {
@@ -196,6 +206,57 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                         Text("Version ${com.streamflow.BuildConfig.VERSION_NAME}",
                             fontSize = 12.sp,
                             color = androidx.compose.ui.graphics.Color.White.copy(0.85f))
+                    }
+                }
+            }
+
+            // ── Dashboard: colorful section tiles, tap to jump ────────────
+            Column(
+                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                listOf(
+                    listOf(
+                        Triple("Appearance", Icons.Rounded.Palette, Color(0xFFAF52DE)),
+                        Triple("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF))),
+                    listOf(
+                        Triple("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)),
+                        Triple("Home", Icons.Rounded.Home, Color(0xFF34C759))),
+                    listOf(
+                        Triple("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)),
+                        Triple("Storage", Icons.Rounded.Storage, Color(0xFF26A69A))),
+                    listOf(
+                        Triple("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)),
+                        Triple("About", Icons.Rounded.Info, Color(0xFFFF7043)))
+                ).forEach { rowTiles ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        rowTiles.forEach { (name, tileIcon, tileColor) ->
+                            Surface(
+                                onClick = {
+                                    settingsSectionOffsets[name]?.let { y ->
+                                        jumpScope.launch { sectionScroll.animateScrollTo(y) }
+                                    }
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = tileColor.copy(0.13f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(30.dp).background(tileColor, RoundedCornerShape(9.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(tileIcon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                    Text(name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -720,7 +781,10 @@ private fun SettingsSection(title: String) {
         text     = title,
         style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color    = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier.padding(start = 20.dp, top = 22.dp, bottom = 8.dp)
+        modifier = Modifier
+            .padding(start = 20.dp, top = 22.dp, bottom = 8.dp)
+            // Record where this section sits so the dashboard tiles can jump here
+            .onGloballyPositioned { settingsSectionOffsets[title] = it.positionInParent().y.toInt() }
     )
 }
 
@@ -729,7 +793,9 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        // Slight tonal lift so cards read as clear groups on the background
+        colors    = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.32f)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) { Column(content = content) }
 }

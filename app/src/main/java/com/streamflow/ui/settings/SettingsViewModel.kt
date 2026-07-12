@@ -67,7 +67,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val confirmExit    = prefs.confirmExit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val showSearchTab  = prefs.showSearchTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
-    val libraryTab     = prefs.libraryTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
+    val libraryTab     = prefs.libraryTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "1")
 
     // ── On-device AI ──────────────────────────────────────────────
     val aiState = com.streamflow.data.ai.AiEngine.downloadState

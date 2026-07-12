@@ -134,7 +134,7 @@ class AppPreferences(private val context: Context) {
     }
     val showSearchTab  : Flow<Boolean> = context.dataStore.data.map { it[SHOW_SEARCH_TAB_KEY] ?: false }
     val fontFamily     : Flow<String>  = context.dataStore.data.map { it[FONT_FAMILY_KEY] ?: "DEFAULT" }
-    val libraryTab     : Flow<String>  = context.dataStore.data.map { it[LIBRARY_TAB_KEY] ?: "0" }
+    val libraryTab     : Flow<String>  = context.dataStore.data.map { it[LIBRARY_TAB_KEY] ?: "1" } // default: History
     // Search
     val recentSearches: Flow<List<String>> = context.dataStore.data.map {
         it[RECENT_SEARCHES_KEY]?.split("|||")?.filter { s -> s.isNotBlank() } ?: emptyList()
