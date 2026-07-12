@@ -33,6 +33,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -49,12 +50,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -404,7 +409,41 @@ fun PlayerScreen(
     var speedBoost by remember { mutableStateOf(false) }
 
     // ── Swipe-down-to-minimize (portrait) ────────────────────────────────────
+    // Uses nestedScroll (not a raw pointerInput drag) so it never fights the
+    // page's own vertical scroll: it only claims a downward drag once the list
+    // is already scrolled to the very top and has nothing left to consume —
+    // exactly the same "overscroll at top" signal pull-to-refresh uses elsewhere.
     var minimizeDrag by remember { mutableFloatStateOf(0f) }
+    val playerListState = rememberLazyListState()
+    val minimizeScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (minimizeDrag > 0f && available.y != 0f) {
+                    minimizeDrag = (minimizeDrag + available.y).coerceAtLeast(0f)
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                val atTop = playerListState.firstVisibleItemIndex == 0 &&
+                    playerListState.firstVisibleItemScrollOffset == 0
+                if (atTop && available.y > 0f) {
+                    minimizeDrag += available.y
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (minimizeDrag > 0f) {
+                    if (minimizeDrag > 260f) { minimizeDrag = 0f; onBack() }
+                    else minimizeDrag = 0f
+                }
+                return Velocity.Zero
+            }
+        }
+    }
 
     // ── Subtitle state ───────────────────────────────────────────────────────
     var showSubMenu by remember { mutableStateOf(false) }
@@ -1168,24 +1207,14 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             Brush.verticalGradient(listOf(ambient.copy(alpha = 0.30f), Color.Transparent))
         )
     )
-    LazyColumn(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+    LazyColumn(
+        state = playerListState,
+        modifier = Modifier.fillMaxSize().statusBarsPadding()
+            .nestedScroll(minimizeScrollConnection)
+    ) {
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
-                    // Swipe down on the video to minimize into the mini player
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { _, dy ->
-                                if (dy > 0f || minimizeDrag > 0f)
-                                    minimizeDrag = (minimizeDrag + dy).coerceAtLeast(0f)
-                            },
-                            onDragEnd = {
-                                if (minimizeDrag > 260f) { minimizeDrag = 0f; onBack() }
-                                else minimizeDrag = 0f
-                            },
-                            onDragCancel = { minimizeDrag = 0f }
-                        )
-                    }
                     .graphicsLayer {
                         translationY = minimizeDrag * 0.35f
                         val f = (minimizeDrag / 900f).coerceIn(0f, 0.25f)
