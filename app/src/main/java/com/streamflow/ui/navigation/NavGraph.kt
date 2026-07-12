@@ -46,6 +46,8 @@ import com.streamflow.ui.playlist.PlaylistDetailScreen
 import com.streamflow.ui.playlist.RemotePlaylistScreen
 import com.streamflow.ui.search.SearchScreen
 import com.streamflow.ui.settings.SettingsScreen
+import com.streamflow.ui.settings.SettingsCategoryScreen
+import com.streamflow.ui.settings.SettingsViewModel
 import com.streamflow.ui.shorts.ShortsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -58,6 +60,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Donghua  : Screen("donghua",  "Donghua", Icons.Rounded.LiveTv)
     object Library  : Screen("library",  "Library", Icons.Rounded.VideoLibrary)
     object Settings : Screen("settings", "Settings",Icons.Rounded.Settings)
+    object SettingsCategory : Screen("settings/{category}", "Settings", Icons.Rounded.Settings) {
+        fun createRoute(category: String) = "settings/${URLEncoder.encode(category, "UTF-8")}"
+    }
     object Player   : Screen("player?videoUrl={videoUrl}", "Player", Icons.Rounded.PlayArrow) {
         fun createRoute(url: String) = "player?videoUrl=${URLEncoder.encode(url, "UTF-8")}"
     }
@@ -342,7 +347,31 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
                     }
                 )
             }
-            composable(Screen.Settings.route) { SettingsScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(onCategoryClick = { category ->
+                    navController.navigate(Screen.SettingsCategory.createRoute(category))
+                })
+            }
+            composable(
+                route = Screen.SettingsCategory.route,
+                arguments = listOf(navArgument("category") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                })
+            ) { back ->
+                val category = URLDecoder.decode(back.arguments?.getString("category") ?: "", "UTF-8")
+                // Share the dashboard's own SettingsViewModel instance (rather than
+                // creating a second one) so state stays in sync and "check for
+                // update" / AI-state refresh don't fire twice per visit
+                val parentEntry = remember(back) { navController.getBackStackEntry(Screen.Settings.route) }
+                val sharedVm: SettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(parentEntry)
+                SettingsCategoryScreen(
+                    category = category,
+                    onBack   = { navController.popBackStack() },
+                    vm       = sharedVm
+                )
+            }
             composable(
                 route = Screen.Player.route,
                 arguments = listOf(navArgument("videoUrl") {

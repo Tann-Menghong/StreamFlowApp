@@ -28,19 +28,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.streamflow.data.ai.AiEngine
-
-// Section header Y-positions inside the settings scroll column, recorded by
-// SettingsSection and used by the quick-jump chips (single-instance screen)
-private val settingsSectionOffsets = mutableStateMapOf<String, Int>()
 
 private val countryOptions = listOf(
     "US" to "United States",
@@ -65,9 +58,231 @@ private val countryOptions = listOf(
     "TR" to "Turkey"
 )
 
+// The 8 dashboard categories: name (also the nav-route key + KmStrings key), icon, color
+private data class SettingsTile(val name: String, val icon: ImageVector, val color: Color)
+private val settingsTiles = listOf(
+    listOf(
+        SettingsTile("Appearance", Icons.Rounded.Palette, Color(0xFFAF52DE)),
+        SettingsTile("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF))),
+    listOf(
+        SettingsTile("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)),
+        SettingsTile("Home", Icons.Rounded.Home, Color(0xFF34C759))),
+    listOf(
+        SettingsTile("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)),
+        SettingsTile("Storage", Icons.Rounded.Storage, Color(0xFF26A69A))),
+    listOf(
+        SettingsTile("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)),
+        SettingsTile("About", Icons.Rounded.Info, Color(0xFFFF7043)))
+)
+
+private fun accentLabel(accentColor: String): String = when {
+    accentColor == "DYNAMIC" -> "Dynamic"
+    accentColor.startsWith("CUSTOM:") -> "Custom"
+    else -> accentColor.lowercase().replaceFirstChar { it.uppercase() }
+}
+
+private fun qualityLabel(quality: String): String = when (quality) {
+    "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto"
+}
+
+// ── Dashboard: the settings home page. Every setting lives one tap away from
+// here — tapping a tile opens its own dedicated page instead of scrolling a
+// giant list, the way a "pro" settings app (iOS/Android system settings) works.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
+fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = viewModel()) {
+    val theme        by vm.theme.collectAsState()
+    val accentColor  by vm.accentColor.collectAsState()
+    val quality      by vm.quality.collectAsState()
+    val autoPlay     by vm.autoPlay.collectAsState()
+    val batterySaver by vm.batterySaver.collectAsState()
+    val notifyNewVideos by vm.notifyNewVideos.collectAsState()
+    val notifyFreq   by vm.notifyFreq.collectAsState()
+    val homeLayout   by vm.homeLayout.collectAsState()
+    val aiState      by vm.aiState.collectAsState()
+    val favCount     by vm.favoritesCount.collectAsState()
+    val histCount    by vm.historyCount.collectAsState()
+    val language     by vm.language.collectAsState()
+    val update       by vm.update.collectAsState()
+
+    val themeLabel = when (theme) { "AMOLED" -> "AMOLED"; "LIGHT" -> "Light"; "SYSTEM" -> "System"; else -> "Dark" }
+    val notifFreqLabel = when (notifyFreq) { "1" -> "hourly"; "3" -> "every 3h"; "12" -> "every 12h"; "24" -> "daily"; else -> "every 6h" }
+    val aiLabel = if (!AiEngine.isSupported()) "Not supported"
+        else when (val s = aiState) {
+            is AiEngine.DownloadState.Downloading -> "${(s.progress * 100).toInt()}% downloaded"
+            is AiEngine.DownloadState.Ready -> "Ready"
+            is AiEngine.DownloadState.Failed -> "Download failed"
+            else -> "Not downloaded"
+        }
+
+    val tileSubtitles = mapOf(
+        "Appearance" to "$themeLabel • ${accentLabel(accentColor)}",
+        "Playback" to if (batterySaver) "Battery saver on"
+            else "${qualityLabel(quality)} • Autoplay ${if (autoPlay) "on" else "off"}",
+        "Notifications" to if (!notifyNewVideos) "Off" else "On • checks $notifFreqLabel",
+        "Home" to if (homeLayout == "GRID") "Grid layout" else "List layout",
+        "AI" to aiLabel,
+        "Storage" to "$favCount favorites • $histCount history",
+        "Backup" to "Export, import & subscriptions",
+        "About" to "v${vm.appVersion}"
+    )
+
+    // Telegram-style big title that collapses into the bar as you scroll
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title  = { Text("Settings", fontWeight = FontWeight.ExtraBold) },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background)
+            )
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(bottom = 32.dp)
+        ) {
+
+            // ── App hero card: gradient brand banner with version ─────────
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        )
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        Modifier.size(46.dp).background(
+                            androidx.compose.ui.graphics.Color.White.copy(0.22f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, null,
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(28.dp))
+                    }
+                    Column {
+                        Text("StreamFlow", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
+                            color = androidx.compose.ui.graphics.Color.White)
+                        Text("Version ${com.streamflow.BuildConfig.VERSION_NAME}",
+                            fontSize = 12.sp,
+                            color = androidx.compose.ui.graphics.Color.White.copy(0.85f))
+                    }
+                }
+            }
+
+            // ── Dashboard: every category, with its current state at a glance.
+            // Tapping a tile opens that category's own page.
+            Column(
+                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                settingsTiles.forEach { rowTiles ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        rowTiles.forEach { tile ->
+                            Surface(
+                                onClick = { onCategoryClick(tile.name) },
+                                shape = RoundedCornerShape(16.dp),
+                                color = tile.color.copy(0.13f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(30.dp).background(tile.color, RoundedCornerShape(9.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(tile.icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(com.streamflow.ui.theme.KmStrings.t(tile.name, language),
+                                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
+                                        Text(tileSubtitles[tile.name] ?: "",
+                                            fontSize = 10.sp, maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Update banner ────────────────────────────────────────────
+            AnimatedVisibility(
+                visible = update.info != null || update.downloading,
+                enter   = fadeIn(tween(300)) + expandVertically(tween(300)),
+                exit    = fadeOut(tween(200)) + shrinkVertically(tween(200))
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    shape    = RoundedCornerShape(14.dp),
+                    colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Rounded.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp))
+                            Text(
+                                if (update.downloading) "Downloading update…"
+                                else "Update available — v${update.info?.latestVersion}",
+                                fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        if (update.downloading) {
+                            LinearProgressIndicator(
+                                progress = { update.progress / 100f },
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                color      = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.15f)
+                            )
+                            Text("${update.progress}%", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+                        } else {
+                            Button(
+                                onClick  = { vm.downloadUpdate() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape    = RoundedCornerShape(10.dp),
+                                colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) { Text("Download & Install") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Category detail page: opened from a dashboard tile. Hosts one category's
+// settings + every dialog (dialogs are shared across categories since their
+// visibility state only ever flips true from within the matching branch).
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsViewModel = viewModel()) {
     val theme                by vm.theme.collectAsState()
     val quality              by vm.quality.collectAsState()
     val autoPlay             by vm.autoPlay.collectAsState()
@@ -151,490 +366,341 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var showLibTabDialog     by remember { mutableStateOf(false) }
     var showDeleteAiDialog   by remember { mutableStateOf(false) }
 
-    // Telegram-style big title that collapses into the bar as you scroll
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
-                title  = { Text("Settings", fontWeight = FontWeight.ExtraBold) },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background)
+            TopAppBar(
+                title = { Text(com.streamflow.ui.theme.KmStrings.t(category, language), fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Rounded.ArrowBack, "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
-        val sectionScroll = rememberScrollState()
-        val jumpScope = rememberCoroutineScope()
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(sectionScroll)
+                .verticalScroll(rememberScrollState())
                 .padding(padding)
                 .padding(bottom = 32.dp)
         ) {
+            Spacer(Modifier.height(8.dp))
 
-            // ── App hero card: gradient brand banner with version ─────────
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.tertiary
-                                )
-                            )
-                        )
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Box(
-                        Modifier.size(46.dp).background(
-                            androidx.compose.ui.graphics.Color.White.copy(0.22f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.PlayArrow, null,
-                            tint = androidx.compose.ui.graphics.Color.White,
-                            modifier = Modifier.size(28.dp))
-                    }
-                    Column {
-                        Text("StreamFlow", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
-                            color = androidx.compose.ui.graphics.Color.White)
-                        Text("Version ${com.streamflow.BuildConfig.VERSION_NAME}",
-                            fontSize = 12.sp,
-                            color = androidx.compose.ui.graphics.Color.White.copy(0.85f))
-                    }
+            when (category) {
+                "Appearance" -> SettingsCard {
+                    SettingsSwitchItem(Icons.Rounded.AutoAwesome, "Modern design",
+                        "Card feed, floating bars, colorful icons — off for the classic look",
+                        designStyle == "MODERN"
+                    ) { vm.setDesignStyle(if (it) "MODERN" else "CLASSIC") }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Palette, "Theme",
+                        when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
+                    ) { showThemeDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.ColorLens, "Accent color",
+                        if (accentColor == "DYNAMIC") "Dynamic (Material You)"
+                        else accentColor.lowercase().replaceFirstChar { it.uppercase() }
+                    ) { showAccentDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Translate, "Language / ភាសា",
+                        if (language == "KM") "ភាសាខ្មែរ" else "English"
+                    ) { showLanguageDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.FormatSize, "Font size",
+                        when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
+                    ) { showFontDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.TextFields, "Font style",
+                        when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
+                    ) { showFontFamilyDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.RoundedCorner, "Thumbnail corners",
+                        when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
+                    ) { showCornerDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Label, "Bottom bar labels",
+                        when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
+                    ) { showNavLabelDialog = true }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Animation, "Reduce motion",
+                        "Calmer, faster screen transitions", reduceMotion, vm::setReduceMotion)
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Vibration, "Haptic feedback",
+                        "Vibrate on long-press actions", hapticsEnabled, vm::setHapticsEnabled)
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.ExitToApp, "Confirm before exit",
+                        "Press back twice on Home to close the app", confirmExit, vm::setConfirmExit)
                 }
-            }
 
-            // ── Dashboard: colorful section tiles, tap to jump ────────────
-            Column(
-                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                listOf(
-                    listOf(
-                        Triple("Appearance", Icons.Rounded.Palette, Color(0xFFAF52DE)),
-                        Triple("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF))),
-                    listOf(
-                        Triple("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)),
-                        Triple("Home", Icons.Rounded.Home, Color(0xFF34C759))),
-                    listOf(
-                        Triple("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)),
-                        Triple("Storage", Icons.Rounded.Storage, Color(0xFF26A69A))),
-                    listOf(
-                        Triple("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)),
-                        Triple("About", Icons.Rounded.Info, Color(0xFFFF7043)))
-                ).forEach { rowTiles ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        rowTiles.forEach { (name, tileIcon, tileColor) ->
-                            Surface(
-                                onClick = {
-                                    settingsSectionOffsets[name]?.let { y ->
-                                        jumpScope.launch { sectionScroll.animateScrollTo(y) }
-                                    }
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                color = tileColor.copy(0.13f),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        Modifier.size(30.dp).background(tileColor, RoundedCornerShape(9.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(tileIcon, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    }
-                                    Text(com.streamflow.ui.theme.KmStrings.t(name, language),
-                                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
-                                }
+                "Notifications" -> {
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.NotificationsActive, "New video alerts",
+                            "Notify when subscribed channels upload", notifyNewVideos
+                        ) { vm.setNotifyNewVideos(it) }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Schedule, "Check frequency",
+                            when (notifyFreq) {
+                                "1" -> "Every hour"; "3" -> "Every 3 hours"; "12" -> "Every 12 hours"
+                                "24" -> "Once a day"; else -> "Every 6 hours"
+                            }
+                        ) { showNotifFreqDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.FilterList, "Alerts per check",
+                            if (notifyMax == "0") "Unlimited" else "Up to $notifyMax"
+                        ) { showNotifMaxDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Bedtime, "Quiet hours",
+                            if (quietHours == "OFF") "Off"
+                            else quietHours.split("-").let { p ->
+                                "%02d:00 – %02d:00".format(p.getOrNull(0)?.toIntOrNull() ?: 22,
+                                                            p.getOrNull(1)?.toIntOrNull() ?: 7)
+                            }
+                        ) { showQuietDialog = true }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.SystemUpdate, "App update alerts",
+                            "Notify when a new StreamFlow version is released", notifyAppUpdates
+                        ) { vm.setNotifyAppUpdates(it) }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Tune, "Sound & vibration",
+                            "Per-channel options in Android settings"
+                        ) {
+                            try {
+                                val i = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                context.startActivity(i)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    SettingsFooter("New-video alerts follow the schedule above and stay silent during quiet hours.")
+                }
+
+                "Home" -> SettingsCard {
+                    SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
+                        "Show videos in a grid instead of list", homeLayout == "GRID"
+                    ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.ViewModule, "Grid columns",
+                        "$gridColumns columns"
+                    ) { showColumnsDialog = true }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.History, "Continue Watching row",
+                        "Show partially watched videos at the top", showContinueWatching
+                    ) { vm.setShowContinueWatching(it) }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Stars, "Hero featured card",
+                        "Show first trending video as a large banner", showHeroCard
+                    ) { vm.setShowHeroCard(it) }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.LiveTv, "Show Donghua tab",
+                        "Hide it from the bottom bar if you don't use it", showDonghua
+                    ) { vm.setShowDonghua(it) }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
+                        "Add a dedicated Search tab to the bottom bar", showSearchTab
+                    ) { vm.setShowSearchTab(it) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Start, "Start screen",
+                        when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
+                    ) { showStartTabDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
+                        listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+                            .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
+                    ) { showLibTabDialog = true }
+                }
+
+                "Playback" -> SettingsCard {
+                    SettingsItem(Icons.Rounded.HighQuality, "Video quality",
+                        when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
+                    ) { showQualityDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.SignalCellularAlt, "Quality on mobile data",
+                        when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
+                    ) { showCellularDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Speed, "Default speed",
+                        when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
+                    ) { showSpeedDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.FastForward, "Double-tap skip",
+                        "${skipSeconds}s per tap"
+                    ) { showSkipDialog = true }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Swipe, "Player swipe gestures",
+                        "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
+                        "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
+                        "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
+                    ) {
+                        try {
+                            val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
+                                as android.os.PowerManager
+                            if (android.os.Build.VERSION.SDK_INT >= 23 &&
+                                !pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                                val i = android.content.Intent(
+                                    android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    android.net.Uri.parse("package:${context.packageName}"))
+                                context.startActivity(i)
+                            } else {
+                                android.widget.Toast.makeText(context,
+                                    "Already protected — playback won't be killed",
+                                    android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (_: Exception) {
+                            // Some OEM builds block the dialog; open the app's battery settings instead
+                            try {
+                                val i = android.content.Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:${context.packageName}"))
+                                context.startActivity(i)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
+                        "Play related videos automatically", autoPlay
+                    ) { vm.setAutoPlay(it) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.VolumeUp, "Volume boost",
+                        when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
+                    ) { showBoostDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
+                        if (eqPreset == "OFF") "Off" else eqPreset
+                    ) { showEqDialog = true }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
+                        "Prefer lower quality to save mobile data", dataSaver
+                    ) { vm.setDataSaver(it) }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
+                        "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
+                    ) { vm.setBatterySaver(it) }
+                    SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
+                        "Watch without saving to history", incognito
+                    ) { vm.setIncognito(it) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Language, "Trending country",
+                        countryOptions.firstOrNull { it.first == country }?.second ?: country
+                    ) { showCountryDialog = true }
+                }
+
+                "AI" -> {
+                    SettingsCard {
+                        if (!AiEngine.isSupported()) {
+                            SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI",
+                                "Needs Android 7.0 or newer")
+                        } else when (val s = aiState) {
+                            is AiEngine.DownloadState.Downloading -> {
+                                SettingsItem(Icons.Rounded.AutoAwesome, "Downloading AI model…",
+                                    "${(s.progress * 100).toInt()}% of ${AiEngine.MODEL_SIZE_LABEL}")
+                                LinearProgressIndicator(
+                                    progress = { s.progress },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+                                )
+                            }
+                            is AiEngine.DownloadState.Ready -> {
+                                SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI ready",
+                                    "${AiEngine.MODEL_LABEL} — tap ✦ in the player for summaries & Q&A")
+                                SettingsDivider()
+                                SettingsItem(Icons.Rounded.DeleteOutline, "Remove AI model",
+                                    "Frees up ${AiEngine.MODEL_SIZE_LABEL} of storage"
+                                ) { showDeleteAiDialog = true }
+                            }
+                            is AiEngine.DownloadState.Failed -> {
+                                SettingsItem(Icons.Rounded.AutoAwesome, "Download failed — tap to resume",
+                                    s.message) { vm.downloadAiModel() }
+                            }
+                            else -> {
+                                SettingsItem(Icons.Rounded.AutoAwesome, "Download AI model",
+                                    "One-time download (${AiEngine.MODEL_SIZE_LABEL}) — video summaries and Q&A, free and fully offline"
+                                ) { vm.downloadAiModel() }
                             }
                         }
                     }
+                    SettingsFooter("The AI runs fully on your device — nothing you ask ever leaves your phone.")
                 }
-            }
 
-            // ── Update banner ────────────────────────────────────────────
-            AnimatedVisibility(
-                visible = update.info != null || update.downloading,
-                enter   = fadeIn(tween(300)) + expandVertically(tween(300)),
-                exit    = fadeOut(tween(200)) + shrinkVertically(tween(200))
-            ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape    = RoundedCornerShape(14.dp),
-                    colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Rounded.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp))
-                            Text(
-                                if (update.downloading) "Downloading update…"
-                                else "Update available — v${update.info?.latestVersion}",
-                                fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                "Storage" -> SettingsCard {
+                    SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
+                        "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
+                    ) { vm.setAutoDlWatchLater(it) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
+                        "$favCount saved"
+                    ) { if (favCount > 0) showClearFav = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.History, "Clear watch history",
+                        "$histCount entries"
+                    ) { if (histCount > 0) showClearHist = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.VisibilityOff, "Hidden videos & channels",
+                        if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
+                    ) { if (blockedCount > 0) showClearBlocked = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
+                        when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
+                    ) { showRetentionDialog = true }
+                }
+
+                "Backup" -> SettingsCard {
+                    SettingsItem(Icons.Rounded.Upload, "Export backup",
+                        "Subscriptions, favorites, playlists → JSON file"
+                    ) { exportLauncher.launch("streamflow-backup.json") }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Download, "Import backup",
+                        "Restore from a StreamFlow backup file"
+                    ) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Subscriptions, "Import YouTube subscriptions",
+                        "From a Google Takeout CSV or NewPipe export"
+                    ) { importSubsLauncher.launch(arrayOf("text/csv", "text/comma-separated-values",
+                        "application/json", "text/*", "application/octet-stream")) }
+                }
+
+                "About" -> SettingsCard {
+                    SettingsItem(Icons.Rounded.Info, "App version", "v${vm.appVersion}")
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.NewReleases, "What's new",
+                        "See what changed in v${com.streamflow.data.Changelog.VERSION_NAME}"
+                    ) { showWhatsNewDialog = true }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.SystemUpdate, "Check for updates",
+                        if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
+                    ) { vm.checkForUpdate() }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Code, "Source code",
+                        "github.com/Tann-Menghong/StreamFlowApp"
+                    ) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/Tann-Menghong/StreamFlowApp")))
+                    }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.BugReport, "Report a problem",
+                        "Opens a pre-filled GitHub issue"
+                    ) {
+                        val title = Uri.encode("Problem in v${vm.appVersion}")
+                        val body = Uri.encode("**What happened:**\n\n\n**Steps to reproduce:**\n1. \n\n**Device:** \n**App version:** v${vm.appVersion}")
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                                "https://github.com/Tann-Menghong/StreamFlowApp/issues/new?title=$title&body=$body")))
                         }
-                        if (update.downloading) {
-                            LinearProgressIndicator(
-                                progress = { update.progress / 100f },
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                                color      = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.15f)
-                            )
-                            Text("${update.progress}%", fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
-                        } else {
-                            Button(
-                                onClick  = { vm.downloadUpdate() },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape    = RoundedCornerShape(10.dp),
-                                colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) { Text("Download & Install") }
-                        }
                     }
                 }
-            }
 
-            // ── Appearance ───────────────────────────────────────────────
-            SettingsSection("Appearance")
-            SettingsCard {
-                SettingsSwitchItem(Icons.Rounded.AutoAwesome, "Modern design",
-                    "Card feed, floating bars, colorful icons — off for the classic look",
-                    designStyle == "MODERN"
-                ) { vm.setDesignStyle(if (it) "MODERN" else "CLASSIC") }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Palette, "Theme",
-                    when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
-                ) { showThemeDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.ColorLens, "Accent color",
-                    if (accentColor == "DYNAMIC") "Dynamic (Material You)"
-                    else accentColor.lowercase().replaceFirstChar { it.uppercase() }
-                ) { showAccentDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Translate, "Language / ភាសា",
-                    if (language == "KM") "ភាសាខ្មែរ" else "English"
-                ) { showLanguageDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.FormatSize, "Font size",
-                    when (fontScale) { "SMALL" -> "Small"; "LARGE" -> "Large"; else -> "Default" }
-                ) { showFontDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.TextFields, "Font style",
-                    when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
-                ) { showFontFamilyDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.RoundedCorner, "Thumbnail corners",
-                    when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
-                ) { showCornerDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Label, "Bottom bar labels",
-                    when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
-                ) { showNavLabelDialog = true }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.Animation, "Reduce motion",
-                    "Calmer, faster screen transitions", reduceMotion, vm::setReduceMotion)
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.Vibration, "Haptic feedback",
-                    "Vibrate on long-press actions", hapticsEnabled, vm::setHapticsEnabled)
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.ExitToApp, "Confirm before exit",
-                    "Press back twice on Home to close the app", confirmExit, vm::setConfirmExit)
-            }
-
-            // ── Notifications ────────────────────────────────────────────
-            SettingsSection("Notifications")
-            SettingsCard {
-                SettingsSwitchItem(Icons.Rounded.NotificationsActive, "New video alerts",
-                    "Notify when subscribed channels upload", notifyNewVideos
-                ) { vm.setNotifyNewVideos(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Schedule, "Check frequency",
-                    when (notifyFreq) {
-                        "1" -> "Every hour"; "3" -> "Every 3 hours"; "12" -> "Every 12 hours"
-                        "24" -> "Once a day"; else -> "Every 6 hours"
-                    }
-                ) { showNotifFreqDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.FilterList, "Alerts per check",
-                    if (notifyMax == "0") "Unlimited" else "Up to $notifyMax"
-                ) { showNotifMaxDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Bedtime, "Quiet hours",
-                    if (quietHours == "OFF") "Off"
-                    else quietHours.split("-").let { p ->
-                        "%02d:00 – %02d:00".format(p.getOrNull(0)?.toIntOrNull() ?: 22,
-                                                    p.getOrNull(1)?.toIntOrNull() ?: 7)
-                    }
-                ) { showQuietDialog = true }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.SystemUpdate, "App update alerts",
-                    "Notify when a new StreamFlow version is released", notifyAppUpdates
-                ) { vm.setNotifyAppUpdates(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Tune, "Sound & vibration",
-                    "Per-channel options in Android settings"
-                ) {
-                    try {
-                        val i = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        context.startActivity(i)
-                    } catch (_: Exception) {}
-                }
-            }
-
-            // ── Home customization ────────────────────────────────────────
-            SettingsFooter("New-video alerts follow the schedule above and stay silent during quiet hours.")
-
-            SettingsSection("Home")
-            SettingsCard {
-                SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
-                    "Show videos in a grid instead of list", homeLayout == "GRID"
-                ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.ViewModule, "Grid columns",
-                    "$gridColumns columns"
-                ) { showColumnsDialog = true }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.History, "Continue Watching row",
-                    "Show partially watched videos at the top", showContinueWatching
-                ) { vm.setShowContinueWatching(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.Stars, "Hero featured card",
-                    "Show first trending video as a large banner", showHeroCard
-                ) { vm.setShowHeroCard(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.LiveTv, "Show Donghua tab",
-                    "Hide it from the bottom bar if you don't use it", showDonghua
-                ) { vm.setShowDonghua(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
-                    "Add a dedicated Search tab to the bottom bar", showSearchTab
-                ) { vm.setShowSearchTab(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Start, "Start screen",
-                    when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
-                ) { showStartTabDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
-                    listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
-                        .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
-                ) { showLibTabDialog = true }
-            }
-
-            // ── Playback ─────────────────────────────────────────────────
-            SettingsSection("Playback")
-            SettingsCard {
-                SettingsItem(Icons.Rounded.HighQuality, "Video quality",
-                    when (quality) { "1080P" -> "1080p"; "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; else -> "Auto" }
-                ) { showQualityDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.SignalCellularAlt, "Quality on mobile data",
-                    when (qualityCellular) { "720P" -> "720p"; "480P" -> "480p"; "360P" -> "360p"; "AUTO" -> "Auto"; else -> "Same as Wi-Fi" }
-                ) { showCellularDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Speed, "Default speed",
-                    when (defaultSpeed) { "0.5" -> "0.5×"; "0.75" -> "0.75×"; "1.25" -> "1.25×"; "1.5" -> "1.5×"; "2.0" -> "2×"; else -> "1×" }
-                ) { showSpeedDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.FastForward, "Double-tap skip",
-                    "${skipSeconds}s per tap"
-                ) { showSkipDialog = true }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.Swipe, "Player swipe gestures",
-                    "Swipe edges for brightness and volume", playerGestures, vm::setPlayerGestures)
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
-                    "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
-                    "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
-                ) {
-                    try {
-                        val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
-                            as android.os.PowerManager
-                        if (android.os.Build.VERSION.SDK_INT >= 23 &&
-                            !pm.isIgnoringBatteryOptimizations(context.packageName)) {
-                            val i = android.content.Intent(
-                                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                android.net.Uri.parse("package:${context.packageName}"))
-                            context.startActivity(i)
-                        } else {
-                            android.widget.Toast.makeText(context,
-                                "Already protected — playback won't be killed",
-                                android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (_: Exception) {
-                        // Some OEM builds block the dialog; open the app's battery settings instead
-                        try {
-                            val i = android.content.Intent(
-                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                android.net.Uri.parse("package:${context.packageName}"))
-                            context.startActivity(i)
-                        } catch (_: Exception) {}
-                    }
-                }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
-                    "Play related videos automatically", autoPlay
-                ) { vm.setAutoPlay(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.VolumeUp, "Volume boost",
-                    when (volumeBoost) { "300" -> "Low (+30%)"; "600" -> "High (+60%)"; "1000" -> "Max (+100%)"; else -> "Off" }
-                ) { showBoostDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
-                    if (eqPreset == "OFF") "Off" else eqPreset
-                ) { showEqDialog = true }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
-                    "Prefer lower quality to save mobile data", dataSaver
-                ) { vm.setDataSaver(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
-                    "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
-                ) { vm.setBatterySaver(it) }
-                SettingsDivider()
-                SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
-                    "Watch without saving to history", incognito
-                ) { vm.setIncognito(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Language, "Trending country",
-                    countryOptions.firstOrNull { it.first == country }?.second ?: country
-                ) { showCountryDialog = true }
-            }
-
-            // ── AI (on-device, free, offline) ────────────────────────────
-            SettingsFooter("Playback keeps running in the notification when you leave the app. If your phone kills it, turn on Background play protection.")
-
-            SettingsSection("AI")
-            SettingsCard {
-                if (!AiEngine.isSupported()) {
-                    SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI",
-                        "Needs Android 7.0 or newer")
-                } else when (val s = aiState) {
-                    is AiEngine.DownloadState.Downloading -> {
-                        SettingsItem(Icons.Rounded.AutoAwesome, "Downloading AI model…",
-                            "${(s.progress * 100).toInt()}% of ${AiEngine.MODEL_SIZE_LABEL}")
-                        LinearProgressIndicator(
-                            progress = { s.progress },
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
-                        )
-                    }
-                    is AiEngine.DownloadState.Ready -> {
-                        SettingsItem(Icons.Rounded.AutoAwesome, "On-device AI ready",
-                            "${AiEngine.MODEL_LABEL} — tap ✦ in the player for summaries & Q&A")
-                        SettingsDivider()
-                        SettingsItem(Icons.Rounded.DeleteOutline, "Remove AI model",
-                            "Frees up ${AiEngine.MODEL_SIZE_LABEL} of storage"
-                        ) { showDeleteAiDialog = true }
-                    }
-                    is AiEngine.DownloadState.Failed -> {
-                        SettingsItem(Icons.Rounded.AutoAwesome, "Download failed — tap to resume",
-                            s.message) { vm.downloadAiModel() }
-                    }
-                    else -> {
-                        SettingsItem(Icons.Rounded.AutoAwesome, "Download AI model",
-                            "One-time download (${AiEngine.MODEL_SIZE_LABEL}) — video summaries and Q&A, free and fully offline"
-                        ) { vm.downloadAiModel() }
-                    }
-                }
-            }
-
-            // ── Storage ──────────────────────────────────────────────────
-            SettingsFooter("The AI runs fully on your device — nothing you ask ever leaves your phone.")
-
-            SettingsSection("Storage")
-            SettingsCard {
-                SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
-                    "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
-                ) { vm.setAutoDlWatchLater(it) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
-                    "$favCount saved"
-                ) { if (favCount > 0) showClearFav = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.History, "Clear watch history",
-                    "$histCount entries"
-                ) { if (histCount > 0) showClearHist = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.VisibilityOff, "Hidden videos & channels",
-                    if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
-                ) { if (blockedCount > 0) showClearBlocked = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
-                    when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
-                ) { showRetentionDialog = true }
-            }
-
-            // ── Backup ───────────────────────────────────────────────────
-            SettingsSection("Backup")
-            SettingsCard {
-                SettingsItem(Icons.Rounded.Upload, "Export backup",
-                    "Subscriptions, favorites, playlists → JSON file"
-                ) { exportLauncher.launch("streamflow-backup.json") }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Download, "Import backup",
-                    "Restore from a StreamFlow backup file"
-                ) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Subscriptions, "Import YouTube subscriptions",
-                    "From a Google Takeout CSV or NewPipe export"
-                ) { importSubsLauncher.launch(arrayOf("text/csv", "text/comma-separated-values",
-                    "application/json", "text/*", "application/octet-stream")) }
-            }
-
-            // ── About ────────────────────────────────────────────────────
-            SettingsSection("About")
-            SettingsCard {
-                SettingsItem(Icons.Rounded.Info, "App version", "v${vm.appVersion}")
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.NewReleases, "What's new",
-                    "See what changed in v${com.streamflow.data.Changelog.VERSION_NAME}"
-                ) { showWhatsNewDialog = true }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.SystemUpdate, "Check for updates",
-                    if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
-                ) { vm.checkForUpdate() }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.Code, "Source code",
-                    "github.com/Tann-Menghong/StreamFlowApp"
-                ) {
-                    context.startActivity(Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/Tann-Menghong/StreamFlowApp")))
-                }
-                SettingsDivider()
-                SettingsItem(Icons.Rounded.BugReport, "Report a problem",
-                    "Opens a pre-filled GitHub issue"
-                ) {
-                    val title = Uri.encode("Problem in v${vm.appVersion}")
-                    val body = Uri.encode("**What happened:**\n\n\n**Steps to reproduce:**\n1. \n\n**Device:** \n**App version:** v${vm.appVersion}")
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
-                            "https://github.com/Tann-Menghong/StreamFlowApp/issues/new?title=$title&body=$body")))
-                    }
-                }
+                else -> {}
             }
         }
     }
 
-    // ── Dialogs ──────────────────────────────────────────────────────
+    // ── Dialogs (shared across all categories) ─────────────────────────
     if (showThemeDialog) {
         val opts = listOf("SYSTEM" to "Follow system", "DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
         PickerDialog("Theme", opts.map { it.second }, opts.indexOfFirst { it.first == theme }.coerceAtLeast(0),
@@ -813,23 +879,6 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
 }
 
 // ── Reusable components ───────────────────────────────────────────────────────
-
-@Composable
-private fun SettingsSection(title: String) {
-    val sectionCtx = androidx.compose.ui.platform.LocalContext.current
-    val sectionLang by com.streamflow.data.local.AppPreferences.get(sectionCtx)
-        .language.collectAsState(initial = "EN")
-    Text(
-        // Display translated; the offsets map stays keyed by the English name
-        text     = com.streamflow.ui.theme.KmStrings.t(title, sectionLang),
-        style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-        color    = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier
-            .padding(start = 20.dp, top = 22.dp, bottom = 8.dp)
-            // Record where this section sits so the dashboard tiles can jump here
-            .onGloballyPositioned { settingsSectionOffsets[title] = it.positionInParent().y.toInt() }
-    )
-}
 
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
