@@ -13,6 +13,16 @@ import androidx.compose.ui.unit.sp
 
 enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM }
 
+// Bundled brand typeface (Manrope, variable weight). Consistent, geometric,
+// and much more "designed" than the system default on every device.
+val ManropeFamily = FontFamily(
+    androidx.compose.ui.text.font.Font(com.streamflow.R.font.manrope, FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(com.streamflow.R.font.manrope, FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(com.streamflow.R.font.manrope, FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(com.streamflow.R.font.manrope, FontWeight.Bold),
+    androidx.compose.ui.text.font.Font(com.streamflow.R.font.manrope, FontWeight.ExtraBold)
+)
+
 fun String.toAppTheme(): AppTheme = when (this) {
     "AMOLED" -> AppTheme.AMOLED
     "LIGHT"  -> AppTheme.LIGHT
@@ -130,7 +140,7 @@ fun StreamFlowTheme(
     val fontFamily = when (fontFamilyPref) {
         "SERIF" -> FontFamily.Serif
         "MONO"  -> FontFamily.Monospace
-        else    -> null // system default
+        else    -> ManropeFamily // bundled brand typeface
     }
     val isDark   = when (theme) {
         AppTheme.LIGHT -> false

@@ -111,6 +111,7 @@ fun LibraryScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            LibraryStatsHeader(favoritesCount = favorites.size, history = history)
             val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size)
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
@@ -781,3 +782,38 @@ private fun SubscriptionList(
 private fun FavoriteEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 private fun HistoryEntity.toVideoItem()  = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 private fun WatchLaterEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
+
+// Dashboard header: colorful stat tiles summarizing the user's week
+@Composable
+private fun LibraryStatsHeader(favoritesCount: Int, history: List<HistoryEntity>) {
+    val weekCutoff = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
+    val weekly = history.filter { it.watchedAt >= weekCutoff }
+    val minutes = weekly.sumOf { it.position } / 1000 / 60
+    val timeLabel = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        StatTile("Watch time", timeLabel, "this week", Modifier.weight(1f))
+        StatTile("Watched", "${weekly.size}", "this week", Modifier.weight(1f))
+        StatTile("Favorites", "$favoritesCount", "saved", Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatTile(title: String, value: String, sub: String, modifier: Modifier) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primary.copy(0.10f),
+        modifier = modifier
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary, maxLines = 1)
+            Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface.copy(0.85f), maxLines = 1)
+            Text(sub, fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}

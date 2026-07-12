@@ -1147,9 +1147,26 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
     }
 
     // ── Portrait layout ───────────────────────────────────────────────────────
+    // Ambient glow: the thumbnail's average color bleeds softly from behind the
+    // player, like YouTube's ambient mode
+    var ambientColor by remember(videoUrl) { mutableStateOf(Color.Transparent) }
+    LaunchedEffect(state) {
+        val d = (state as? PlayerUiState.Ready)?.details ?: return@LaunchedEffect
+        if (d.thumbnailUrl.isNotEmpty()) {
+            ambientColor = averageThumbColor(context, d.thumbnailUrl) ?: Color.Transparent
+        }
+    }
+    val ambient by animateColorAsState(ambientColor, tween(700), label = "ambient")
+
     // statusBarsPadding: keep the portrait player below the clock/battery/wifi
     // status bar (fullscreen mode uses its own immersive Box and is unaffected)
-    LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(
+        Modifier.fillMaxWidth().height(320.dp).background(
+            Brush.verticalGradient(listOf(ambient.copy(alpha = 0.30f), Color.Transparent))
+        )
+    )
+    LazyColumn(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
@@ -1948,6 +1965,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             }
         }
     }
+    } // ambient-glow wrapper Box
 
     // ── Queue bottom sheet ────────────────────────────────────────────────────
     if (showDownloadDialog) {
@@ -2340,3 +2358,26 @@ private fun ActionChip(
         }
     }
 }
+
+// Average color of the video thumbnail (tiny 24px decode) for the ambient glow
+private suspend fun averageThumbColor(context: android.content.Context, url: String): Color? = try {
+    val req = coil.request.ImageRequest.Builder(context)
+        .data(url).size(24).allowHardware(false).build()
+    val bmp = (coil.Coil.imageLoader(context).execute(req).drawable
+        as? android.graphics.drawable.BitmapDrawable)?.bitmap
+    if (bmp == null) null else {
+        var r = 0L; var g = 0L; var b = 0L; var n = 0
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                val c = bmp.getPixel(x, y)
+                r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+                x += 2
+            }
+            y += 2
+        }
+        if (n == 0) null
+        else Color(red = (r / n) / 255f, green = (g / n) / 255f, blue = (b / n) / 255f)
+    }
+} catch (_: Exception) { null }
