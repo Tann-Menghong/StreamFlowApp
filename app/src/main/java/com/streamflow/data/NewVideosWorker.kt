@@ -14,6 +14,9 @@ import com.streamflow.MainActivity
 import com.streamflow.R
 import com.streamflow.StreamFlowApp
 import com.streamflow.data.local.AppPreferences
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 
 // True while the user's quiet-hours window is active ("start-end" in 24h form,
@@ -50,10 +53,21 @@ class NewVideosWorker(
         var notified = 0
         var newCount = 0
 
-        subs.forEach { sub ->
+        // Fetch all channels in parallel — 20 sequential extractions kept the
+        // worker alive for minutes on slow networks; parallel finishes in one
+        // round-trip's worth of time (notifications still posted in order below)
+        val latestByChannel = coroutineScope {
+            subs.map { sub ->
+                async {
+                    sub to try { repo.getChannelInfo(sub.channelUrl).videos.firstOrNull() }
+                           catch (_: Exception) { null }
+                }
+            }.awaitAll()
+        }
+
+        latestByChannel.forEach { (sub, latest) ->
+            if (latest == null) return@forEach
             try {
-                val info = repo.getChannelInfo(sub.channelUrl)
-                val latest = info.videos.firstOrNull() ?: return@forEach
                 // First check just records the baseline; notify only on a change
                 if (sub.lastVideoUrl.isNotEmpty() && sub.lastVideoUrl != latest.url) {
                     newCount++

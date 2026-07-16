@@ -110,7 +110,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _repliesLoading.value = _repliesLoading.value + key
             val result = try { repo.getCommentReplies(videoUrl, page) } catch (_: Exception) { emptyList() }
-            _replies.value = _replies.value + (key to result)
+            // Don't cache an empty result: the repo maps failures to emptyList,
+            // and caching it would pin "no replies" forever — leaving it out
+            // lets the next tap retry the fetch
+            if (result.isNotEmpty()) _replies.value = _replies.value + (key to result)
             _repliesLoading.value = _repliesLoading.value - key
         }
     }
@@ -374,11 +377,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _commentsLoading.value = true
             try {
-                _comments.value = repo.getComments(videoUrl)
+                val result = repo.getComments(videoUrl)
+                _comments.value = result
+                // The repo maps failures to an empty list, so an empty result may
+                // mean "network hiccup", not "no comments" — clear the marker so
+                // reopening the sheet retries instead of showing empty forever
+                if (result.isEmpty() && commentsLoadedFor == videoUrl) commentsLoadedFor = ""
             } catch (_: Exception) {
                 _comments.value = emptyList()
-                // Failed (network hiccup): clear the marker so reopening the
-                // comments sheet retries instead of showing empty forever
                 if (commentsLoadedFor == videoUrl) commentsLoadedFor = ""
             } finally {
                 _commentsLoading.value = false

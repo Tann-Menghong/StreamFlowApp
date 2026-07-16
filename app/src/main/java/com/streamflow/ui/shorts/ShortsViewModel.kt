@@ -37,6 +37,8 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
     private val query = "#shorts"
     private var nextPage: Page? = null
     private var loadingMore = false
+    // Bumped per loadFeed so a Retry can't race an in-flight load or page-walk
+    private var feedGeneration = 0
     private val loadingDetails = mutableSetOf<String>()
     private val watched = mutableSetOf<String>()
 
@@ -46,15 +48,18 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         filter { it.duration in 1..75 && it.url.isNotEmpty() }
 
     fun loadFeed() {
+        val gen = ++feedGeneration
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
             try {
                 val result = repo.search(query)
+                if (gen != feedGeneration) return@launch // superseded by a newer retry
                 nextPage = result.nextPage
                 _videos.value = result.videos.onlyShorts().distinctBy { it.url }
                 if (_videos.value.isEmpty()) loadMore()
             } catch (e: Exception) {
+                if (gen != feedGeneration) return@launch
                 _error.value = friendlyError(e)
             } finally {
                 _loading.value = false
@@ -66,6 +71,7 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         val page = nextPage ?: return
         if (loadingMore) return
         loadingMore = true
+        val gen = feedGeneration
         viewModelScope.launch {
             try {
                 // A whole page can filter down to zero shorts — keep walking pages
@@ -74,6 +80,7 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
                 var hops = 0
                 while (p != null && hops < 5) {
                     val result = repo.searchNextPage(query, p)
+                    if (gen != feedGeneration) return@launch // feed was reloaded mid-walk
                     nextPage = result.nextPage
                     val added = result.videos.onlyShorts()
                     _videos.value = (_videos.value + added).distinctBy { it.url }

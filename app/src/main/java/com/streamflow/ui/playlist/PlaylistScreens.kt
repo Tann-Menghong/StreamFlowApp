@@ -145,8 +145,14 @@ fun PlaylistDetailScreen(
                                     onClick = {
                                         val above = items.getOrNull(index - 1) ?: return@IconButton
                                         scope.launch {
-                                            db.playlistDao().setAddedAt(playlistId, item.url, above.addedAt)
-                                            db.playlistDao().setAddedAt(playlistId, above.url, item.addedAt)
+                                            if (above.addedAt == item.addedAt) {
+                                                // Batch-imported items share a timestamp — swapping
+                                                // equal values is a no-op, so step past instead
+                                                db.playlistDao().setAddedAt(playlistId, item.url, above.addedAt - 1)
+                                            } else {
+                                                db.playlistDao().setAddedAt(playlistId, item.url, above.addedAt)
+                                                db.playlistDao().setAddedAt(playlistId, above.url, item.addedAt)
+                                            }
                                         }
                                     },
                                     enabled = index > 0, modifier = Modifier.size(22.dp)
@@ -159,8 +165,12 @@ fun PlaylistDetailScreen(
                                     onClick = {
                                         val below = items.getOrNull(index + 1) ?: return@IconButton
                                         scope.launch {
-                                            db.playlistDao().setAddedAt(playlistId, item.url, below.addedAt)
-                                            db.playlistDao().setAddedAt(playlistId, below.url, item.addedAt)
+                                            if (below.addedAt == item.addedAt) {
+                                                db.playlistDao().setAddedAt(playlistId, item.url, below.addedAt + 1)
+                                            } else {
+                                                db.playlistDao().setAddedAt(playlistId, item.url, below.addedAt)
+                                                db.playlistDao().setAddedAt(playlistId, below.url, item.addedAt)
+                                            }
                                         }
                                     },
                                     enabled = index < items.size - 1, modifier = Modifier.size(22.dp)
@@ -200,9 +210,11 @@ fun RemotePlaylistScreen(
     var videos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
     var nextPage by remember { mutableStateOf<Page?>(null) }
     var loadingMore by remember { mutableStateOf(false) }
+    var retryKey by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(playlistUrl) {
+    LaunchedEffect(playlistUrl, retryKey) {
+        error = null
         try {
             val p = repo.getRemotePlaylist(playlistUrl)
             playlist = p
@@ -259,6 +271,8 @@ fun RemotePlaylistScreen(
                     Spacer(Modifier.height(6.dp))
                     Text(error ?: "", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(14.dp))
+                    Button(onClick = { retryKey++ }) { Text("Retry") }
                 }
                 playlist == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)

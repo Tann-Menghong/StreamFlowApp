@@ -34,7 +34,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel()) {
     val state by vm.uiState.collectAsState()
-    var query by remember { mutableStateOf("") }
+    // Saveable: the typed query survives navigating away and back (the results
+    // already do, via the ViewModel — losing just the text felt broken)
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
 
@@ -110,7 +112,11 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                 }
                 is SearchUiState.Loading -> ShimmerList()
                 is SearchUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(s.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { vm.search(query) }, enabled = query.isNotBlank()) { Text("Retry") }
+                    }
                 }
                 is SearchUiState.Success -> LazyColumn(
                     state = listState,

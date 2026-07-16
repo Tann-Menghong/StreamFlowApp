@@ -519,9 +519,12 @@ class YouTubeRepository {
             val request = Request.Builder()
                 .url("https://sponsor.ajay.app/api/skipSegments?videoID=$videoId&categories=$categories")
                 .build()
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext emptyList()
-            val body = response.body?.string() ?: return@withContext emptyList()
+            // use{} so the connection is returned to the pool even on the
+            // early-return paths (a non-200 without close leaked the connection)
+            val body = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                response.body?.string() ?: return@withContext emptyList()
+            }
             val arr = JSONArray(body)
             (0 until arr.length()).map { i ->
                 val obj = arr.getJSONObject(i)
