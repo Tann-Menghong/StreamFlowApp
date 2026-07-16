@@ -142,9 +142,10 @@ fun HomeScreen(
         }
     }
 
-    // Search bar state
-    var searchExpanded by remember { mutableStateOf(false) }
-    var searchText     by remember { mutableStateOf("") }
+    // Search bar state — saveable so the pill's text/expansion survive opening
+    // a video and coming back (the results already survive via the ViewModel)
+    var searchExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var searchText     by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
 
@@ -172,15 +173,20 @@ fun HomeScreen(
         }
     }
 
-    val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
+    // Load more when near the end — snapshotFlow re-arms after each append
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+    // FAB must track whichever layout is active — checking only the list state
+    // meant it never appeared in GRID layout
+    val showFab by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemIndex > 2 }
+    }
 
     // Sync search text with active query (e.g. when category chip clears search)
     LaunchedEffect(activeSearch) {
         if (activeSearch.isEmpty() && searchText.isNotEmpty()) searchText = ""
     }
 
-    // Load more when near the end — snapshotFlow re-arms after each append
-    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -206,7 +212,10 @@ fun HomeScreen(
                 exit    = fadeOut(tween(150)) + scaleOut(tween(150))
             ) {
                 FloatingActionButton(
-                    onClick           = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+                    onClick           = { coroutineScope.launch {
+                        listState.animateScrollToItem(0)
+                        gridState.scrollToItem(0)
+                    } },
                     containerColor    = MaterialTheme.colorScheme.primary,
                     contentColor      = MaterialTheme.colorScheme.onPrimary,
                     shape             = RoundedCornerShape(16.dp),
@@ -587,7 +596,14 @@ fun HomeScreen(
         // Pull down to refresh the feed
         val ptrState = rememberPullToRefreshState()
         if (ptrState.isRefreshing) {
-            LaunchedEffect(true) { vm.refresh() }
+            LaunchedEffect(true) {
+                vm.refresh()
+                // Failsafe: a refresh that fails while the cached feed is showing
+                // never changes `state`, so the state-watcher below never fires —
+                // without this the spinner would spin forever
+                delay(12_000)
+                ptrState.endRefresh()
+            }
         }
         LaunchedEffect(state) {
             if (ptrState.isRefreshing && state !is HomeUiState.Loading) ptrState.endRefresh()

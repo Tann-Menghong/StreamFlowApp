@@ -59,13 +59,20 @@ fun LibraryScreen(
     val subscriptions by vm.subscriptions.collectAsState()
     val playlists     by vm.playlists.collectAsState()
     val downloads     by vm.downloads.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // Saveable: the chosen tab survives opening a video and coming back —
+    // plain remember reset it and the default-tab effect snapped it away
+    var selectedTab by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
+    var tabInitialized by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val libContext = androidx.compose.ui.platform.LocalContext.current
     val libPrefs = remember { com.streamflow.data.local.AppPreferences.get(libContext) }
     val uiLang by libPrefs.language.collectAsState(initial = "EN")
-    // Open on the user's preferred tab (Settings > Home > Default Library tab)
+    // Open on the user's preferred tab (Settings > Home > Default Library tab) —
+    // but only on the FIRST open, never over a tab the user has navigated to
     LaunchedEffect(Unit) {
-        selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 6) ?: 1
+        if (!tabInitialized) {
+            selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 6) ?: 1
+            tabInitialized = true
+        }
     }
     val tabs = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }

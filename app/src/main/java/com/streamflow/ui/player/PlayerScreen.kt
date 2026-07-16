@@ -578,12 +578,14 @@ fun PlayerScreen(
     // ── Stats overlay ────────────────────────────────────────────────────────
     var showStats by remember { mutableStateOf(false) }
     var bufferPct by remember { mutableIntStateOf(0) }
-    LaunchedEffect(mediaController) {
-        while (true) {
-            delay(1000L)
-            val mc = mediaController ?: continue
-            if (mc.duration > 0L)
+    // Poll only while the stats overlay is actually open — this loop used to
+    // tick once a second for the whole playback session for a hidden overlay
+    LaunchedEffect(mediaController, showStats) {
+        while (showStats) {
+            val mc = mediaController
+            if (mc != null && mc.duration > 0L)
                 bufferPct = ((mc.bufferedPosition * 100L) / mc.duration).toInt().coerceIn(0, 100)
+            delay(1000L)
         }
     }
 

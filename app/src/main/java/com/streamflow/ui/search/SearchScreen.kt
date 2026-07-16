@@ -47,7 +47,13 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
             total > 0 && last >= total - 3
         }
     }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.loadMore() }
+    // Keyed on isLoadingMore too: a tiny appended page can leave shouldLoadMore
+    // stuck at true, and an effect keyed only on it would never re-fire —
+    // pagination stalled until the user scrolled again
+    val isLoadingMore = (state as? SearchUiState.Success)?.isLoadingMore == true
+    LaunchedEffect(shouldLoadMore, isLoadingMore) {
+        if (shouldLoadMore && !isLoadingMore) vm.loadMore()
+    }
 
     // statusBarsPadding: keep the search bar below the clock/battery/wifi
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
@@ -115,7 +121,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(s.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(12.dp))
-                        Button(onClick = { vm.search(query) }, enabled = query.isNotBlank()) { Text("Retry") }
+                        Button(onClick = { vm.retry() }) { Text("Retry") }
                     }
                 }
                 is SearchUiState.Success -> LazyColumn(

@@ -185,7 +185,8 @@ class AppPreferences(private val context: Context) {
                     uploaderAvatarUrl = o.optString("uploaderAvatarUrl"),
                     viewCount = o.optLong("viewCount"),
                     duration = o.optLong("duration"),
-                    uploadedAgo = o.optString("uploadedAgo")
+                    uploadedAgo = o.optString("uploadedAgo"),
+                    uploadedEpoch = o.optLong("uploadedEpoch")
                 )
             }
         } catch (_: Exception) { emptyList() }
@@ -270,7 +271,7 @@ class AppPreferences(private val context: Context) {
                 .put("thumbnailUrl", v.thumbnailUrl).put("uploaderName", v.uploaderName)
                 .put("uploaderUrl", v.uploaderUrl).put("uploaderAvatarUrl", v.uploaderAvatarUrl)
                 .put("viewCount", v.viewCount).put("duration", v.duration)
-                .put("uploadedAgo", v.uploadedAgo))
+                .put("uploadedAgo", v.uploadedAgo).put("uploadedEpoch", v.uploadedEpoch))
         }
         prefsMap[CACHED_FEED_KEY] = arr.toString()
     }

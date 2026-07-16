@@ -131,7 +131,10 @@ class MainActivity : ComponentActivity() {
         if (isPlayerActive && autoPipEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9)).build()
-            enterPictureInPictureMode(params)
+            // Some OEMs throw IllegalStateException here when the user has
+            // revoked the PiP permission in system settings — never crash
+            // the whole app just because the mini window couldn't open
+            try { enterPictureInPictureMode(params) } catch (_: Exception) {}
         }
     }
 

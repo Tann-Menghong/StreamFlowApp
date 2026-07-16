@@ -32,8 +32,14 @@ class SearchViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val uiState: StateFlow<SearchUiState> = _uiState
 
+    // Last submitted query, so Retry works even after the text field was cleared
+    private var lastQuery = ""
+
+    fun retry() { if (lastQuery.isNotBlank()) search(lastQuery) }
+
     fun search(query: String) {
         if (query.isBlank()) return
+        lastQuery = query
         val gen = ++searchGeneration
         viewModelScope.launch {
             _uiState.value = SearchUiState.Loading

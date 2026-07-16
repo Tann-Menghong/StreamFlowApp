@@ -83,13 +83,24 @@ fun ShortsScreen(
     var isPaused by remember { mutableStateOf(false) }
 
     // Pause when the app goes to background — Shorts has no playback service,
-    // so without this the audio would keep playing after leaving the app
+    // so without this the audio would keep playing after leaving the app.
+    // Coming back auto-resumes (only if WE paused it, not the user).
+    var pausedByLifecycle by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE && player.isPlaying) {
-                player.pause()
-                isPaused = true
+            when {
+                event == Lifecycle.Event.ON_PAUSE && player.isPlaying -> {
+                    player.pause()
+                    isPaused = true
+                    pausedByLifecycle = true
+                }
+                event == Lifecycle.Event.ON_RESUME && pausedByLifecycle -> {
+                    player.play()
+                    isPaused = false
+                    pausedByLifecycle = false
+                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
