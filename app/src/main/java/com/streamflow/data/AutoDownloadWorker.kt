@@ -18,8 +18,12 @@ class AutoDownloadWorker(context: Context, params: WorkerParameters) :
 
         val repo = YouTubeRepository()
         val watchLater = try { app.database.watchLaterDao().getAll().first() } catch (_: Exception) { return Result.success() }
+        // FAILED rows don't count as "already downloaded" — otherwise one failed
+        // attempt permanently blocked that video from ever auto-downloading again
         val downloaded = try {
-            app.database.downloadDao().getAll().first().mapTo(HashSet()) { it.url }
+            app.database.downloadDao().getAll().first()
+                .filter { it.status != "FAILED" }
+                .mapTo(HashSet()) { it.url }
         } catch (_: Exception) { emptySet<String>() }
 
         // A few per run keeps each pass light; the periodic schedule catches the rest

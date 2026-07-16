@@ -46,9 +46,11 @@ fun ChannelScreen(
     val data by vm.channel.collectAsState()
     val isSubscribed by vm.isSubscribed.collectAsState()
     val listState = rememberLazyListState()
-    // About is a local tab — it shows data we already have, no network call
-    var showAbout by remember(channelUrl) { mutableStateOf(false) }
-    var channelQuery by remember(channelUrl) { mutableStateOf("") }
+    // About is a local tab — it shows data we already have, no network call.
+    // Saveable: plain remember lost the selected tab and the in-channel search
+    // text on rotation / process recreation
+    var showAbout by androidx.compose.runtime.saveable.rememberSaveable(channelUrl) { mutableStateOf(false) }
+    var channelQuery by androidx.compose.runtime.saveable.rememberSaveable(channelUrl) { mutableStateOf("") }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -80,7 +82,7 @@ fun ChannelScreen(
             data.isLoading && data.name.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding)) {
                 com.streamflow.ui.components.ShimmerList()
             }
-            data.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            data.error != null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                     Text("Failed to load channel", fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground)

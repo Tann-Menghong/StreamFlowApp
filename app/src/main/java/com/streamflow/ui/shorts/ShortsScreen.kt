@@ -142,6 +142,9 @@ fun ShortsScreen(
                 val currentDetails = currentVideo?.let { details[it.url] }
                 LaunchedEffect(pagerState.currentPage, currentDetails != null) {
                     player.stop()
+                    // Clear a pause left over from the previous page — otherwise the
+                    // big Play icon showed over the next short's loading spinner
+                    isPaused = false
                     val d = currentDetails ?: return@LaunchedEffect
                     val dsf = OkHttpDataSource.Factory(OkHttpDownloader.instance.client)
                     val videoSource = ProgressiveMediaSource.Factory(dsf)

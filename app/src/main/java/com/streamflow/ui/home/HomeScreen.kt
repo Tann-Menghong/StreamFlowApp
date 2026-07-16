@@ -359,7 +359,9 @@ fun HomeScreen(
                                 cursorBrush    = SolidColor(MaterialTheme.colorScheme.primary),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = {
-                                    vm.search(searchText)
+                                    // A blank submit used to reload/reshuffle the whole
+                                    // feed (search("") falls through to loadTrending)
+                                    if (searchText.isNotBlank()) vm.search(searchText)
                                     focusManager.clearFocus()
                                 }),
                                 decorationBox  = { inner ->
@@ -372,7 +374,14 @@ fun HomeScreen(
                             )
                             if (searchText.isNotEmpty()) {
                                 IconButton(
-                                    onClick  = { searchText = ""; vm.loadTrending() },
+                                    onClick  = {
+                                        searchText = ""
+                                        vm.clearSuggestions()
+                                        // Only reload the feed if a search was actually
+                                        // active — clearing typed-but-unsearched text
+                                        // used to reshuffle the whole feed for nothing
+                                        if (activeSearch.isNotEmpty()) vm.loadTrending()
+                                    },
                                     modifier = Modifier.size(38.dp)
                                 ) {
                                     Icon(Icons.Rounded.Close, "Clear",
@@ -653,6 +662,9 @@ fun HomeScreen(
 
                     is HomeUiState.Success -> {
                         val cols = gridCols.toIntOrNull() ?: 2
+                        // Videos animate in only ONCE — scrolling back up used to
+                        // replay the fade/slide on every card that re-entered view
+                        val animatedUrls = remember { mutableSetOf<String>() }
                         if (homeLayout == "GRID") {
                             LazyVerticalGrid(
                                 columns               = GridCells.Fixed(cols),
@@ -663,8 +675,13 @@ fun HomeScreen(
                                 verticalArrangement   = Arrangement.spacedBy(8.dp)
                             ) {
                                 gridItemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
-                                    var visible by remember { mutableStateOf(false) }
-                                    LaunchedEffect(Unit) { delay((index * 35L).coerceAtMost(280L)); visible = true }
+                                    var visible by remember { mutableStateOf(video.url in animatedUrls) }
+                                    LaunchedEffect(Unit) {
+                                        if (!visible) {
+                                            delay((index * 35L).coerceAtMost(280L))
+                                            animatedUrls.add(video.url); visible = true
+                                        }
+                                    }
                                     AnimatedVisibility(visible,
                                         modifier = Modifier.animateItemPlacement(),
                                         enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 6 }) {
@@ -732,8 +749,13 @@ fun HomeScreen(
                                     s.videos,
                                     key = { _, v -> "list_${v.url}" }
                                 ) { index, video ->
-                                    var visible by remember { mutableStateOf(false) }
-                                    LaunchedEffect(Unit) { delay((index * 25L).coerceAtMost(200L)); visible = true }
+                                    var visible by remember { mutableStateOf(video.url in animatedUrls) }
+                                    LaunchedEffect(Unit) {
+                                        if (!visible) {
+                                            delay((index * 25L).coerceAtMost(200L))
+                                            animatedUrls.add(video.url); visible = true
+                                        }
+                                    }
                                     AnimatedVisibility(visible,
                                         modifier = Modifier.animateItemPlacement(),
                                         enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 6 }

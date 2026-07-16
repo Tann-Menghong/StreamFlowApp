@@ -57,7 +57,7 @@ fun ChannelAvatar(
     onClick: (() -> Unit)? = null
 ) {
     val clickMod = if (onClick != null)
-        Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
+        Modifier.pointerInput(name, avatarUrl) { detectTapGestures(onTap = { onClick() }) }
     else Modifier
     if (avatarUrl.isNotEmpty()) {
         AsyncImage(
@@ -123,7 +123,10 @@ fun VideoCard(
                         .background(MaterialTheme.colorScheme.surface)
                     else Modifier
                 )
-                .pointerInput(Unit) {
+                // Keyed on the video: pointerInput(Unit) froze the FIRST video's
+                // click/long-press closures, so after an in-place feed refresh a tap
+                // could open the wrong (old) video
+                .pointerInput(video.url) {
                     detectTapGestures(
                         onPress = { pressed = true; tryAwaitRelease(); pressed = false },
                         onTap   = { onClick() },
@@ -220,7 +223,7 @@ fun VideoCard(
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
-                            Modifier.pointerInput(Unit) {
+                            Modifier.pointerInput(video.uploaderUrl) {
                                 detectTapGestures(onTap = { onChannelClick(video.uploaderUrl) })
                             } else Modifier
                     )
@@ -363,7 +366,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             .scale(scale)
             .clip(RoundedCornerShape((corner + 4).dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
-            .pointerInput(Unit) {
+            .pointerInput(video.url) {
                 detectTapGestures(
                     onPress  = { pressed = true; tryAwaitRelease(); pressed = false },
                     onTap    = { onClick() }
@@ -426,7 +429,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(160.dp)
-            .pointerInput(Unit) {
+            .pointerInput(entity.url) {
                 detectTapGestures(onTap = { onClick() })
             }
     ) {
@@ -441,21 +444,22 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
                 contentScale       = ContentScale.Crop,
                 modifier           = Modifier.fillMaxSize()
             )
-            Box(
-                Modifier.align(Alignment.BottomStart).padding(5.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(0.88f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
-            ) {
-                Text("▶ ${formatDuration(entity.position / 1000)}",
-                    color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-            }
-            // Progress bar
+            // Progress bar (drawn first so the position badge sits on top of it,
+            // not underneath — they share the same BottomStart corner)
             if (fraction > 0.01f) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)) {
                     Box(Modifier.fillMaxSize().background(Color.White.copy(0.3f)))
                     Box(Modifier.fillMaxWidth(fraction).fillMaxHeight()
                         .background(MaterialTheme.colorScheme.primary))
                 }
+            }
+            Box(
+                Modifier.align(Alignment.BottomStart).padding(start = 5.dp, bottom = 7.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(0.88f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text("▶ ${formatDuration(entity.position / 1000)}",
+                    color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         Spacer(Modifier.height(5.dp))
@@ -494,7 +498,7 @@ fun CompactVideoCard(
             .fillMaxWidth()
             .scale(scale)
             .padding(bottom = 12.dp)
-            .pointerInput(Unit) {
+            .pointerInput(video.url) {
                 detectTapGestures(
                     onPress     = { pressed = true; tryAwaitRelease(); pressed = false },
                     onTap       = { onClick() },
@@ -559,7 +563,7 @@ fun CompactVideoCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = if (onChannelClick != null && video.uploaderUrl.isNotEmpty())
-                        Modifier.pointerInput(Unit) {
+                        Modifier.pointerInput(video.uploaderUrl) {
                             detectTapGestures(onTap = { onChannelClick(video.uploaderUrl) })
                         } else Modifier)
             }

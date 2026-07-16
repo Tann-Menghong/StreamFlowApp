@@ -86,7 +86,9 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
-                            vm.search(query); focusManager.clearFocus()
+                            // Ignore blank submits instead of firing an empty search
+                            if (query.isNotBlank()) vm.search(query)
+                            focusManager.clearFocus()
                         }),
                         decorationBox = { inner ->
                             if (query.isEmpty()) Text("Search YouTube…", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -124,13 +126,22 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                         Button(onClick = { vm.retry() }) { Text("Retry") }
                     }
                 }
-                is SearchUiState.Success -> LazyColumn(
+                is SearchUiState.Success -> {
+                    // Results animate in only once — scrolling back up used to
+                    // replay the fade on every card that re-entered view
+                    val animatedUrls = remember { mutableSetOf<String>() }
+                    LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                 ) {
                     itemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
-                        var visible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) { delay((index * 30L).coerceAtMost(240L)); visible = true }
+                        var visible by remember { mutableStateOf(video.url in animatedUrls) }
+                        LaunchedEffect(Unit) {
+                            if (!visible) {
+                                delay((index * 30L).coerceAtMost(240L))
+                                animatedUrls.add(video.url); visible = true
+                            }
+                        }
                         AnimatedVisibility(visible, enter = fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 6 }) {
                             VideoCard(video = video, onClick = { onVideoClick(video.url) })
                         }
@@ -142,6 +153,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                             }
                         }
                     }
+                }
                 }
             }
         }

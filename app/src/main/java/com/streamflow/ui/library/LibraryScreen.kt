@@ -70,7 +70,9 @@ fun LibraryScreen(
     // but only on the FIRST open, never over a tab the user has navigated to
     LaunchedEffect(Unit) {
         if (!tabInitialized) {
-            selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 6) ?: 1
+            // Fallback 0 = Favorites (matches the Settings default); it was 1
+            // (History) which contradicted what Settings claimed
+            selectedTab = libPrefs.libraryTab.first().toIntOrNull()?.coerceIn(0, 6) ?: 0
             tabInitialized = true
         }
     }

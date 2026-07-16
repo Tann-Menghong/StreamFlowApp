@@ -63,7 +63,10 @@ private fun isAdRequest(url: String): Boolean {
     return AD_DOMAINS.any { lower.contains(it) } || AD_URL_PATTERNS.any { lower.contains(it) }
 }
 
-private val EMPTY_RESPONSE = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
+// A fresh response per request: shouldInterceptRequest runs on multiple WebView
+// threads, and a single shared WebResourceResponse (one InputStream instance)
+// handed to concurrent requests is not thread-safe
+private fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
 
 private val AD_BLOCK_JS = """
 (function(){
@@ -145,10 +148,15 @@ fun DonghuaScreen(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            AndroidView(
-                factory = { customView!! },
-                modifier = Modifier.fillMaxSize()
-            )
+            // key(): AndroidView's factory only runs once per slot, so when the
+            // site swaps in a NEW fullscreen view (next episode) the old one kept
+            // showing — keying forces a fresh AndroidView for each custom view
+            key(customView) {
+                AndroidView(
+                    factory = { customView!! },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
         return
     }
@@ -222,7 +230,7 @@ fun DonghuaScreen(
                                 request: WebResourceRequest
                             ): WebResourceResponse? {
                                 val url = request.url.toString()
-                                if (isAdRequest(url)) return EMPTY_RESPONSE
+                                if (isAdRequest(url)) return emptyResponse()
                                 return null
                             }
                             override fun onReceivedSslError(

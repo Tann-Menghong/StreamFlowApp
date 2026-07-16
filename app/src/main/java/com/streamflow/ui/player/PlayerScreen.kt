@@ -344,7 +344,9 @@ fun PlayerScreen(
 
     // ── Repeat mode ──────────────────────────────────────────────────────────
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
-    LaunchedEffect(repeatMode) { mediaController?.repeatMode = repeatMode }
+    // Also keyed on the controller: a repeat mode chosen before the session
+    // connected (controller still null) was silently dropped — re-apply on connect
+    LaunchedEffect(repeatMode, mediaController) { mediaController?.repeatMode = repeatMode }
 
     // ── A–B section loop ─────────────────────────────────────────────────────
     var loopA by remember { mutableStateOf<Long?>(null) }
@@ -535,9 +537,12 @@ fun PlayerScreen(
                     .build()
             )).build()
         }
+        // Preserve the play/pause state: unconditional play() force-started
+        // playback when the user toggled subtitles while paused
+        val wasPlaying = mc.isPlaying || mc.playWhenReady
         mc.setMediaItem(newItem, pos)
         mc.prepare()
-        mc.play()
+        if (wasPlaying) mc.play()
     }
 
     // ── Lock state ───────────────────────────────────────────────────────────
@@ -748,6 +753,12 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 </body></html>"""
                         wv.loadDataWithBaseURL("https://donghuafun.com/", html, "text/html", "utf-8", null)
                     }
+                },
+                // Without this the WebView leaked on back navigation and its <video>
+                // could keep playing audio after leaving the screen
+                onRelease = { wv ->
+                    wv.loadUrl("about:blank")
+                    wv.destroy()
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -1264,11 +1275,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
     // player, like YouTube's ambient mode
     var ambientColor by remember(videoUrl) { mutableStateOf(Color.Transparent) }
     val batterySaverOn by prefs.batterySaver.collectAsState(initial = false)
-    LaunchedEffect(state, batterySaverOn) {
+    // Keyed on the thumbnail URL, not the whole state: likes/comments updates
+    // mutate `state` and used to re-decode the thumbnail bitmap every time
+    val ambientThumbUrl = (state as? PlayerUiState.Ready)?.details?.thumbnailUrl ?: ""
+    LaunchedEffect(ambientThumbUrl, batterySaverOn) {
         if (batterySaverOn) { ambientColor = Color.Transparent; return@LaunchedEffect }
-        val d = (state as? PlayerUiState.Ready)?.details ?: return@LaunchedEffect
-        if (d.thumbnailUrl.isNotEmpty()) {
-            ambientColor = averageThumbColor(context, d.thumbnailUrl) ?: Color.Transparent
+        if (ambientThumbUrl.isNotEmpty()) {
+            ambientColor = averageThumbColor(context, ambientThumbUrl) ?: Color.Transparent
         }
     }
     val ambient by animateColorAsState(ambientColor, tween(700), label = "ambient")

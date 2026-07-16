@@ -9,6 +9,10 @@ object KmStrings {
         "Library" to "បណ្ណាល័យ",
         "Settings" to "ការកំណត់",
         "Search" to "ស្វែងរក",
+        // Bottom-bar tabs that were missing (stayed English in Khmer mode)
+        "Donghua" to "ដុងហួ",
+        "Shorts" to "វីដេអូខ្លី",
+        "Feed" to "វីដេអូថ្មីៗ",
         "Favorites" to "ចូលចិត្ត",
         "History" to "ប្រវត្តិ",
         "Watch Later" to "មើលពេលក្រោយ",

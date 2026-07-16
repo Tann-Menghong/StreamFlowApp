@@ -225,13 +225,16 @@ fun RemotePlaylistScreen(
         }
     }
 
-    // Infinite scroll for long playlists
+    // Infinite scroll for long playlists. The flow emits (lastVisible, total)
+    // instead of a Boolean: a small appended page could leave "near end" stuck
+    // at true, and snapshotFlow's dedupe (true -> true) never re-fired, so
+    // pagination stalled until the user scrolled again.
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount > 0 && last >= info.totalItemsCount - 4
-        }.collect { nearEnd ->
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) to info.totalItemsCount
+        }.collect { (last, total) ->
+            val nearEnd = total > 0 && last >= total - 4
             val page = nextPage
             if (nearEnd && page != null && !loadingMore) {
                 loadingMore = true

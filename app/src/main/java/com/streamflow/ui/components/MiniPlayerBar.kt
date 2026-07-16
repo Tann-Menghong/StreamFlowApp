@@ -65,7 +65,10 @@ fun MiniPlayerBar(
                 translationX = dragX
                 alpha = 1f - (kotlin.math.abs(dragX) / 700f).coerceIn(0f, 0.6f)
             }
-            .pointerInput(Unit) {
+            // Keyed on the controller: with pointerInput(Unit) the gesture kept the
+            // NULL controller captured before the session connected, so swiping the
+            // bar away dismissed it without actually pausing playback
+            .pointerInput(mediaController) {
                 detectHorizontalDragGestures(
                     onHorizontalDrag = { _, dx -> dragX += dx },
                     onDragEnd = {
@@ -78,7 +81,9 @@ fun MiniPlayerBar(
                     onDragCancel = { dragX = 0f }
                 )
             }
-            .pointerInput(Unit) {
+            // Keyed on the current video: after autoplay advanced, swipe-up used to
+            // reopen the PREVIOUS video (stale data.url in the frozen closure)
+            .pointerInput(data.url) {
                 detectVerticalDragGestures(
                     onVerticalDrag = { _, dy -> dragY += dy },
                     onDragEnd = {

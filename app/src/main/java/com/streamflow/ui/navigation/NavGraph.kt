@@ -144,8 +144,10 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
         }
     }
 
-    // "What's New" dialog: shown once after every app update (not on fresh installs)
-    var showWhatsNew by remember { mutableStateOf(false) }
+    // "What's New" dialog: shown once after every app update (not on fresh installs).
+    // Saveable: lastSeenVersion is written immediately below, so with plain
+    // remember a rotation while the dialog was open dismissed it forever
+    var showWhatsNew by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val lastSeen = appPrefs.lastSeenVersion.first()
         val current = com.streamflow.BuildConfig.VERSION_CODE
