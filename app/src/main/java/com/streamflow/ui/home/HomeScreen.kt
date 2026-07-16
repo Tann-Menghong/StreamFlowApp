@@ -187,19 +187,24 @@ fun HomeScreen(
         if (activeSearch.isEmpty() && searchText.isNotEmpty()) searchText = ""
     }
 
+    // Emit (lastVisible, total) pairs, not a Boolean: snapshotFlow dedupes
+    // true -> true, so a small appended page that left "near end" true never
+    // re-fired and pagination stalled until the user scrolled again
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount > 0 && last >= info.totalItemsCount - 5
-        }.collect { if (it) vm.loadMore() }
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) to info.totalItemsCount
+        }.collect { (last, total) ->
+            if (total > 0 && last >= total - 5) vm.loadMore()
+        }
     }
     LaunchedEffect(gridState) {
         snapshotFlow {
             val info = gridState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount > 0 && last >= info.totalItemsCount - 6
-        }.collect { if (it) vm.loadMore() }
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) to info.totalItemsCount
+        }.collect { (last, total) ->
+            if (total > 0 && last >= total - 6) vm.loadMore()
+        }
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -984,7 +989,7 @@ private fun CustomizeHomeSheet(
             SheetSwitchRow("Featured row", "Horizontal top-trending strip", showHero, onShowHero)
             SheetSwitchRow("Category chips", "Topic bar under the search field", showCategoryBar, onShowCategoryBar)
             SheetSwitchRow("Hide watched videos", "Skip videos already in your history", hideWatched, onHideWatched)
-            SheetSwitchRow("Hide Shorts", "Skip videos under 60 seconds", hideShorts, onHideShorts)
+            SheetSwitchRow("Hide Shorts", "Skip short vertical videos (about a minute or less)", hideShorts, onHideShorts)
 
             Spacer(Modifier.height(20.dp))
 
@@ -1067,7 +1072,7 @@ private fun CustomizeHomeSheet(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
                                 if (newCategory.isNotBlank()) {
-                                    onAddCategory(newCategory); newCategory = ""
+                                    onAddCategory(newCategory.trim()); newCategory = ""
                                 }
                             }),
                             decorationBox = { inner ->
@@ -1081,7 +1086,7 @@ private fun CustomizeHomeSheet(
                 }
                 FilledTonalButton(
                     onClick = {
-                        if (newCategory.isNotBlank()) { onAddCategory(newCategory); newCategory = "" }
+                        if (newCategory.isNotBlank()) { onAddCategory(newCategory.trim()); newCategory = "" }
                     },
                     enabled = newCategory.isNotBlank(),
                     contentPadding = PaddingValues(horizontal = 14.dp)

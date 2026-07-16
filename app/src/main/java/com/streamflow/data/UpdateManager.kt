@@ -30,10 +30,14 @@ class UpdateManager(private val context: Context) {
             .url("https://api.github.com/repos/Tann-Menghong/StreamFlowApp/releases/latest")
             .header("Accept", "application/vnd.github.v3+json")
             .build()
-        val resp = client.newCall(req).execute()
-        val body = resp.body?.string()
-        if (!resp.isSuccessful || body == null)
-            throw java.io.IOException("Update check failed (HTTP ${resp.code})")
+        // .use{} — body?.string() closes on success, but the null-body/error path
+        // used to leak the connection (same OkHttp leak class as getSponsorSegments)
+        val body = client.newCall(req).execute().use { resp ->
+            val b = resp.body?.string()
+            if (!resp.isSuccessful || b == null)
+                throw java.io.IOException("Update check failed (HTTP ${resp.code})")
+            b
+        }
         val json = JSONObject(body)
         val tag = json.optString("tag_name").removePrefix("v")
         val notes = json.optString("body", "")

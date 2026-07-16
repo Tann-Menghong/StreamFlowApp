@@ -207,8 +207,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 val trimmed = text.trimStart()
                 if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
                     // NewPipe subscriptions export: {"subscriptions":[{"url":..,"name":..}]}
-                    val root = org.json.JSONObject(trimmed)
-                    val arr = root.optJSONArray("subscriptions") ?: org.json.JSONArray()
+                    // A bare top-level array previously crashed JSONObject(...) and the
+                    // whole import failed despite the startsWith("[") check
+                    val arr = if (trimmed.startsWith("["))
+                        org.json.JSONArray(trimmed)
+                    else
+                        org.json.JSONObject(trimmed).optJSONArray("subscriptions") ?: org.json.JSONArray()
                     for (i in 0 until arr.length()) {
                         val o = arr.getJSONObject(i)
                         val url = o.optString("url")
@@ -252,7 +256,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val ok = try {
                 val root = org.json.JSONObject().apply {
-                    put("app", "StreamFlow"); put("backupVersion", 2)
+                    put("app", "StreamFlow"); put("backupVersion", 3)
                     put("history", org.json.JSONArray().also { arr ->
                         db.historyDao().getAll().first().forEach { h ->
                             arr.put(org.json.JSONObject()
@@ -264,9 +268,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     })
                     put("subscriptions", org.json.JSONArray().also { arr ->
                         db.subscriptionDao().getAllOnce().forEach { s ->
+                            // groupName + notify were silently dropped before (backup v2),
+                            // so a restore lost every bell toggle and channel group
                             arr.put(org.json.JSONObject()
                                 .put("channelUrl", s.channelUrl).put("name", s.name)
-                                .put("avatarUrl", s.avatarUrl))
+                                .put("avatarUrl", s.avatarUrl)
+                                .put("groupName", s.groupName).put("notify", s.notify)
+                                .put("subscribedAt", s.subscribedAt))
                         }
                     })
                     put("favorites", org.json.JSONArray().also { arr ->
@@ -274,7 +282,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                             arr.put(org.json.JSONObject()
                                 .put("url", f.url).put("title", f.title)
                                 .put("thumbnailUrl", f.thumbnailUrl).put("uploaderName", f.uploaderName)
-                                .put("viewCount", f.viewCount).put("duration", f.duration))
+                                .put("viewCount", f.viewCount).put("duration", f.duration)
+                                .put("savedAt", f.savedAt))
                         }
                     })
                     put("watchLater", org.json.JSONArray().also { arr ->
@@ -282,7 +291,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                             arr.put(org.json.JSONObject()
                                 .put("url", w.url).put("title", w.title)
                                 .put("thumbnailUrl", w.thumbnailUrl).put("uploaderName", w.uploaderName)
-                                .put("viewCount", w.viewCount).put("duration", w.duration))
+                                .put("viewCount", w.viewCount).put("duration", w.duration)
+                                .put("addedAt", w.addedAt))
                         }
                     })
                     put("blocked", org.json.JSONArray().also { arr ->
@@ -300,9 +310,21 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                                             .put("url", i.url).put("title", i.title)
                                             .put("thumbnailUrl", i.thumbnailUrl)
                                             .put("uploaderName", i.uploaderName)
-                                            .put("duration", i.duration))
+                                            .put("duration", i.duration)
+                                            .put("addedAt", i.addedAt))
                                     }
                                 }))
+                        }
+                    })
+                    // Bookmarks ("clip moments") were missing from backups entirely
+                    put("bookmarks", org.json.JSONArray().also { arr ->
+                        db.bookmarkDao().getAll().first().forEach { b ->
+                            arr.put(org.json.JSONObject()
+                                .put("videoUrl", b.videoUrl).put("title", b.title)
+                                .put("thumbnailUrl", b.thumbnailUrl)
+                                .put("uploaderName", b.uploaderName)
+                                .put("positionMs", b.positionMs)
+                                .put("createdAt", b.createdAt))
                         }
                     })
                 }
@@ -333,7 +355,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         val o = arr.getJSONObject(i)
                         db.subscriptionDao().insert(com.streamflow.data.local.entity.SubscriptionEntity(
                             channelUrl = o.getString("channelUrl"), name = o.optString("name"),
-                            avatarUrl = o.optString("avatarUrl")))
+                            avatarUrl = o.optString("avatarUrl"),
+                            subscribedAt = o.optLong("subscribedAt", System.currentTimeMillis()),
+                            groupName = o.optString("groupName"),
+                            notify = o.optBoolean("notify", true)))
                         restored++
                     }
                 }
@@ -343,7 +368,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         db.favoriteDao().insert(com.streamflow.data.local.entity.FavoriteEntity(
                             url = o.getString("url"), title = o.optString("title"),
                             thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
-                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration")))
+                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration"),
+                            savedAt = o.optLong("savedAt", System.currentTimeMillis())))
                         restored++
                     }
                 }
@@ -353,7 +379,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         db.watchLaterDao().insert(com.streamflow.data.local.entity.WatchLaterEntity(
                             url = o.getString("url"), title = o.optString("title"),
                             thumbnailUrl = o.optString("thumbnailUrl"), uploaderName = o.optString("uploaderName"),
-                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration")))
+                            viewCount = o.optLong("viewCount"), duration = o.optLong("duration"),
+                            addedAt = o.optLong("addedAt", System.currentTimeMillis())))
                         restored++
                     }
                 }
@@ -389,9 +416,24 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                                 db.playlistDao().addItem(com.streamflow.data.local.entity.PlaylistItemEntity(
                                     playlistId = id, url = it2.getString("url"),
                                     title = it2.optString("title"), thumbnailUrl = it2.optString("thumbnailUrl"),
-                                    uploaderName = it2.optString("uploaderName"), duration = it2.optLong("duration")))
+                                    uploaderName = it2.optString("uploaderName"), duration = it2.optLong("duration"),
+                                    // Fallback preserves the backup's ordering (j) when
+                                    // restoring an older backup without addedAt
+                                    addedAt = it2.optLong("addedAt", System.currentTimeMillis() + j)))
                             }
                         }
+                        restored++
+                    }
+                }
+                root.optJSONArray("bookmarks")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        db.bookmarkDao().insert(com.streamflow.data.local.entity.BookmarkEntity(
+                            videoUrl = o.getString("videoUrl"), title = o.optString("title"),
+                            thumbnailUrl = o.optString("thumbnailUrl"),
+                            uploaderName = o.optString("uploaderName"),
+                            positionMs = o.optLong("positionMs"),
+                            createdAt = o.optLong("createdAt", System.currentTimeMillis())))
                         restored++
                     }
                 }
