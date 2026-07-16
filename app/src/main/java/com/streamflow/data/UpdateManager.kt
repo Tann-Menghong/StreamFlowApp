@@ -22,27 +22,31 @@ class UpdateManager(private val context: Context) {
 
     private val client = OkHttpClient()
 
+    // Returns null when already up to date; THROWS when the check itself failed
+    // (offline, rate-limited) — swallowing that here made the Settings row claim
+    // "Up to date" with no network. Callers decide how to surface the failure.
     suspend fun checkForUpdate(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
-        try {
-            val req = Request.Builder()
-                .url("https://api.github.com/repos/Tann-Menghong/StreamFlowApp/releases/latest")
-                .header("Accept", "application/vnd.github.v3+json")
-                .build()
-            val body = client.newCall(req).execute().body?.string() ?: return@withContext null
-            val json = JSONObject(body)
-            val tag = json.optString("tag_name").removePrefix("v")
-            val notes = json.optString("body", "")
-            val assets = json.optJSONArray("assets") ?: return@withContext null
-            var url = ""
-            for (i in 0 until assets.length()) {
-                val a = assets.getJSONObject(i)
-                if (a.getString("name").endsWith(".apk")) {
-                    url = a.getString("browser_download_url"); break
-                }
+        val req = Request.Builder()
+            .url("https://api.github.com/repos/Tann-Menghong/StreamFlowApp/releases/latest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .build()
+        val resp = client.newCall(req).execute()
+        val body = resp.body?.string()
+        if (!resp.isSuccessful || body == null)
+            throw java.io.IOException("Update check failed (HTTP ${resp.code})")
+        val json = JSONObject(body)
+        val tag = json.optString("tag_name").removePrefix("v")
+        val notes = json.optString("body", "")
+        val assets = json.optJSONArray("assets") ?: return@withContext null
+        var url = ""
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            if (a.getString("name").endsWith(".apk")) {
+                url = a.getString("browser_download_url"); break
             }
-            if (url.isEmpty() || !isNewer(tag, currentVersion)) return@withContext null
-            UpdateInfo(tag, url, notes)
-        } catch (e: Exception) { null }
+        }
+        if (url.isEmpty() || !isNewer(tag, currentVersion)) return@withContext null
+        UpdateInfo(tag, url, notes)
     }
 
     suspend fun downloadAndInstall(

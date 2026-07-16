@@ -68,33 +68,45 @@ object AiEngine {
         val part = File(target.parentFile, target.name + ".part")
         try {
             target.parentFile?.mkdirs()
-            val existing = if (part.exists()) part.length() else 0L
-            val reqBuilder = Request.Builder().url(MODEL_URL)
-            if (existing > 0) reqBuilder.header("Range", "bytes=$existing-")
-            OkHttpDownloader.instance.client.newCall(reqBuilder.build()).execute().use { resp ->
-                if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code}")
-                val resumed = resp.code == 206
-                val body = resp.body ?: throw IllegalStateException("Empty response")
-                val total = body.contentLength().let { len ->
-                    if (len > 0) len + (if (resumed) existing else 0L) else -1L
-                }
-                var written = if (resumed) existing else 0L
-                FileOutputStream(part, resumed).use { out ->
-                    body.byteStream().use { input ->
-                        val buf = ByteArray(256 * 1024)
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            written += n
-                            if (total > 0) {
-                                _downloadState.value =
-                                    DownloadState.Downloading((written.toFloat() / total).coerceIn(0f, 1f))
+            var retryFresh: Boolean
+            do {
+                retryFresh = false
+                val existing = if (part.exists()) part.length() else 0L
+                val reqBuilder = Request.Builder().url(MODEL_URL)
+                if (existing > 0) reqBuilder.header("Range", "bytes=$existing-")
+                OkHttpDownloader.instance.client.newCall(reqBuilder.build()).execute().use { resp ->
+                    if (resp.code == 416 && existing > 0) {
+                        // The .part no longer matches the remote file (stale resume
+                        // offset or the upstream file changed) — every retry would
+                        // 416 forever, so drop it and restart from scratch once
+                        part.delete()
+                        retryFresh = true
+                        return@use
+                    }
+                    if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code}")
+                    val resumed = resp.code == 206
+                    val body = resp.body ?: throw IllegalStateException("Empty response")
+                    val total = body.contentLength().let { len ->
+                        if (len > 0) len + (if (resumed) existing else 0L) else -1L
+                    }
+                    var written = if (resumed) existing else 0L
+                    FileOutputStream(part, resumed).use { out ->
+                        body.byteStream().use { input ->
+                            val buf = ByteArray(256 * 1024)
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                written += n
+                                if (total > 0) {
+                                    _downloadState.value =
+                                        DownloadState.Downloading((written.toFloat() / total).coerceIn(0f, 1f))
+                                }
                             }
                         }
                     }
                 }
-            }
+            } while (retryFresh)
             if (!part.renameTo(target)) throw IllegalStateException("Couldn't move model into place")
             _downloadState.value = DownloadState.Ready
         } catch (e: Exception) {

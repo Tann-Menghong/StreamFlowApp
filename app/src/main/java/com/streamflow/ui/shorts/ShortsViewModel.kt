@@ -68,10 +68,19 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         loadingMore = true
         viewModelScope.launch {
             try {
-                val result = repo.searchNextPage(query, page)
-                nextPage = result.nextPage
-                _videos.value = (_videos.value + result.videos.onlyShorts())
-                    .distinctBy { it.url }
+                // A whole page can filter down to zero shorts — keep walking pages
+                // (bounded) so the feed doesn't dead-end while more results exist
+                var p: Page? = page
+                var hops = 0
+                while (p != null && hops < 5) {
+                    val result = repo.searchNextPage(query, p)
+                    nextPage = result.nextPage
+                    val added = result.videos.onlyShorts()
+                    _videos.value = (_videos.value + added).distinctBy { it.url }
+                    if (added.isNotEmpty()) break
+                    p = result.nextPage
+                    hops++
+                }
             } catch (_: Exception) {
             } finally {
                 loadingMore = false
@@ -100,13 +109,17 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             if (prefs.incognito.first()) return@launch
             try {
+                // REPLACE would wipe a saved resume position if this URL was already
+                // in history from a normal watch — carry it over (same as PlayerViewModel)
+                val prevPos = try { db.historyDao().getPosition(video.url) } catch (_: Exception) { 0L }
                 db.historyDao().insert(HistoryEntity(
                     url = video.url,
                     title = video.title,
                     thumbnailUrl = video.thumbnailUrl,
                     uploaderName = video.uploaderName,
                     viewCount = video.viewCount,
-                    duration = video.duration
+                    duration = video.duration,
+                    position = prevPos
                 ))
             } catch (_: Exception) {
             }

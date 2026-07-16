@@ -218,10 +218,19 @@ fun ShortsScreen(
                     }
                 }
             }
-            else -> Text(
-                "No Shorts found", color = Color.White,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            else -> Column(
+                Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("No Shorts found", color = Color.White,
+                    fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(14.dp))
+                Button(onClick = { vm.loadFeed() }) {
+                    Icon(Icons.Rounded.Refresh, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry")
+                }
+            }
         }
 
         // Top bar

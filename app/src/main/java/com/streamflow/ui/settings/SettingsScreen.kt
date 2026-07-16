@@ -683,7 +683,12 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { showWhatsNewDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.SystemUpdate, "Check for updates",
-                        if (update.checking) "Checking…" else if (update.info != null) "Update available!" else "Up to date"
+                        when {
+                            update.checking -> "Checking…"
+                            update.info != null -> "Update available!"
+                            update.error == "check_failed" -> "Couldn't check — tap to retry"
+                            else -> "Up to date"
+                        }
                     ) { vm.checkForUpdate() }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.Code, "Source code",

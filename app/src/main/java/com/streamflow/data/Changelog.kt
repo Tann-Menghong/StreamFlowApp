@@ -3,14 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.10.0"
+    const val VERSION_NAME = "3.11.0"
 
     val notes = listOf(
-        "Fixed: quickly switching searches or categories on Home could briefly show results from the previous one — the newest query now always wins",
-        "Fixed: Incognito is now fully private — it no longer updates watch progress on videos you'd watched before",
-        "Fixed: the Search tab could show stale results when you changed your query mid-load",
-        "View counts in the billions now read as 2.5B instead of 2500M",
-        "Numbers and durations format correctly in every region (no more '2,0M' on some devices)",
-        "Various stability and polish fixes across the app"
+        "Fixed: the AI model download could get permanently stuck after an interrupted download — it now recovers and restarts cleanly",
+        "Fixed: Shorts no longer shows an empty screen when the first results pages have no shorts — it keeps looking, and there's a Retry button",
+        "Fixed: watching a short no longer resets the saved resume position of a video already in your history",
+        "Fixed: 'Check for updates' now says when the check itself failed (offline) instead of claiming you're up to date",
+        "Security: download-complete events from other apps can no longer alter your downloads list",
+        "Stability and polish fixes across the app"
     )
 }

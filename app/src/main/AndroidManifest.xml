@@ -80,9 +80,12 @@
                 android:resource="@xml/widget_quick_access_info" />
         </receiver>
 
+        <!-- Not exported: DownloadManager delivers ACTION_DOWNLOAD_COMPLETE directly
+             to the app that enqueued the download, so exported=true only let other
+             apps spoof completions and flip our Room rows to DONE/FAILED -->
         <receiver
             android:name=".data.DownloadReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
             </intent-filter>

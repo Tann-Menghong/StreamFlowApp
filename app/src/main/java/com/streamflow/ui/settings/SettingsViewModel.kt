@@ -115,7 +115,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 val info = updater.checkForUpdate(appVersion)
                 _update.value = UpdateState(info = info)
             } catch (e: Exception) {
-                _update.value = UpdateState()
+                // Sentinel the About row checks so a failed check (offline,
+                // rate-limited) doesn't read as "Up to date"
+                _update.value = UpdateState(error = "check_failed")
             }
         }
     }
