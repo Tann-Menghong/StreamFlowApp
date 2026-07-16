@@ -142,7 +142,14 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             @Suppress("DEPRECATION")
             val best = windowManager.defaultDisplay.supportedModes
-                .maxByOrNull { it.refreshRate }
+                // Resolution first, refresh second: phones with resolution
+                // switching (e.g. iQOO's 1.5K panels also expose a downscaled
+                // 1080p mode) must not get a blurry mode just because it is
+                // fast — we want full resolution AT its highest refresh rate.
+                .maxWithOrNull(compareBy(
+                    { it.physicalWidth.toLong() * it.physicalHeight },
+                    { it.refreshRate }
+                ))
             if (best != null) {
                 window.attributes = window.attributes.also {
                     it.preferredDisplayModeId = best.modeId

@@ -164,13 +164,15 @@ class YouTubeRepository {
 
             // AUTO starts at 720p for fast startup (highest resolutions are often
             // VP9/AV1 — software-decoded on many phones — and need far more
-            // bandwidth to begin playing). Manual picks can still go higher.
+            // bandwidth to begin playing). Devices with hardware VP9/AV1 decode
+            // and plenty of RAM (probed once in DeviceCaps) start at 1080p
+            // instead. Manual picks can still go higher.
             val maxHeight = maxHeightOverride ?: when (qualityPref) {
                 "1080P" -> 1080
                 "720P"  -> 720
                 "480P"  -> 480
                 "360P"  -> 360
-                else    -> 720
+                else    -> DeviceCaps.autoMaxHeight
             }
 
             val streamUrl: String

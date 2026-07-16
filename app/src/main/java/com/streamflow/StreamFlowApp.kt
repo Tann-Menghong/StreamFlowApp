@@ -32,6 +32,9 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Probe RAM + hardware codecs first — quality/buffer/cache decisions
+        // elsewhere read these capabilities
+        com.streamflow.data.DeviceCaps.init(this)
         NewPipe.init(OkHttpDownloader.instance)
 
         // Warm the TLS connections to YouTube's hosts right away so the first
@@ -107,13 +110,19 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
     }
 
     // Aggressive thumbnail caching: YouTube sends no-cache headers, so without
-    // respectCacheHeaders(false) every scroll re-downloads the same thumbnails
+    // respectCacheHeaders(false) every scroll re-downloads the same thumbnails.
+    // High-RAM devices get bigger caches — smoother scroll-back, fewer re-fetches.
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.25).build() }
+        .memoryCache {
+            MemoryCache.Builder(this)
+                .maxSizePercent(if (com.streamflow.data.DeviceCaps.isHighPerf) 0.35 else 0.25)
+                .build()
+        }
         .diskCache {
             DiskCache.Builder()
                 .directory(cacheDir.resolve("image_cache"))
-                .maxSizeBytes(128L * 1024 * 1024)
+                .maxSizeBytes(if (com.streamflow.data.DeviceCaps.isHighPerf) 256L * 1024 * 1024
+                              else 128L * 1024 * 1024)
                 .build()
         }
         .respectCacheHeaders(false)

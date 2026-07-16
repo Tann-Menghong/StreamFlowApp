@@ -107,12 +107,19 @@ class PlaybackService : MediaSessionService() {
 
         // Start playback with just 0.8s buffered (default is 2.5s) for faster video
         // start, while keeping a large max buffer for smooth long-form playback.
+        // High-RAM devices buffer further ahead and keep a back-buffer so small
+        // rewinds replay instantly instead of re-fetching from the network.
+        val highPerf = com.streamflow.data.DeviceCaps.isHighPerf
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 20_000,
-                /* maxBufferMs = */ 60_000,
+                /* maxBufferMs = */ if (highPerf) 120_000 else 60_000,
                 /* bufferForPlaybackMs = */ 800,
                 /* bufferForPlaybackAfterRebufferMs = */ 1_500
+            )
+            .setBackBuffer(
+                /* backBufferDurationMs = */ if (highPerf) 20_000 else 0,
+                /* retainBackBufferFromKeyframe = */ true
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
