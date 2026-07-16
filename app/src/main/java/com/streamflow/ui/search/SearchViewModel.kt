@@ -71,6 +71,9 @@ class SearchViewModel : ViewModel() {
                     hasMore       = result.nextPage != null
                 )
             } catch (e: Exception) {
+                // Guard the failure path too: writing the captured `current` here
+                // after a new search started would resurrect the old query's results
+                if (gen != searchGeneration) return@launch
                 _uiState.value = current.copy(isLoadingMore = false)
             }
         }

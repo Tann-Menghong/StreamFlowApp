@@ -136,9 +136,11 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             try { miniMediaController = future.get() } catch (_: Exception) {}
         }, ContextCompat.getMainExecutor(context))
         onDispose {
-            future.cancel(false)
-            miniMediaController?.release()
             miniMediaController = null
+            // releaseFuture handles the race where the controller finishes
+            // building after this dispose — cancel(false) + release() could
+            // leak a connected controller in that window
+            MediaController.releaseFuture(future)
         }
     }
 

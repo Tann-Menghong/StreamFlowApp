@@ -259,6 +259,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // ── Playback queue ────────────────────────────────────────────────────────
     val queue = PlaybackQueue.queue
 
+    // Bumped per load/quality-change so a slow older extraction can't clobber
+    // a newer one (stale-response race — same pattern as ChannelViewModel)
+    private var loadGeneration = 0
+
     fun loadVideo(videoUrl: String) {
         _currentUrl.value = videoUrl
         _replies.value = emptyMap()
@@ -268,6 +272,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         _aiOutput.value = ""
         transcriptCache = null
         aiSession++
+        val gen = ++loadGeneration
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
             if (isDirectStream(videoUrl)) {
@@ -304,10 +309,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         else -> qualityPref
                     }
                     val details = repo.getVideoDetails(videoUrl, quality)
+                    if (gen != loadGeneration) return@launch // superseded by a newer video
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
                     if (!saverOn) prefetchNext(details, quality) // saver: no background prefetch
                 } catch (e: Exception) {
+                    if (gen != loadGeneration) return@launch
                     _uiState.value = PlayerUiState.Error(friendlyError(e))
                 }
             }
@@ -342,6 +349,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun changeQuality(videoUrl: String, height: Int?) {
         val current = _uiState.value as? PlayerUiState.Ready ?: return
         _autoQuality.value = height == null
+        val gen = ++loadGeneration
         viewModelScope.launch {
             // Battery saver is a hard cap (Settings literally says "Cap quality at
             // 480p") — without this, picking a quality from the in-player menu
@@ -350,8 +358,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.value = PlayerUiState.Loading
             try {
                 val details = repo.getVideoDetails(videoUrl, "AUTO", maxHeightOverride = cappedHeight)
+                if (gen != loadGeneration) return@launch // a newer video/quality pick replaced this
                 _uiState.value = PlayerUiState.Ready(details)
             } catch (_: Exception) {
+                if (gen != loadGeneration) return@launch
                 // Revert to the working stream rather than showing an error
                 _uiState.value = PlayerUiState.Ready(current.details)
             }
@@ -367,6 +377,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 _comments.value = repo.getComments(videoUrl)
             } catch (_: Exception) {
                 _comments.value = emptyList()
+                // Failed (network hiccup): clear the marker so reopening the
+                // comments sheet retries instead of showing empty forever
+                if (commentsLoadedFor == videoUrl) commentsLoadedFor = ""
             } finally {
                 _commentsLoading.value = false
             }
@@ -440,8 +453,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 uploaderName = d.uploaderName, positionMs = positionMs
             ))
             val s = positionMs / 1000
-            val label = if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
-                        else "%d:%02d".format(s / 60, s % 60)
+            val label = if (s >= 3600) "%d:%02d:%02d".format(java.util.Locale.US, s / 3600, (s % 3600) / 60, s % 60)
+                        else "%d:%02d".format(java.util.Locale.US, s / 60, s % 60)
             android.widget.Toast.makeText(app, "Moment saved at $label", android.widget.Toast.LENGTH_SHORT).show()
         }
     }

@@ -216,12 +216,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _typeLoading.value = true
             try {
                 when (type) {
-                    "CHANNELS"  -> _channelResults.value = repo.searchChannels(q)
-                    "PLAYLISTS" -> _playlistResults.value = repo.searchPlaylists(q)
+                    "CHANNELS"  -> {
+                        val res = repo.searchChannels(q)
+                        // A newer search may have replaced the query mid-flight —
+                        // don't show the old query's channels under the new one
+                        if (q == _activeSearchQuery.value) _channelResults.value = res
+                    }
+                    "PLAYLISTS" -> {
+                        val res = repo.searchPlaylists(q)
+                        if (q == _activeSearchQuery.value) _playlistResults.value = res
+                    }
                 }
             } catch (_: Exception) {
-                if (type == "CHANNELS") _channelResults.value = emptyList()
-                else _playlistResults.value = emptyList()
+                if (q == _activeSearchQuery.value) {
+                    if (type == "CHANNELS") _channelResults.value = emptyList()
+                    else _playlistResults.value = emptyList()
+                }
             } finally {
                 _typeLoading.value = false
             }
@@ -347,6 +357,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 // Snapshot for instant startup next launch
                 try { prefs.saveCachedFeed(mixed) } catch (_: Exception) {}
             } catch (e: Exception) {
+                // A stale failure must not replace a newer feed with an error page
+                if (gen != feedGeneration) return@launch
                 // Offline / failed refresh: the cached feed is better than an error page
                 if (!showingCachedFeed) _uiState.value = HomeUiState.Error(friendlyError(e))
             }
@@ -378,6 +390,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 nextPage   = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
+                if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
                 _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }
@@ -405,6 +418,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     nextPage   = result.nextPage
                     _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
                 } catch (e: Exception) {
+                    if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
                     _uiState.value = HomeUiState.Error(friendlyError(e))
                 }
             }
@@ -426,6 +440,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 nextPage   = result.nextPage
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
+                if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
                 _uiState.value = HomeUiState.Error(friendlyError(e))
             }
         }

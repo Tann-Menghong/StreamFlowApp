@@ -42,6 +42,9 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
 
     private var loaded = false
 
+    // Bumped per load so a slow older refresh can't clobber a newer one
+    private var feedGeneration = 0
+
     fun setGroupFilter(group: String) {
         _groupFilter.value = group
         applyFilter()
@@ -57,10 +60,12 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
 
     fun load(force: Boolean = false) {
         if (loaded && !force && _uiState.value is FeedUiState.Success) return
+        val gen = ++feedGeneration
         viewModelScope.launch {
             _uiState.value = FeedUiState.Loading
             try {
                 val subs = db.subscriptionDao().getAll().first()
+                if (gen != feedGeneration) return@launch // superseded by a newer load
                 if (subs.isEmpty()) {
                     _uiState.value = FeedUiState.NoSubscriptions
                     return@launch
@@ -69,11 +74,13 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                 _groups.value = subs.mapNotNull { it.groupName.ifBlank { null } }.distinct().sorted()
 
                 // Fetch each channel's latest uploads in parallel (cap channels + per-channel count),
-                // keeping which channel each video came from so group filtering works
+                // keeping which channel each video came from so group filtering works.
+                // Notify-enabled channels get priority for the cap slots — those are
+                // the ones the user explicitly cares about most.
                 // Dedupe by video url — the FeedScreen list is keyed by it, and a
                 // video can in principle surface from more than one channel fetch
-                videosByChannel = coroutineScope {
-                    subs.take(12).map { sub ->
+                val fetched = coroutineScope {
+                    subs.sortedByDescending { it.notify }.take(12).map { sub ->
                         async {
                             try {
                                 repo.getChannelInfo(sub.channelUrl).videos.take(5)
@@ -82,6 +89,8 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }.awaitAll().flatten()
                 }.distinctBy { it.second.url }
+                if (gen != feedGeneration) return@launch // superseded by a newer load
+                videosByChannel = fetched
                 if (videosByChannel.isEmpty()) {
                     _uiState.value = FeedUiState.Error("Couldn't load any videos from your channels.")
                     return@launch
@@ -93,6 +102,7 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                 applyFilter()
                 loaded = true
             } catch (e: Exception) {
+                if (gen != feedGeneration) return@launch
                 _uiState.value = FeedUiState.Error(friendlyError(e))
             }
         }
