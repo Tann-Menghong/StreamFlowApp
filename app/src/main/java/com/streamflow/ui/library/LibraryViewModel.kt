@@ -66,6 +66,24 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeDownload(url: String) = viewModelScope.launch { db.downloadDao().delete(url) }
+
+    // Failed downloads used to dead-end (delete was the only option) — re-extract
+    // a fresh stream URL and re-enqueue with the system DownloadManager
+    fun retryDownload(d: DownloadEntity) = viewModelScope.launch {
+        try {
+            val streams = com.streamflow.data.YouTubeRepository().getDownloadStreams(d.url)
+            val streamUrl = (if (d.isAudio) streams.audioUrl else streams.videoUrl) ?: run {
+                android.widget.Toast.makeText(getApplication(),
+                    "No downloadable stream found", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val id = com.streamflow.data.DownloadHelper.enqueue(getApplication(), streamUrl, d.title, d.isAudio)
+            db.downloadDao().insert(d.copy(downloadId = id, status = "DOWNLOADING", filePath = ""))
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(getApplication(),
+                "Retry failed — check your connection", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     fun deletePlaylist(id: Long) = viewModelScope.launch {
         db.playlistDao().clearItems(id)
         db.playlistDao().deletePlaylist(id)

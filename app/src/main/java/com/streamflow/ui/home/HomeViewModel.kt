@@ -68,7 +68,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             v.url !in blockedVideos &&
             (v.uploaderUrl.isEmpty() || v.uploaderUrl !in blockedChannels) &&
             v.url !in watched &&
-            !(f.hideShorts && v.duration in 1..60)
+            // 1..75 matches ShortsViewModel's definition of a short — 60 missed
+            // the 61-75s shorts that the Shorts feed itself includes
+            !(f.hideShorts && v.duration in 1..75)
         }
         val sorted = when {
             _activeSearchQuery.value.isEmpty() -> filtered
@@ -278,9 +280,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .distinct().take(10).toList().shuffled().take(5)
         val searchSeeds = try { prefs.recentSearches.first().take(4) } catch (_: Exception) { emptyList() }
         val categorySeeds = try { prefs.homeCategories.first() } catch (_: Exception) { emptyList() }
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         val evergreen = listOf(
             "popular this week", "new music video", "viral videos",
-            "highlights today", "best of 2026", "documentary"
+            "highlights today", "best of $year", "documentary"
         )
         return ((channelSeeds + searchSeeds).shuffled() + (categorySeeds + evergreen).shuffled()).distinct()
     }

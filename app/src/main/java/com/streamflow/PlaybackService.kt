@@ -18,6 +18,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -142,16 +145,31 @@ class PlaybackService : MediaSessionService() {
                 applyEq()
             }
         })
+        // distinctUntilChanged: DataStore re-emits on EVERY preference write, and
+        // without it toggling any unrelated setting released + recreated the
+        // LoudnessEnhancer/Equalizer mid-playback (audible glitch)
         serviceScope.launch {
-            (application as StreamFlowApp).prefs.volumeBoost.collect { v ->
+            (application as StreamFlowApp).prefs.volumeBoost.distinctUntilChanged().collect { v ->
                 boostGainMb = v.toIntOrNull() ?: 0
                 applyBoost()
             }
         }
         serviceScope.launch {
-            (application as StreamFlowApp).prefs.eqPreset.collect { v ->
+            (application as StreamFlowApp).prefs.eqPreset.distinctUntilChanged().collect { v ->
                 eqPresetName = v
                 applyEq()
+            }
+        }
+
+        // Enforce the sleep timer here, not in the UI: the player screen is
+        // recreated on every autoplay/related-video switch, which used to
+        // silently cancel the timer — the service outlives all of that.
+        serviceScope.launch {
+            com.streamflow.data.SleepTimer.deadlineAt.collectLatest { deadline ->
+                if (deadline <= 0L) return@collectLatest
+                delay((deadline - System.currentTimeMillis()).coerceAtLeast(0L))
+                mediaSession?.player?.pause()
+                com.streamflow.data.SleepTimer.clear()
             }
         }
 

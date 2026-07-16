@@ -544,20 +544,21 @@ fun PlayerScreen(
     var isLocked by remember { mutableStateOf(false) }
 
     // ── Sleep timer state ────────────────────────────────────────────────────
-    var sleepMinutes by remember { mutableIntStateOf(0) }
+    // The timer itself lives in SleepTimer and is enforced by PlaybackService —
+    // a remember{}-based timer died on every autoplay video switch (the player
+    // entry is replaced), letting playback run all night. This is display only.
+    val sleepDeadline by com.streamflow.data.SleepTimer.deadlineAt.collectAsState()
     var sleepRemaining by remember { mutableLongStateOf(0L) }
     var showSleepMenu by remember { mutableStateOf(false) }
 
-    LaunchedEffect(sleepMinutes) {
-        if (sleepMinutes <= 0) { sleepRemaining = 0L; return@LaunchedEffect }
-        sleepRemaining = sleepMinutes * 60L
-        while (sleepRemaining > 0L) {
+    LaunchedEffect(sleepDeadline) {
+        if (sleepDeadline <= 0L) { sleepRemaining = 0L; return@LaunchedEffect }
+        while (true) {
+            val left = (sleepDeadline - System.currentTimeMillis() + 999) / 1000
+            if (left <= 0L) { sleepRemaining = 0L; break }
+            sleepRemaining = left
             delay(1000L)
-            sleepRemaining--
         }
-        mediaController?.pause()
-        sleepMinutes = 0
-        sleepRemaining = 0L
     }
 
     // ── Brightness/volume drag state ─────────────────────────────────────────
@@ -938,7 +939,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 val mm = sleepRemaining / 60
                                 val ss = sleepRemaining % 60
                                 Text(
-                                    "Sleep: %02d:%02d".format(mm, ss),
+                                    "Sleep: %02d:%02d".format(java.util.Locale.US, mm, ss),
                                     color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier
                                         .background(Color.Black.copy(0.5f), RoundedCornerShape(6.dp))
@@ -999,13 +1000,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             Box {
                                 IconButton(onClick = { showSleepMenu = true }) {
                                     Icon(Icons.Rounded.Bedtime, "Sleep timer",
-                                        tint = if (sleepMinutes > 0) MaterialTheme.colorScheme.primary else Color.White)
+                                        tint = if (sleepRemaining > 0L) MaterialTheme.colorScheme.primary else Color.White)
                                 }
                                 DropdownMenu(expanded = showSleepMenu, onDismissRequest = { showSleepMenu = false }) {
                                     listOf(0 to "Off", 15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "60 min").forEach { (mins, label) ->
+                                        val active = if (mins == 0) sleepRemaining <= 0L
+                                                     else sleepRemaining > 0L && com.streamflow.data.SleepTimer.activeMinutes == mins
                                         DropdownMenuItem(
-                                            text = { Text(label, fontWeight = if (sleepMinutes == mins) FontWeight.Bold else FontWeight.Normal) },
-                                            onClick = { sleepMinutes = mins; showSleepMenu = false }
+                                            text = { Text(label, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal) },
+                                            onClick = { com.streamflow.data.SleepTimer.set(mins); showSleepMenu = false }
                                         )
                                     }
                                 }
@@ -1909,7 +1912,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
                                 details.chapters.forEach { ch ->
                                     val h = ch.startMs / 3_600_000; val m = (ch.startMs % 3_600_000) / 60_000; val s = (ch.startMs % 60_000) / 1_000
-                                    val timeLabel = if (h > 0) "%d:%02d:%02d".format(h,m,s) else "%d:%02d".format(m,s)
+                                    val timeLabel = if (h > 0) "%d:%02d:%02d".format(java.util.Locale.US, h, m, s)
+                                                    else "%d:%02d".format(java.util.Locale.US, m, s)
                                     Row(
                                         Modifier.fillMaxWidth()
                                             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
@@ -2391,7 +2395,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
 private fun fmtMs(ms: Long): String {
     val s = ms / 1000L; val h = s / 3600; val m = (s % 3600) / 60; val sec = s % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+    return if (h > 0) "%d:%02d:%02d".format(java.util.Locale.US, h, m, sec)
+           else "%d:%02d".format(java.util.Locale.US, m, sec)
 }
 
 // Makes timestamps (seek) and links (open) tappable in the video description

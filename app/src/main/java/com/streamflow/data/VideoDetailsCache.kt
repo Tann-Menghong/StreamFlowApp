@@ -8,7 +8,9 @@ object VideoDetailsCache {
     private data class Entry(val details: VideoDetails, val at: Long)
 
     private const val TTL_MS = 30 * 60 * 1000L
-    private const val MAX_ENTRIES = 40
+    // High-RAM devices keep more extracted videos warm (each entry is small —
+    // this is metadata + URLs, not media). First touched well after DeviceCaps.init.
+    private val MAX_ENTRIES = if (DeviceCaps.isHighPerf) 80 else 40
 
     private val map = object : LinkedHashMap<String, Entry>(MAX_ENTRIES, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) =

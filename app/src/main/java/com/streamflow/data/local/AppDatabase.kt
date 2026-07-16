@@ -125,7 +125,13 @@ abstract class AppDatabase : RoomDatabase() {
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "streamflow.db")
                     .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                    .fallbackToDestructiveMigration()
+                    // Destructive fallback ONLY from the ancient v1 schema (no
+                    // migration exists for it). The blanket fallback was a data
+                    // landmine: any future version bump missing a migration would
+                    // silently wipe favorites/history/playlists/subscriptions.
+                    // Now that case crashes in development instead of destroying
+                    // user data in production.
+                    .fallbackToDestructiveMigrationFrom(1)
                     .build()
                     .also { INSTANCE = it }
             }

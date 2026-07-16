@@ -454,7 +454,8 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsItem(Icons.Rounded.Bedtime, "Quiet hours",
                             if (quietHours == "OFF") "Off"
                             else quietHours.split("-").let { p ->
-                                "%02d:00 – %02d:00".format(p.getOrNull(0)?.toIntOrNull() ?: 22,
+                                "%02d:00 – %02d:00".format(java.util.Locale.US,
+                                                            p.getOrNull(0)?.toIntOrNull() ?: 22,
                                                             p.getOrNull(1)?.toIntOrNull() ?: 7)
                             }
                         ) { showQuietDialog = true }
@@ -677,6 +678,16 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 
                 "About" -> SettingsCard {
                     SettingsItem(Icons.Rounded.Info, "App version", "v${vm.appVersion}")
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.Speed, "Device performance",
+                        run {
+                            val caps = com.streamflow.data.DeviceCaps
+                            if (caps.isHighPerf)
+                                "High (${"%.0f".format(java.util.Locale.US, caps.totalRamGb)}GB RAM" +
+                                    (if (caps.hasHwAv1) ", AV1" else if (caps.hasHwVp9) ", VP9" else "") +
+                                    ") — Auto quality up to ${caps.autoMaxHeight}p"
+                            else "Standard — battery-friendly defaults"
+                        })
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.NewReleases, "What's new",
                         "See what changed in v${com.streamflow.data.Changelog.VERSION_NAME}"

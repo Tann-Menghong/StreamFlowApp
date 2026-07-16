@@ -95,13 +95,18 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Resolve the playable stream for a page (480p is plenty for vertical video)
+    // Resolve the playable stream for a page. 480p is plenty on budget phones;
+    // high-perf devices (hardware decode + sharp screens) get 720p — full-screen
+    // vertical video at 480p looks visibly soft on a 1.5K panel.
+    private val shortsQuality =
+        if (com.streamflow.data.DeviceCaps.isHighPerf) "720P" else "480P"
+
     fun loadDetails(url: String) {
         if (url.isEmpty() || _details.value.containsKey(url) || url in loadingDetails) return
         loadingDetails.add(url)
         viewModelScope.launch {
             try {
-                val d = repo.getVideoDetails(url, "480P")
+                val d = repo.getVideoDetails(url, shortsQuality)
                 _details.value = _details.value + (url to d)
             } catch (_: Exception) {
             } finally {

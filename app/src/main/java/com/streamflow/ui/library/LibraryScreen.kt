@@ -259,6 +259,7 @@ fun LibraryScreen(
                                 if (d.status == "DONE" && d.filePath.isNotEmpty()) onVideoClick(d.filePath)
                                 else onVideoClick(d.url)
                             },
+                            onRetry = vm::retryDownload,
                             onRemove = vm::removeDownload
                         )
                 }
@@ -354,6 +355,7 @@ private fun PlaylistList(
 private fun DownloadList(
     downloads: List<DownloadEntity>,
     onPlay: (DownloadEntity) -> Unit,
+    onRetry: (DownloadEntity) -> Unit,
     onRemove: (String) -> Unit
 ) {
     if (downloads.isEmpty()) {
@@ -401,6 +403,13 @@ private fun DownloadList(
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
+                }
+                if (d.status == "FAILED") {
+                    IconButton(onClick = { onRetry(d) }) {
+                        Icon(Icons.Rounded.Refresh, "Retry download",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp))
+                    }
                 }
                 IconButton(onClick = { onRemove(d.url) }) {
                     Icon(Icons.Rounded.DeleteOutline, "Remove download",

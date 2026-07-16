@@ -163,6 +163,8 @@ class AppPreferences(private val context: Context) {
                     title = o.optString("title"),
                     thumbnailUrl = o.optString("thumbnailUrl"),
                     uploaderName = o.optString("uploaderName"),
+                    uploaderUrl = o.optString("uploaderUrl"),
+                    uploaderAvatarUrl = o.optString("uploaderAvatarUrl"),
                     viewCount = o.optLong("viewCount"),
                     duration = o.optLong("duration")
                 )
@@ -259,6 +261,7 @@ class AppPreferences(private val context: Context) {
             arr.put(org.json.JSONObject()
                 .put("url", v.url).put("title", v.title)
                 .put("thumbnailUrl", v.thumbnailUrl).put("uploaderName", v.uploaderName)
+                .put("uploaderUrl", v.uploaderUrl).put("uploaderAvatarUrl", v.uploaderAvatarUrl)
                 .put("viewCount", v.viewCount).put("duration", v.duration))
         }
         prefsMap[SAVED_QUEUE_KEY] = arr.toString()
