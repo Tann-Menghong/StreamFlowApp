@@ -28,9 +28,13 @@
         android:theme="@style/Theme.StreamFlow"
         android:usesCleartextTraffic="true">
 
+        <!-- singleTask: sharing a link / tapping a shortcut while the app is open
+             routes into the existing instance via onNewIntent instead of stacking
+             a second copy of the whole app (two players fighting over one session) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.StreamFlow.Starting"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">

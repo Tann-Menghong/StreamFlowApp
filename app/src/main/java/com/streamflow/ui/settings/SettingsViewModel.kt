@@ -125,12 +125,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun downloadUpdate() {
         val url = _update.value.info?.downloadUrl ?: return
         viewModelScope.launch {
-            _update.value = _update.value.copy(downloading = true, error = null)
+            // progress = 0: a retry after a failure used to start the bar at the
+            // old stuck percentage instead of from the beginning
+            _update.value = _update.value.copy(downloading = true, error = null, progress = 0)
             try {
                 updater.downloadAndInstall(url) { p -> _update.value = _update.value.copy(progress = p) }
                 _update.value = _update.value.copy(downloading = false, done = true)
             } catch (e: Exception) {
                 _update.value = _update.value.copy(downloading = false, error = e.message)
+                // The banner just flips back to the button on failure — say why
+                android.widget.Toast.makeText(getApplication(),
+                    "Update download failed — check your connection and try again",
+                    android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }

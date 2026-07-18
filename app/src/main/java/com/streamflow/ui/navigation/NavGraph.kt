@@ -186,7 +186,9 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
         )
     }
 
-    LaunchedEffect(startUrl) {
+    // Both keys: with singleTask, onNewIntent updates these while the app runs —
+    // a shortcut after a shared link (or vice versa) must re-navigate
+    LaunchedEffect(startUrl, startDest) {
         if (startUrl != null) {
             // Pure playlist links open the playlist screen; watch links open the player
             if (startUrl.contains("/playlist") && startUrl.contains("list=")) {

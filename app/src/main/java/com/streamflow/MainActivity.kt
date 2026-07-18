@@ -38,6 +38,38 @@ class MainActivity : ComponentActivity() {
     // Mirrors the autoPip pref for the synchronous onUserLeaveHint callback
     private var autoPipEnabled = false
 
+    // Share/open-link and shortcut destinations as state so onNewIntent
+    // (singleTask launch mode) can route into the already-running UI
+    private var pendingUrl by mutableStateOf<String?>(null)
+    private var pendingDest by mutableStateOf<String?>(null)
+
+    private fun handleIntent(intent: Intent?) {
+        val url = when (intent?.action) {
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+                Regex("https?://(?:www\\.|m\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
+            }
+            Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
+        val dest = when (intent?.action) {
+            "com.streamflow.shortcut.FEED" -> "feed"
+            "com.streamflow.shortcut.LIBRARY" -> "library"
+            "com.streamflow.shortcut.SEARCH" -> "search"
+            "com.streamflow.shortcut.SETTINGS" -> "settings"
+            else -> null
+        }
+        // Only overwrite on a real destination — a plain launcher re-open
+        // (ACTION_MAIN) must not yank the user anywhere. Setting one side
+        // clears the other so the newest request always wins.
+        if (url != null) { pendingUrl = url; pendingDest = null }
+        else if (dest != null) { pendingDest = dest; pendingUrl = null }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Branded splash (must be installed before super.onCreate)
         installSplashScreen()
@@ -59,21 +91,7 @@ class MainActivity : ComponentActivity() {
             prefs.autoPip.collect { autoPipEnabled = it }
         }
 
-        val sharedUrl = when (intent?.action) {
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-                Regex("https?://(?:www\\.|m\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
-            }
-            Intent.ACTION_VIEW -> intent.dataString
-            else -> null
-        }
-        // Launcher shortcut / widget destinations
-        val shortcutDest = when (intent?.action) {
-            "com.streamflow.shortcut.FEED" -> "feed"
-            "com.streamflow.shortcut.LIBRARY" -> "library"
-            "com.streamflow.shortcut.SEARCH" -> "search"
-            "com.streamflow.shortcut.SETTINGS" -> "settings"
-            else -> null
-        }
+        handleIntent(intent)
 
         enableHighRefreshRate()
         enableEdgeToEdge()
@@ -117,7 +135,7 @@ class MainActivity : ComponentActivity() {
                     when (onboardingDone) {
                         null  -> Unit // waiting for DataStore, hidden behind the splash
                         false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
-                        else  -> NavGraph(startUrl = sharedUrl, startDest = shortcutDest)
+                        else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest)
                     }
                 }
             }

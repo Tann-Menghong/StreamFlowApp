@@ -281,7 +281,10 @@ class YouTubeRepository {
             // (big enough to see, small enough to load instantly while scrubbing)
             val storyboard = try {
                 info.previewFrames
-                    .filter { it.urls.isNotEmpty() && it.frameWidth > 0 && it.durationPerFrame > 0 }
+                    // framesPerPage must be positive too: a 0 would crash the seek
+                    // preview with a divide-by-zero while scrubbing
+                    .filter { it.urls.isNotEmpty() && it.frameWidth > 0 && it.durationPerFrame > 0 &&
+                              it.framesPerPageX > 0 && it.framesPerPageY > 0 }
                     .minByOrNull { kotlin.math.abs(it.frameWidth - 200) }
                     ?.let { fs ->
                         Storyboard(

@@ -51,16 +51,17 @@ class OkHttpDownloader private constructor() : Downloader() {
             else -> builder.get()
         }
 
-        val okResponse = client.newCall(builder.build()).execute()
-        val responseBody = okResponse.body?.string()
-
-        return Response(
-            okResponse.code,
-            okResponse.message,
-            okResponse.headers.toMultimap(),
-            responseBody,
-            okResponse.request.url.toString()
-        )
+        // .use{} — body?.string() closes the body on success, but a null-body
+        // response used to leak the connection out of the shared pool
+        return client.newCall(builder.build()).execute().use { okResponse ->
+            Response(
+                okResponse.code,
+                okResponse.message,
+                okResponse.headers.toMultimap(),
+                okResponse.body?.string(),
+                okResponse.request.url.toString()
+            )
+        }
     }
 
     companion object {

@@ -1034,7 +1034,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             IconButton(onClick = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
-                                    activity?.enterPictureInPictureMode(params)
+                                    // Same OEM quirk as MainActivity.onUserLeaveHint: some devices
+                                    // throw when the PiP permission was revoked — never crash
+                                    try { activity?.enterPictureInPictureMode(params) } catch (_: Exception) {}
                                 }
                             }) {
                                 Icon(Icons.Rounded.PictureInPicture, "PiP", tint = Color.White)
@@ -2486,7 +2488,9 @@ private fun StoryboardPreview(
 
     val context = LocalContext.current
     var pageBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    LaunchedEffect(pageIdx) {
+    // Keyed on the page URL, not the index: a new video's storyboard usually
+    // starts at the same pageIdx (0), which kept showing the OLD video's frames
+    LaunchedEffect(sb.urls[pageIdx]) {
         // allowHardware(false): Canvas cropping needs a software bitmap
         val request = coil.request.ImageRequest.Builder(context)
             .data(sb.urls[pageIdx])

@@ -89,6 +89,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val commentsLoading: StateFlow<Boolean> = _commentsLoading
 
     private var commentsLoadedFor = ""
+    private var commentsGeneration = 0
 
     // ── Comment replies (keyed by comment identity, toggle to collapse) ───────
     private val _replies = MutableStateFlow<Map<String, List<Comment>>>(emptyMap())
@@ -271,6 +272,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         _replies.value = emptyMap()
         _comments.value = emptyList()
         commentsLoadedFor = ""
+        commentsGeneration++
         _sponsorSegments.value = emptyList()
         _aiOutput.value = ""
         transcriptCache = null
@@ -351,6 +353,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // Reload the same video at a specific resolution (null = Auto, best available).
     fun changeQuality(videoUrl: String, height: Int?) {
         val current = _uiState.value as? PlayerUiState.Ready ?: return
+        val wasAuto = _autoQuality.value
         _autoQuality.value = height == null
         val gen = ++loadGeneration
         viewModelScope.launch {
@@ -365,7 +368,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = PlayerUiState.Ready(details)
             } catch (_: Exception) {
                 if (gen != loadGeneration) return@launch
-                // Revert to the working stream rather than showing an error
+                // Revert to the working stream rather than showing an error — and
+                // put the quality menu back too, or it would claim the new pick took
+                _autoQuality.value = wasAuto
                 _uiState.value = PlayerUiState.Ready(current.details)
             }
         }
@@ -374,31 +379,35 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun loadComments(videoUrl: String) {
         if (commentsLoadedFor == videoUrl) return
         commentsLoadedFor = videoUrl
+        // Generation guard: without it, a slow fetch for the PREVIOUS video could
+        // land after a video switch and show the wrong video's comments
+        val gen = ++commentsGeneration
         viewModelScope.launch {
             _commentsLoading.value = true
             try {
                 val result = repo.getComments(videoUrl)
+                if (gen != commentsGeneration) return@launch
                 _comments.value = result
                 // The repo maps failures to an empty list, so an empty result may
                 // mean "network hiccup", not "no comments" — clear the marker so
                 // reopening the sheet retries instead of showing empty forever
                 if (result.isEmpty() && commentsLoadedFor == videoUrl) commentsLoadedFor = ""
             } catch (_: Exception) {
+                if (gen != commentsGeneration) return@launch
                 _comments.value = emptyList()
                 if (commentsLoadedFor == videoUrl) commentsLoadedFor = ""
             } finally {
-                _commentsLoading.value = false
+                if (gen == commentsGeneration) _commentsLoading.value = false
             }
         }
     }
 
     fun loadSponsorSegments(videoUrl: String) {
         viewModelScope.launch {
-            try {
-                _sponsorSegments.value = repo.getSponsorSegments(videoUrl)
-            } catch (_: Exception) {
-                _sponsorSegments.value = emptyList()
-            }
+            val segments = try { repo.getSponsorSegments(videoUrl) } catch (_: Exception) { emptyList() }
+            // Stale guard: a slow fetch for the previous video must not attach its
+            // segments to the new one — auto-skip would jump at the wrong times
+            if (_currentUrl.value == videoUrl) _sponsorSegments.value = segments
         }
     }
 

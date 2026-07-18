@@ -663,7 +663,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 
                 "Backup" -> SettingsCard {
                     SettingsItem(Icons.Rounded.Upload, "Export backup",
-                        "Subscriptions, favorites, playlists → JSON file"
+                        "Subscriptions, favorites, playlists, bookmarks & more → JSON file"
                     ) { exportLauncher.launch("streamflow-backup.json") }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.Download, "Import backup",
