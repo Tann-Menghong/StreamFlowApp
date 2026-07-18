@@ -79,8 +79,11 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                 // the ones the user explicitly cares about most.
                 // Dedupe by video url — the FeedScreen list is keyed by it, and a
                 // video can in principle surface from more than one channel fetch
+                // High-perf devices can afford more parallel channel fetches —
+                // capping at 12 silently hid channels 13+ from the feed
+                val channelCap = if (com.streamflow.data.DeviceCaps.isHighPerf) 20 else 12
                 val fetched = coroutineScope {
-                    subs.sortedByDescending { it.notify }.take(12).map { sub ->
+                    subs.sortedByDescending { it.notify }.take(channelCap).map { sub ->
                         async {
                             try {
                                 repo.getChannelInfo(sub.channelUrl).videos.take(5)

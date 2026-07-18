@@ -76,19 +76,19 @@ class YouTubeRepository {
         )
     }
 
+    // THROWS on failure (no catch → empty): swallowing errors here returned
+    // (emptyList, null) and callers latched nextPage = null — one transient
+    // network hiccup permanently ended pagination. Callers keep their old page
+    // on exception so the next scroll retries.
     suspend fun getTrendingNextPage(nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val kiosk = youtube.kioskList.getDefaultKioskExtractor()
-            kiosk.fetchPage()
-            val page = kiosk.getPage(nextPage)
-            PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
-                nextPage = page.nextPage
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            PagedResult(emptyList(), null)
-        }
+        // No fetchPage() before getPage(): fetchPage re-downloaded page 1 on
+        // every load-more, doubling the network cost of scrolling
+        val kiosk = youtube.kioskList.getDefaultKioskExtractor()
+        val page = kiosk.getPage(nextPage)
+        PagedResult(
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
+            nextPage = page.nextPage
+        )
     }
 
     suspend fun search(query: String): PagedResult = withContext(Dispatchers.IO) {
@@ -103,7 +103,9 @@ class YouTubeRepository {
 
     suspend fun searchNextPage(query: String, nextPage: Page): PagedResult = withContext(Dispatchers.IO) {
         val extractor = youtube.getSearchExtractor(query)
-        extractor.fetchPage()
+        // getPage(continuation) doesn't need fetchPage() — calling it first
+        // re-downloaded the ENTIRE first results page on every load-more
+        // (same as NewPipe's own SearchInfo.getMoreItems, which skips it)
         val page = extractor.getPage(nextPage)
         PagedResult(
             videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
@@ -356,6 +358,7 @@ class YouTubeRepository {
             } ?: info.tabs.firstOrNull()
 
             if (videoTab != null) {
+                cachedChannelTab = Triple(channelUrl, tabFilter, videoTab)
                 val tabInfo = ChannelTabInfo.getInfo(youtube, videoTab)
                 videos = tabInfo.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url }
                 playlists = tabInfo.relatedItems
@@ -386,25 +389,35 @@ class YouTubeRepository {
         streamCount = try { streamCount } catch (_: Exception) { -1L }
     )
 
-    suspend fun getChannelNextPage(channelUrl: String, nextPage: Page, tabFilter: String = "videos"): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val info = ChannelInfo.getInfo(youtube, channelUrl)
-            val videoTab = info.tabs.firstOrNull { tab ->
-                tab.contentFilters.any { it.contains(tabFilter, ignoreCase = true) }
-            } ?: info.tabs.firstOrNull() ?: return@withContext PagedResult(emptyList(), null)
+    // The tab handler resolved by getChannelInfo, reused for pagination — without
+    // it every "load more" redid the FULL channel-page extraction (a second
+    // network round-trip) just to rediscover the same tab.
+    private var cachedChannelTab:
+        Triple<String, String, org.schabi.newpipe.extractor.linkhandler.ListLinkHandler>? = null
 
-            val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
-            PagedResult(
-                videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
-                nextPage = page.nextPage,
-                playlists = page.items
-                    .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
-                    .map { it.toPlaylistItem() }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            PagedResult(emptyList(), null)
+    // THROWS on failure (see getTrendingNextPage) — a swallowed error used to
+    // latch channel pagination dead for the rest of the visit.
+    suspend fun getChannelNextPage(channelUrl: String, nextPage: Page, tabFilter: String = "videos"): PagedResult = withContext(Dispatchers.IO) {
+        val cached = cachedChannelTab
+        val videoTab = if (cached != null && cached.first == channelUrl && cached.second == tabFilter) {
+            cached.third
+        } else {
+            val info = ChannelInfo.getInfo(youtube, channelUrl)
+            val tab = info.tabs.firstOrNull { t ->
+                t.contentFilters.any { it.contains(tabFilter, ignoreCase = true) }
+            } ?: info.tabs.firstOrNull() ?: return@withContext PagedResult(emptyList(), null)
+            cachedChannelTab = Triple(channelUrl, tabFilter, tab)
+            tab
         }
+
+        val page = ChannelTabInfo.getMoreItems(youtube, videoTab, nextPage)
+        PagedResult(
+            videos = page.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
+            nextPage = page.nextPage,
+            playlists = page.items
+                .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
+                .map { it.toPlaylistItem() }.filter { it.url.isNotEmpty() }.distinctBy { it.url }
+        )
     }
 
     private fun CommentsInfoItem.toComment() = Comment(
@@ -412,7 +425,10 @@ class YouTubeRepository {
         text = try { commentText?.content ?: "" } catch (_: Exception) { commentText.toString() },
         likeCount = likeCount.coerceAtLeast(0).toLong(),
         avatarUrl = try { thumbnails.firstOrNull()?.url ?: "" } catch (_: Exception) { "" },
-        isOwnerComment = false,
+        // These were hardcoded false — the UI's owner highlight was dead code
+        isOwnerComment = try { isChannelOwner } catch (_: Exception) { false },
+        isPinned = try { isPinned } catch (_: Exception) { false },
+        isHearted = try { isHeartedByUploader } catch (_: Exception) { false },
         publishedTime = try { textualUploadDate ?: "" } catch (_: Exception) { "" },
         replyCount = try { replyCount } catch (_: Exception) { 0 },
         repliesPage = try { replies } catch (_: Exception) { null }
@@ -489,16 +505,13 @@ class YouTubeRepository {
         )
     }
 
+    // THROWS on failure (see getTrendingNextPage) — swallowing killed pagination
     suspend fun getRemotePlaylistNextPage(playlistUrl: String, page: Page): PagedResult = withContext(Dispatchers.IO) {
-        try {
-            val result = org.schabi.newpipe.extractor.playlist.PlaylistInfo.getMoreItems(youtube, playlistUrl, page)
-            PagedResult(
-                videos = result.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
-                nextPage = result.nextPage
-            )
-        } catch (_: Exception) {
-            PagedResult(emptyList(), null)
-        }
+        val result = org.schabi.newpipe.extractor.playlist.PlaylistInfo.getMoreItems(youtube, playlistUrl, page)
+        PagedResult(
+            videos = result.items.filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }.distinctBy { it.url },
+            nextPage = result.nextPage
+        )
     }
 
     // Matches the standard watch?v= form plus the short/shorts/embed link shapes —

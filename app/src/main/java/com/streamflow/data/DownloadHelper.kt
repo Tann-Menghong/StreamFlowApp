@@ -23,7 +23,10 @@ object DownloadHelper {
         title: String,
         isAudio: Boolean
     ): Long {
+        // ifBlank: a title that is ALL illegal characters sanitized down to
+        // nothing and produced a hidden ".mp4" file the user couldn't find
         val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80)
+            .trim().ifBlank { "video-${System.currentTimeMillis()}" }
         val ext = if (isAudio) "m4a" else "mp4"
         val request = DownloadManager.Request(Uri.parse(streamUrl))
             .setTitle(title)

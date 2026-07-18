@@ -8,6 +8,8 @@ data class Comment(
     val likeCount: Long,
     val avatarUrl: String,
     val isOwnerComment: Boolean,
+    val isPinned: Boolean = false,   // pinned by the creator (shown first by YouTube)
+    val isHearted: Boolean = false,  // "hearted" by the video's creator
     val publishedTime: String,
     val replyCount: Int = 0,
     val repliesPage: Page? = null // non-null when replies can be fetched

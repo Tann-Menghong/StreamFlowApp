@@ -72,13 +72,12 @@ fun PlaylistDetailScreen(
             if (items.isNotEmpty()) {
                 fun playAll(shuffled: Boolean) {
                     val order = if (shuffled) items.shuffled() else items
-                    PlaybackQueue.clear()
-                    order.drop(1).forEach {
-                        PlaybackQueue.add(VideoItem(
+                    PlaybackQueue.setAll(order.drop(1).map {
+                        VideoItem(
                             url = it.url, title = it.title, thumbnailUrl = it.thumbnailUrl,
                             uploaderName = it.uploaderName, viewCount = 0L, duration = it.duration
-                        ))
-                    }
+                        )
+                    })
                     onVideoClick(order.first().url)
                 }
                 Row(
@@ -240,9 +239,13 @@ fun RemotePlaylistScreen(
                 loadingMore = true
                 val r = try { repo.getRemotePlaylistNextPage(playlistUrl, page) }
                         catch (_: Exception) { null }
-                nextPage = r?.nextPage
-                val existing = videos.mapTo(HashSet()) { it.url }
-                videos = videos + (r?.videos?.filter { it.url !in existing } ?: emptyList())
+                // Keep the page on failure so the next scroll retries — nulling
+                // it on a hiccup permanently ended the playlist at that point
+                if (r != null) {
+                    nextPage = r.nextPage
+                    val existing = videos.mapTo(HashSet()) { it.url }
+                    videos = videos + r.videos.filter { it.url !in existing }
+                }
                 loadingMore = false
             }
         }
@@ -293,8 +296,7 @@ fun RemotePlaylistScreen(
                             if (videos.isNotEmpty()) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(onClick = {
-                                        PlaybackQueue.clear()
-                                        videos.drop(1).forEach { PlaybackQueue.add(it) }
+                                        PlaybackQueue.setAll(videos.drop(1))
                                         onVideoClick(videos.first().url)
                                     }) {
                                         Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(18.dp))
@@ -303,8 +305,7 @@ fun RemotePlaylistScreen(
                                     }
                                     OutlinedButton(onClick = {
                                         val order = videos.shuffled()
-                                        PlaybackQueue.clear()
-                                        order.drop(1).forEach { PlaybackQueue.add(it) }
+                                        PlaybackQueue.setAll(order.drop(1))
                                         onVideoClick(order.first().url)
                                     }) {
                                         Icon(Icons.Rounded.Shuffle, null, modifier = Modifier.size(16.dp))

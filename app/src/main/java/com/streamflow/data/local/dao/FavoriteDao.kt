@@ -12,6 +12,10 @@ interface FavoriteDao {
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE url = :url)")
     fun isFavorite(url: String): Flow<Boolean>
 
+    // Snapshot for swipe-to-delete undo (preserves savedAt so undo keeps list order)
+    @Query("SELECT * FROM favorites WHERE url = :url LIMIT 1")
+    suspend fun getByUrl(url: String): FavoriteEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: FavoriteEntity)
 

@@ -3,18 +3,18 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.19.0"
+    const val VERSION_NAME = "3.20.0"
 
     val notes = listOf(
-        "Sharing a YouTube link to StreamFlow while it's already open no longer launches a second copy of the app",
-        "Fixed: after switching videos, the previous video's comments could show up on the new one",
-        "Fixed: after switching videos, the previous video's sponsor-skip segments could make the new video jump at the wrong times",
-        "Fixed: seek previews could show frames from the previous video after switching",
-        "Fixed: rare crash when tapping picture-in-picture in fullscreen on some phones",
-        "Fixed: rare crash while scrubbing with seek previews on certain videos",
-        "Fixed: picking a video quality that fails to load no longer leaves the quality menu showing the wrong selection",
-        "Update downloads now say when they fail, and retries restart the progress bar properly",
-        "Fixed a network connection leak in video loading",
-        "Backup description now lists everything that's included"
+        "Scrolling loads much faster: loading more search results no longer secretly re-downloads the first page every time, and channel pages skip a full extra network round-trip",
+        "Comments now show YouTube's badges: pinned comments, creator-hearted comments, and the creator's own comments highlighted",
+        "Fixed: one network hiccup while scrolling could permanently stop a channel, playlist, or search feed from loading more — it now retries on the next scroll",
+        "Fixed: the endless Home feed could dead-end after a brief offline moment",
+        "Fixed: Undo after swipe-deleting from Library now restores the item to its original spot — history undo also keeps your watch progress and date",
+        "Subscriptions feed now covers up to 20 channels on powerful phones (was 12)",
+        "Playing a large playlist starts faster (queue is filled in one step)",
+        "Shorts use less memory during long viewing sessions",
+        "Search queries are trimmed so \" cats\" and \"cats\" aren't two different recent searches",
+        "Fixed: downloads with symbol-only titles produced an invisible file"
     )
 }

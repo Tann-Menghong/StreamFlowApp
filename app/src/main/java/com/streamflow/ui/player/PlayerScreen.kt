@@ -2040,12 +2040,21 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             Column(Modifier.weight(1f)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
+                                    if (comment.isPinned) {
+                                        Icon(Icons.Rounded.PushPin, "Pinned",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(11.dp))
+                                    }
                                     Text(comment.author, fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
                                         color = if (comment.isOwnerComment) MaterialTheme.colorScheme.primary
                                                 else MaterialTheme.colorScheme.onBackground)
                                     if (comment.publishedTime.isNotEmpty()) {
                                         Text(comment.publishedTime, fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (comment.isHearted) {
+                                        Icon(Icons.Rounded.Favorite, "Hearted by creator",
+                                            tint = Color(0xFFE91E63), modifier = Modifier.size(11.dp))
                                     }
                                 }
                                 Spacer(Modifier.height(3.dp))

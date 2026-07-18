@@ -12,6 +12,10 @@ interface HistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: HistoryEntity)
 
+    // Snapshot for swipe-to-delete undo (preserves position/watchedAt on restore)
+    @Query("SELECT * FROM history WHERE url = :url LIMIT 1")
+    suspend fun getByUrl(url: String): HistoryEntity?
+
     @Query("DELETE FROM history WHERE url = :url")
     suspend fun delete(url: String)
 

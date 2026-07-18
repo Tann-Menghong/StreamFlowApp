@@ -369,7 +369,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // Called by the search bar when user submits a text query
-    fun search(query: String) {
+    fun search(rawQuery: String) {
+        // Trim: " cats" and "cats" used to be two different recent-search entries
+        val query = rawQuery.trim()
         if (query.isBlank()) { loadTrending(); return }
         showingCachedFeed = false
         isSearchMode = true
@@ -463,7 +465,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.value = base.copy(
                 videos        = base.videos + fresh.filter { it.url !in existing },
                 isLoadingMore = false,
-                hasMore       = if (isSearchMode) nextPage != null else fresh.isNotEmpty()
+                // Feed mode: seeds are endless, so one empty/failed round (e.g. a
+                // brief offline moment) must not end the feed forever — keep
+                // hasMore true while seeds exist and let the next scroll retry
+                hasMore       = if (isSearchMode) nextPage != null
+                                else fresh.isNotEmpty() || feedSeeds.isNotEmpty()
             )
         }
     }
@@ -479,7 +485,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         // Home feed: trending pagination first (usually absent) …
         nextPage?.let { p ->
             val r = try { repo.getTrendingNextPage(p) } catch (_: Exception) { null }
-            nextPage = r?.nextPage
+            // Only advance the page on success — nulling it on a transient
+            // failure permanently ended trending pagination
+            if (r != null) nextPage = r.nextPage
             val fresh = r?.videos?.filter { seenUrls.add(it.url) } ?: emptyList()
             if (fresh.isNotEmpty()) return fresh
         }

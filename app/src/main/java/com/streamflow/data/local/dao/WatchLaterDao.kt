@@ -12,6 +12,10 @@ interface WatchLaterDao {
     @Query("SELECT EXISTS(SELECT 1 FROM watch_later WHERE url = :url)")
     fun isInWatchLater(url: String): Flow<Boolean>
 
+    // Snapshot for swipe-to-delete undo (preserves addedAt so undo keeps list order)
+    @Query("SELECT * FROM watch_later WHERE url = :url LIMIT 1")
+    suspend fun getByUrl(url: String): WatchLaterEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: WatchLaterEntity)
 

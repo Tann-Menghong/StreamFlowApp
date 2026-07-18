@@ -107,7 +107,14 @@ class ShortsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val d = repo.getVideoDetails(url, shortsQuality)
-                _details.value = _details.value + (url to d)
+                val newMap = _details.value + (url to d)
+                // Cap the resolved-stream cache: a long Shorts binge otherwise
+                // accumulates hundreds of entries. Oldest = farthest behind the
+                // viewport; scrolling back just re-resolves via the repo cache.
+                _details.value = if (newMap.size > 16) {
+                    val drop = newMap.keys.take(newMap.size - 16).toSet()
+                    newMap.filterKeys { it !in drop }
+                } else newMap
             } catch (_: Exception) {
             } finally {
                 loadingDetails.remove(url)

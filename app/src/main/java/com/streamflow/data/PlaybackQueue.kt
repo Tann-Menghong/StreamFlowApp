@@ -30,6 +30,12 @@ object PlaybackQueue {
         _queue.value = _queue.value + video
     }
 
+    // Bulk replace for "Play all": one state emission (and one persisted write)
+    // instead of one per video — add() in a loop hammered DataStore N times
+    fun setAll(videos: List<VideoItem>) {
+        _queue.value = videos.distinctBy { it.url }
+    }
+
     // Puts the video at the front of the queue (it plays right after the current one)
     fun addNext(video: VideoItem) {
         _queue.value = listOf(video) + _queue.value.filter { it.url != video.url }

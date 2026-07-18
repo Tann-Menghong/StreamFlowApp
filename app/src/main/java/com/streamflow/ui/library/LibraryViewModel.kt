@@ -100,25 +100,44 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun setNotify(channelUrl: String, notify: Boolean) = viewModelScope.launch {
         db.subscriptionDao().updateNotify(channelUrl, notify)
     }
-    fun removeFavorite(url: String) = viewModelScope.launch { db.favoriteDao().delete(url) }
-    fun removeHistory(url: String) = viewModelScope.launch { db.historyDao().delete(url) }
-    fun removeWatchLater(url: String) = viewModelScope.launch { db.watchLaterDao().delete(url) }
+    // Undo snapshots: swipe-delete then Undo must restore the ORIGINAL row.
+    // Rebuilding from the visible card data lost savedAt/addedAt (the restored
+    // item jumped to a different list position) and, for history, wiped the
+    // saved resume position and original watch date.
+    private var lastDeletedFavorite: FavoriteEntity? = null
+    private var lastDeletedHistory: HistoryEntity? = null
+    private var lastDeletedWatchLater: WatchLaterEntity? = null
 
-    // Undo for swipe-to-delete: re-insert from the visible card data
+    fun removeFavorite(url: String) = viewModelScope.launch {
+        lastDeletedFavorite = try { db.favoriteDao().getByUrl(url) } catch (_: Exception) { null }
+        db.favoriteDao().delete(url)
+    }
+    fun removeHistory(url: String) = viewModelScope.launch {
+        lastDeletedHistory = try { db.historyDao().getByUrl(url) } catch (_: Exception) { null }
+        db.historyDao().delete(url)
+    }
+    fun removeWatchLater(url: String) = viewModelScope.launch {
+        lastDeletedWatchLater = try { db.watchLaterDao().getByUrl(url) } catch (_: Exception) { null }
+        db.watchLaterDao().delete(url)
+    }
+
     fun restoreFavorite(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
-        db.favoriteDao().insert(FavoriteEntity(
-            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
-            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+        db.favoriteDao().insert(
+            lastDeletedFavorite?.takeIf { it.url == v.url } ?: FavoriteEntity(
+                url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+                uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
     }
     fun restoreHistory(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
-        db.historyDao().insert(HistoryEntity(
-            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
-            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+        db.historyDao().insert(
+            lastDeletedHistory?.takeIf { it.url == v.url } ?: HistoryEntity(
+                url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+                uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
     }
     fun restoreWatchLater(v: com.streamflow.data.model.VideoItem) = viewModelScope.launch {
-        db.watchLaterDao().insert(WatchLaterEntity(
-            url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
-            uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
+        db.watchLaterDao().insert(
+            lastDeletedWatchLater?.takeIf { it.url == v.url } ?: WatchLaterEntity(
+                url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
+                uploaderName = v.uploaderName, viewCount = v.viewCount, duration = v.duration))
     }
     fun clearHistory() = viewModelScope.launch { db.historyDao().clearAll() }
     fun clearFavorites() = viewModelScope.launch { db.favoriteDao().clearAll() }
