@@ -3,18 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "3.20.0"
+    const val VERSION_NAME = "4.0.0"
 
     val notes = listOf(
-        "Scrolling loads much faster: loading more search results no longer secretly re-downloads the first page every time, and channel pages skip a full extra network round-trip",
-        "Comments now show YouTube's badges: pinned comments, creator-hearted comments, and the creator's own comments highlighted",
-        "Fixed: one network hiccup while scrolling could permanently stop a channel, playlist, or search feed from loading more — it now retries on the next scroll",
-        "Fixed: the endless Home feed could dead-end after a brief offline moment",
-        "Fixed: Undo after swipe-deleting from Library now restores the item to its original spot — history undo also keeps your watch progress and date",
-        "Subscriptions feed now covers up to 20 channels on powerful phones (was 12)",
-        "Playing a large playlist starts faster (queue is filled in one step)",
-        "Shorts use less memory during long viewing sessions",
-        "Search queries are trimmed so \" cats\" and \"cats\" aren't two different recent searches",
-        "Fixed: downloads with symbol-only titles produced an invisible file"
+        "StreamFlow 4.0 — the complete release 🎉",
+        "After 17 improvement passes and 155 fixes, StreamFlow is feature-complete and stable: fast ad-free playback up to 1080p, Shorts, live streams, comments with badges, SponsorBlock, chapters, subtitles, and picture-in-picture",
+        "Your whole library lives on your phone: subscriptions with groups and bells, favorites, history with resume, watch later, bookmarks, playlists, downloads, and a persistent queue",
+        "Private by design: no account, no ads, no tracking, incognito mode, and full local backup/restore",
+        "Personal touches: endless For-You feed, on-device AI summaries, Khmer + English, deep theming, and performance tuned to your phone's hardware",
+        "The app keeps updating itself — future releases appear right here in Settings"
     )
 }
