@@ -380,7 +380,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             }.distinct().filter { it != currentUrl }.take(2)
             for (url in candidates) {
                 if ((_uiState.value as? PlayerUiState.Ready)?.details?.url != currentUrl) return@launch
-                try { repo.getVideoDetails(url, quality) } catch (_: Exception) {}
+                try {
+                    val d = repo.getVideoDetails(url, quality)
+                    // Warm the stream's first bytes into the media disk cache
+                    // too, so "next" starts playing instantly (skip live —
+                    // stale live segments are useless seconds later)
+                    if (!d.isLive) {
+                        val app = getApplication<Application>()
+                        com.streamflow.data.MediaCache.warmStream(app, d.streamUrl, 1_500_000)
+                        d.audioUrl?.let {
+                            com.streamflow.data.MediaCache.warmStream(app, it, 512_000)
+                        }
+                    }
+                } catch (_: Exception) {}
             }
         }
     }

@@ -1,9 +1,16 @@
 package com.streamflow.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 // Process-wide disk cache for media streams. Replaying a video, returning to it
@@ -22,4 +29,19 @@ object MediaCache {
             StandaloneDatabaseProvider(context)
         ).also { cache = it }
     }
+
+    // Pre-download the first [bytes] of a stream into the cache so pressing
+    // play on it starts instantly. CacheWriter skips ranges already cached,
+    // and PlaybackService reads through the same cache.
+    suspend fun warmStream(context: Context, url: String, bytes: Long) =
+        withContext(Dispatchers.IO) {
+            try {
+                val ds = CacheDataSource.Factory()
+                    .setCache(get(context))
+                    .setUpstreamDataSourceFactory(
+                        OkHttpDataSource.Factory(OkHttpDownloader.instance.client))
+                    .createDataSource()
+                CacheWriter(ds, DataSpec(Uri.parse(url), 0, bytes), null, null).cache()
+            } catch (_: Exception) {}
+        }
 }

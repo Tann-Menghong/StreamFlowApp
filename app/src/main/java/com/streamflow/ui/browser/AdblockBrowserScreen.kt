@@ -78,9 +78,9 @@ private val AD_BLOCK_JS = """
     try{ if(!window[k]) Object.defineProperty(window,k,{get:function(){return noopObj},set:noop}); }catch(e){}
   });
   window.open = noop;
-  var _si = window.setInterval, _st = window.setTimeout;
-  window.setInterval = function(fn, t){ try{ var s=String(fn); if(s.indexOf('ad')>-1||s.indexOf('pop')>-1) return 0; }catch(e){} return _si(fn,t); };
-  window.setTimeout  = function(fn, t){ try{ var s=String(fn); if(s.indexOf('pop')>-1) return 0; }catch(e){} return _st(fn,t); };
+  // NOTE: no setInterval/setTimeout source-sniffing here. Substring checks for
+  // 'ad'/'pop' false-positive on ordinary code ('load', 'padding', queue.pop())
+  // and silently killed main-frame players (broke Clappr/hls.js on pdtvhd.com).
   var css = [
     '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"]',
     '.ads,.advertisement,.adsbygoogle,.ad-banner,.ad-slot,.ad-unit',
@@ -98,8 +98,11 @@ private val AD_BLOCK_JS = """
     muts.forEach(function(m){
       m.addedNodes.forEach(function(n){
         if(n.nodeType!==1) return;
-        var src = n.src||n.getAttribute&&n.getAttribute('src')||'';
-        if(blocked.test(src)||blocked.test(n.outerHTML||'')){
+        // Judge the node by its OWN attributes only. Testing outerHTML matched
+        // descendants too, so a legitimate container with one ad snippet
+        // inside got removed wholesale (blanked whole sections of some sites).
+        var own = (n.src||'')+' '+(n.id||'')+' '+(n.className||'');
+        if(blocked.test(own)){
           try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
         }
       });
