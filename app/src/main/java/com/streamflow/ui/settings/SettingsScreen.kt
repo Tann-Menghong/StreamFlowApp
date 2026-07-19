@@ -328,6 +328,12 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val fontFamily           by vm.fontFamily.collectAsState()
     val libraryTab           by vm.libraryTab.collectAsState()
     val aiState              by vm.aiState.collectAsState()
+    val showDislikes         by vm.showDislikes.collectAsState()
+    val deArrow              by vm.deArrow.collectAsState()
+    val sponsorCategories    by vm.sponsorCategories.collectAsState()
+    val autoBackup           by vm.autoBackup.collectAsState()
+    var showSponsorDialog    by remember { mutableStateOf(false) }
+    var showDesignDialog     by remember { mutableStateOf(false) }
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -391,10 +397,13 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 
             when (category) {
                 "Appearance" -> SettingsCard {
-                    SettingsSwitchItem(Icons.Rounded.AutoAwesome, "Modern design",
-                        "Card feed, floating bars, colorful icons — off for the classic look",
-                        designStyle == "MODERN"
-                    ) { vm.setDesignStyle(if (it) "MODERN" else "CLASSIC") }
+                    SettingsItem(Icons.Rounded.AutoAwesome, "Design style",
+                        when (designStyle) {
+                            "CLASSIC" -> "Classic — flat & minimal"
+                            "AURORA" -> "Aurora — glass & gradients"
+                            else -> "Modern — cards & floating bars"
+                        }
+                    ) { showDesignDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.Palette, "Theme",
                         when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
@@ -586,6 +595,24 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             if (eqPreset == "OFF") "Off" else eqPreset
                         ) { showEqDialog = true }
                     }
+                    SettingsGroupLabel("Smart extras")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.FastForward, "SponsorBlock auto-skip",
+                            when {
+                                sponsorCategories.isEmpty() -> "Off"
+                                sponsorCategories.size == 7 -> "All categories"
+                                else -> "${sponsorCategories.size} of 7 categories"
+                            }
+                        ) { showSponsorDialog = true }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.ThumbDown, "Dislike counts",
+                            "Show real dislikes via Return YouTube Dislike", showDislikes
+                        ) { vm.setShowDislikes(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.AutoFixHigh, "Clickbait-free titles",
+                            "Community titles from DeArrow replace clickbait in the player", deArrow
+                        ) { vm.setDeArrow(it) }
+                    }
                     SettingsGroupLabel("Data & privacy")
                     SettingsCard {
                         SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
@@ -667,6 +694,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                 }
 
                 "Backup" -> SettingsCard {
+                    SettingsSwitchItem(Icons.Rounded.EventRepeat, "Weekly auto-backup",
+                        "Saves a backup file to Documents/StreamFlow every week", autoBackup
+                    ) { vm.setAutoBackup(it) }
+                    SettingsDivider()
                     SettingsItem(Icons.Rounded.Upload, "Export backup",
                         "Subscriptions, favorites, playlists, bookmarks & more → JSON file"
                     ) { exportLauncher.launch("streamflow-backup.json") }
@@ -864,6 +895,62 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             (libraryTab.toIntOrNull() ?: 0).coerceIn(0, 6),
             { vm.setLibraryTab(it.toString()); showLibTabDialog = false }, { showLibTabDialog = false })
     }
+    if (showDesignDialog) {
+        val designOpts = listOf(
+            "MODERN" to "Modern — cards & floating bars",
+            "AURORA" to "Aurora — glass & gradients ✨",
+            "CLASSIC" to "Classic — flat & minimal")
+        PickerDialog("Design style", designOpts.map { it.second },
+            designOpts.indexOfFirst { it.first == designStyle }.coerceAtLeast(0),
+            { vm.setDesignStyle(designOpts[it].first); showDesignDialog = false },
+            { showDesignDialog = false })
+    }
+    if (showSponsorDialog) {
+        val catLabels = listOf(
+            "sponsor" to "Sponsors",
+            "selfpromo" to "Self-promotion",
+            "interaction" to "Subscribe reminders",
+            "intro" to "Intros",
+            "outro" to "Outros & end cards",
+            "preview" to "Previews & recaps",
+            "music_offtopic" to "Non-music sections"
+        )
+        var picked by remember { mutableStateOf(sponsorCategories) }
+        AlertDialog(
+            onDismissRequest = { showSponsorDialog = false },
+            title = { Text("SponsorBlock auto-skip") },
+            text = {
+                Column {
+                    Text("Choose what gets skipped automatically. Untick everything to turn auto-skip off.",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    catLabels.forEach { (key, label) ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clickable {
+                                    picked = if (key in picked) picked - key else picked + key
+                                }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(checked = key in picked, onCheckedChange = {
+                                picked = if (key in picked) picked - key else picked + key
+                            })
+                            Text(label, fontSize = 14.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.setSponsorCategories(picked); showSponsorDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSponsorDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
     if (showCornerDialog) {
         val cornerOpts = listOf("SQUARE" to "Square", "ROUNDED" to "Rounded", "ROUND" to "Extra round")
         PickerDialog("Thumbnail corners", cornerOpts.map { it.second },
@@ -941,10 +1028,17 @@ private val badgePalette = listOf(
 
 @Composable
 private fun SettingsIconBadge(icon: ImageVector, title: String) {
-    if (com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN") {
+    val badgeStyle = com.streamflow.ui.theme.LocalDesignStyle.current
+    if (badgeStyle != "CLASSIC") {
         val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
         Box(
-            Modifier.size(32.dp).background(color, RoundedCornerShape(9.dp)),
+            Modifier.size(32.dp).background(
+                // AURORA: gradient badge instead of a flat tile
+                if (badgeStyle == "AURORA")
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(color, color.copy(alpha = 0.55f)))
+                else androidx.compose.ui.graphics.SolidColor(color),
+                RoundedCornerShape(9.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))

@@ -22,6 +22,32 @@ sealed class SearchUiState {
     data class Error(val message: String) : SearchUiState()
 }
 
+// Client-side result filters (YouTube's search API doesn't expose these via
+// NewPipe, so they're applied to the fetched results)
+enum class DurationFilter(val label: String) {
+    ANY("Any length"), SHORT("Under 4 min"), MEDIUM("4–20 min"), LONG("Over 20 min");
+    fun matches(seconds: Long): Boolean = when (this) {
+        ANY -> true
+        SHORT -> seconds in 1 until 240
+        MEDIUM -> seconds in 240..1200
+        LONG -> seconds > 1200
+    }
+}
+
+enum class DateFilter(val label: String) {
+    ANY("Any time"), DAY("Today"), WEEK("This week"), MONTH("This month");
+    fun matches(uploadedEpoch: Long): Boolean {
+        if (this == ANY) return true
+        if (uploadedEpoch <= 0L) return false // unknown date can't satisfy a date filter
+        val age = System.currentTimeMillis() - uploadedEpoch
+        return when (this) {
+            DAY -> age <= 24L * 3600_000
+            WEEK -> age <= 7L * 24 * 3600_000
+            else -> age <= 31L * 24 * 3600_000
+        }
+    }
+}
+
 class SearchViewModel : ViewModel() {
 
     private val repo = YouTubeRepository()
@@ -31,6 +57,11 @@ class SearchViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val uiState: StateFlow<SearchUiState> = _uiState
+
+    // Filters live outside the Success state so pagination keeps the RAW list
+    // and filtering stays a pure view concern (changing a filter never refetches)
+    val durationFilter = MutableStateFlow(DurationFilter.ANY)
+    val dateFilter = MutableStateFlow(DateFilter.ANY)
 
     // Last submitted query, so Retry works even after the text field was cleared
     private var lastQuery = ""

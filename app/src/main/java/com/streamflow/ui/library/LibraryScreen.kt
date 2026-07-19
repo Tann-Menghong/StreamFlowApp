@@ -395,6 +395,35 @@ private fun DownloadList(
             "Use the download button in the player to save videos for offline watching.")
         return
     }
+    // Live progress for in-flight downloads, polled from the system
+    // DownloadManager (it only broadcasts completion, never progress)
+    val dlContext = androidx.compose.ui.platform.LocalContext.current
+    val dm = remember {
+        dlContext.getSystemService(android.content.Context.DOWNLOAD_SERVICE)
+            as android.app.DownloadManager
+    }
+    var progressMap by remember { mutableStateOf<Map<Long, Pair<Long, Long>>>(emptyMap()) }
+    val activeIds = downloads.filter { it.status == "DOWNLOADING" }.map { it.downloadId }
+    LaunchedEffect(activeIds) {
+        while (activeIds.isNotEmpty()) {
+            val map = HashMap<Long, Pair<Long, Long>>()
+            try {
+                dm.query(android.app.DownloadManager.Query()
+                    .setFilterById(*activeIds.toLongArray())).use { c ->
+                    while (c.moveToNext()) {
+                        val id = c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_ID))
+                        val done = c.getLong(c.getColumnIndexOrThrow(
+                            android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                        val total = c.getLong(c.getColumnIndexOrThrow(
+                            android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                        map[id] = done to total
+                    }
+                }
+            } catch (_: Exception) {}
+            progressMap = map
+            kotlinx.coroutines.delay(1000L)
+        }
+    }
     LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
         // Key must include the format: video + audio of the SAME url can now
         // coexist, and a bare url key would hard-crash on the duplicate
@@ -424,10 +453,14 @@ private fun DownloadList(
                         maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onBackground, lineHeight = 17.sp)
                     Spacer(Modifier.height(2.dp))
+                    val prog = progressMap[d.downloadId]
                     Text(
-                        when (d.status) {
-                            "DONE" -> "Saved offline${if (d.isAudio) " · audio" else ""}"
-                            "FAILED" -> "Download failed"
+                        when {
+                            d.status == "DONE" -> "Saved offline${if (d.isAudio) " · audio" else ""}"
+                            d.status == "FAILED" -> "Download failed"
+                            prog != null && prog.second > 0 ->
+                                "${prog.first * 100 / prog.second}% · " +
+                                "${prog.first / 1_048_576} / ${prog.second / 1_048_576} MB"
                             else -> "Downloading…"
                         },
                         fontSize = 11.sp,
@@ -437,6 +470,13 @@ private fun DownloadList(
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
+                    if (d.status == "DOWNLOADING" && prog != null && prog.second > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { (prog.first.toFloat() / prog.second).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(3.dp)
+                        )
+                    }
                 }
                 if (d.status == "FAILED") {
                     IconButton(onClick = { onRetry(d) }) {
@@ -445,8 +485,15 @@ private fun DownloadList(
                             modifier = Modifier.size(20.dp))
                     }
                 }
-                IconButton(onClick = { onRemove(d) }) {
-                    Icon(Icons.Rounded.DeleteOutline, "Remove download",
+                IconButton(onClick = {
+                    // Cancelling an in-flight download must also stop the transfer,
+                    // not just remove the row
+                    if (d.status == "DOWNLOADING") try { dm.remove(d.downloadId) } catch (_: Exception) {}
+                    onRemove(d)
+                }) {
+                    Icon(
+                        if (d.status == "DOWNLOADING") Icons.Rounded.Close else Icons.Rounded.DeleteOutline,
+                        if (d.status == "DOWNLOADING") "Cancel download" else "Remove download",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
                         modifier = Modifier.size(20.dp))
                 }

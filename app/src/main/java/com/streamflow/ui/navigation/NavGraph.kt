@@ -456,12 +456,20 @@ private fun AnimatedNavBar(
     reduceMotion: Boolean = false,
     onSelect: (Screen) -> Unit
 ) {
-    // MODERN design: floating pill nav; CLASSIC: original full-width bar
-    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
+    // MODERN: floating pill nav; AURORA: the pill gets a gradient hairline
+    // border (glass look); CLASSIC: original full-width bar
+    val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
+    val modernStyle = designStyle != "CLASSIC"
     Surface(
         color        = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
         shadowElevation = 10.dp,
+        border = if (designStyle == "AURORA")
+            androidx.compose.foundation.BorderStroke(1.dp,
+                androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                    MaterialTheme.colorScheme.primary.copy(0.55f),
+                    MaterialTheme.colorScheme.tertiary.copy(0.35f))))
+        else null,
         shape = if (modernStyle) RoundedCornerShape(26.dp)
                 else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier

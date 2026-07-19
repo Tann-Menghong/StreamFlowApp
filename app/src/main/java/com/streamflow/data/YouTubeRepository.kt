@@ -203,13 +203,50 @@ class YouTubeRepository {
                     { if (it.format == org.schabi.newpipe.extractor.MediaFormat.MPEG_4) 1 else 0 }
                 ))
 
-            // Prefer M4A audio (pairs safely with MP4 video in the merged source)
+            // Prefer M4A audio (pairs safely with MP4 video in the merged source).
+            // ORIGINAL track first: multi-audio videos list every dub, and a raw
+            // bitrate max could otherwise start playback in a random dubbed language
+            fun trackTypeRank(s: org.schabi.newpipe.extractor.stream.AudioStream): Int = try {
+                when (s.audioTrackType) {
+                    org.schabi.newpipe.extractor.stream.AudioTrackType.ORIGINAL -> 2
+                    null -> 1
+                    else -> 0
+                }
+            } catch (_: Exception) { 1 }
             val audioStream = info.audioStreams
                 .filter { !it.content.isNullOrEmpty() }
                 .maxWithOrNull(compareBy(
+                    { trackTypeRank(it) },
                     { if (it.format == org.schabi.newpipe.extractor.MediaFormat.M4A) 1 else 0 },
                     { it.averageBitrate }
                 ))
+
+            // Selectable audio languages: best stream per distinct track id.
+            // Only meaningful when the video actually has more than one language.
+            val audioTracks: List<com.streamflow.data.model.AudioTrackOption> = try {
+                info.audioStreams
+                    .filter { !it.content.isNullOrEmpty() }
+                    .groupBy { it.audioTrackId ?: "" }
+                    .let { groups ->
+                        if (groups.size <= 1) emptyList()
+                        else groups.mapNotNull { (_, streams) ->
+                            val best = streams.maxWithOrNull(compareBy(
+                                { if (it.format == org.schabi.newpipe.extractor.MediaFormat.M4A) 1 else 0 },
+                                { it.averageBitrate }
+                            )) ?: return@mapNotNull null
+                            val original = trackTypeRank(best) == 2
+                            val name = try { best.audioTrackName }
+                                catch (_: Exception) { null }
+                                ?: try { best.audioLocale?.displayLanguage } catch (_: Exception) { null }
+                                ?: if (original) "Original" else "Unknown"
+                            com.streamflow.data.model.AudioTrackOption(
+                                name = name + if (original) " (original)" else "",
+                                url = best.content!!,
+                                isOriginal = original
+                            )
+                        }.sortedByDescending { it.isOriginal }
+                    }
+            } catch (_: Exception) { emptyList() }
 
             val hlsUrl = info.hlsUrl
             val dashUrl = try { info.dashMpdUrl } catch (_: Exception) { null }
@@ -320,6 +357,9 @@ class YouTubeRepository {
                 availableQualities = if (isLive) emptyList() else availableQualities,
                 currentQuality = currentQuality,
                 isLive = isLive,
+                // Track switching swaps the merged audio source, which only works
+                // for the separate video+audio path — not muxed/live streams
+                audioTracks = if (!isLive && audioUrl != null) audioTracks else emptyList(),
                 videoCodec = videoCodec,
                 storyboard = storyboard,
                 uploadedAgo = try { info.textualUploadDate ?: "" } catch (_: Exception) { "" }
@@ -527,11 +567,57 @@ class YouTubeRepository {
     private fun extractVideoId(url: String): String? =
         videoIdPatterns.firstNotNullOfOrNull { it.find(url)?.groupValues?.get(1) }
 
-    suspend fun getSponsorSegments(videoUrl: String): List<SponsorSegment> = withContext(Dispatchers.IO) {
+    // Real dislike counts via the Return YouTube Dislike public API
+    suspend fun getDislikes(videoUrl: String): Long? = withContext(Dispatchers.IO) {
+        try {
+            val videoId = extractVideoId(videoUrl) ?: return@withContext null
+            val request = Request.Builder()
+                .url("https://returnyoutubedislikeapi.com/votes?videoId=$videoId")
+                .build()
+            val body = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                response.body?.string() ?: return@withContext null
+            }
+            org.json.JSONObject(body).optLong("dislikes", -1L).takeIf { it >= 0L }
+        } catch (_: Exception) { null }
+    }
+
+    // DeArrow: community-voted clickbait-free title for a video (null = keep original)
+    suspend fun getDeArrowTitle(videoUrl: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val videoId = extractVideoId(videoUrl) ?: return@withContext null
+            val request = Request.Builder()
+                .url("https://sponsor.ajay.app/api/branding?videoID=$videoId")
+                .build()
+            val body = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                response.body?.string() ?: return@withContext null
+            }
+            val titles = org.json.JSONObject(body).optJSONArray("titles") ?: return@withContext null
+            for (i in 0 until titles.length()) {
+                val t = titles.getJSONObject(i)
+                // Accept community titles that are locked or net-upvoted, and skip
+                // entries flagged as the original title
+                if (!t.optBoolean("original", false) &&
+                    (t.optBoolean("locked", false) || t.optInt("votes", -1) >= 0)) {
+                    // DeArrow marks intentionally-kept casing with ">" word prefixes
+                    return@withContext t.optString("title").replace(Regex(">(\\S)"), "$1")
+                        .trim().ifBlank { null }
+                }
+            }
+            null
+        } catch (_: Exception) { null }
+    }
+
+    suspend fun getSponsorSegments(
+        videoUrl: String,
+        enabledCategories: Set<String> = com.streamflow.data.local.AppPreferences.DEFAULT_SPONSOR_CATS
+    ): List<SponsorSegment> = withContext(Dispatchers.IO) {
+        if (enabledCategories.isEmpty()) return@withContext emptyList()
         try {
             val videoId = extractVideoId(videoUrl) ?: return@withContext emptyList()
             val categories = URLEncoder.encode(
-                """["sponsor","selfpromo","interaction","intro","outro","preview","music_offtopic"]""",
+                org.json.JSONArray(enabledCategories.toList()).toString(),
                 "UTF-8"
             )
             val request = Request.Builder()

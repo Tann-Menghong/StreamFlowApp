@@ -11,7 +11,10 @@ val LocalThumbCorner = staticCompositionLocalOf { 12 }
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
 // Design style: "MODERN" = card feed, floating pill bars, colorful settings
-// badges (the new look); "CLASSIC" = the original flat full-width design
+// badges; "AURORA" = the modern layout plus translucent "glass" surfaces and
+// gradient hairline borders; "CLASSIC" = the original flat full-width design.
+// Structural checks should use != "CLASSIC" (aurora shares modern's layout);
+// == "AURORA" only for the glass/gradient accents.
 val LocalDesignStyle = staticCompositionLocalOf { "MODERN" }
 
 fun cornerDpFor(style: String): Int = when (style) {

@@ -72,6 +72,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val showSearchTab  = prefs.showSearchTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val fontFamily     = prefs.fontFamily.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
     val libraryTab     = prefs.libraryTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
+    // Pro features (v4.2.0)
+    val showDislikes   = prefs.showDislikes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val deArrow        = prefs.deArrow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val sponsorCategories = prefs.sponsorCategories.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
+        com.streamflow.data.local.AppPreferences.DEFAULT_SPONSOR_CATS)
+    val autoBackup     = prefs.autoBackup.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // ── On-device AI ──────────────────────────────────────────────
     val aiState = com.streamflow.data.ai.AiEngine.downloadState
@@ -198,6 +204,23 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }
     fun setShowDrama(v: Boolean)         = viewModelScope.launch { prefs.setShowDrama(v) }
+    fun setShowDislikes(v: Boolean)      = viewModelScope.launch { prefs.setShowDislikes(v) }
+    fun setDeArrow(v: Boolean)           = viewModelScope.launch { prefs.setDeArrow(v) }
+    fun setSponsorCategories(v: Set<String>) = viewModelScope.launch { prefs.setSponsorCategories(v) }
+    fun setAutoBackup(v: Boolean) = viewModelScope.launch {
+        prefs.setAutoBackup(v)
+        val wm = androidx.work.WorkManager.getInstance(getApplication())
+        if (v) {
+            wm.enqueueUniquePeriodicWork(
+                com.streamflow.data.AutoBackupWorker.WORK_NAME,
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                androidx.work.PeriodicWorkRequestBuilder<com.streamflow.data.AutoBackupWorker>(
+                    7, java.util.concurrent.TimeUnit.DAYS).build()
+            )
+        } else {
+            wm.cancelUniqueWork(com.streamflow.data.AutoBackupWorker.WORK_NAME)
+        }
+    }
     fun setStartTab(v: String)           = viewModelScope.launch { prefs.setStartTab(v) }
     fun setIncognito(v: Boolean)         = viewModelScope.launch { prefs.setIncognito(v) }
     fun setQualityCellular(v: String)    = viewModelScope.launch { prefs.setQualityCellular(v) }
@@ -263,79 +286,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val ok = try {
-                val root = org.json.JSONObject().apply {
-                    put("app", "StreamFlow"); put("backupVersion", 3)
-                    put("history", org.json.JSONArray().also { arr ->
-                        db.historyDao().getAll().first().forEach { h ->
-                            arr.put(org.json.JSONObject()
-                                .put("url", h.url).put("title", h.title)
-                                .put("thumbnailUrl", h.thumbnailUrl).put("uploaderName", h.uploaderName)
-                                .put("viewCount", h.viewCount).put("duration", h.duration)
-                                .put("watchedAt", h.watchedAt).put("position", h.position))
-                        }
-                    })
-                    put("subscriptions", org.json.JSONArray().also { arr ->
-                        db.subscriptionDao().getAllOnce().forEach { s ->
-                            // groupName + notify were silently dropped before (backup v2),
-                            // so a restore lost every bell toggle and channel group
-                            arr.put(org.json.JSONObject()
-                                .put("channelUrl", s.channelUrl).put("name", s.name)
-                                .put("avatarUrl", s.avatarUrl)
-                                .put("groupName", s.groupName).put("notify", s.notify)
-                                .put("subscribedAt", s.subscribedAt))
-                        }
-                    })
-                    put("favorites", org.json.JSONArray().also { arr ->
-                        db.favoriteDao().getAll().first().forEach { f ->
-                            arr.put(org.json.JSONObject()
-                                .put("url", f.url).put("title", f.title)
-                                .put("thumbnailUrl", f.thumbnailUrl).put("uploaderName", f.uploaderName)
-                                .put("viewCount", f.viewCount).put("duration", f.duration)
-                                .put("savedAt", f.savedAt))
-                        }
-                    })
-                    put("watchLater", org.json.JSONArray().also { arr ->
-                        db.watchLaterDao().getAll().first().forEach { w ->
-                            arr.put(org.json.JSONObject()
-                                .put("url", w.url).put("title", w.title)
-                                .put("thumbnailUrl", w.thumbnailUrl).put("uploaderName", w.uploaderName)
-                                .put("viewCount", w.viewCount).put("duration", w.duration)
-                                .put("addedAt", w.addedAt))
-                        }
-                    })
-                    put("blocked", org.json.JSONArray().also { arr ->
-                        db.blockedDao().getAll().first().forEach { b ->
-                            arr.put(org.json.JSONObject()
-                                .put("itemKey", b.itemKey).put("type", b.type).put("name", b.name))
-                        }
-                    })
-                    put("playlists", org.json.JSONArray().also { arr ->
-                        db.playlistDao().getPlaylistsOnce().forEach { p ->
-                            arr.put(org.json.JSONObject().put("name", p.name)
-                                .put("items", org.json.JSONArray().also { itemsArr ->
-                                    db.playlistDao().getItemsOnce(p.id).forEach { i ->
-                                        itemsArr.put(org.json.JSONObject()
-                                            .put("url", i.url).put("title", i.title)
-                                            .put("thumbnailUrl", i.thumbnailUrl)
-                                            .put("uploaderName", i.uploaderName)
-                                            .put("duration", i.duration)
-                                            .put("addedAt", i.addedAt))
-                                    }
-                                }))
-                        }
-                    })
-                    // Bookmarks ("clip moments") were missing from backups entirely
-                    put("bookmarks", org.json.JSONArray().also { arr ->
-                        db.bookmarkDao().getAll().first().forEach { b ->
-                            arr.put(org.json.JSONObject()
-                                .put("videoUrl", b.videoUrl).put("title", b.title)
-                                .put("thumbnailUrl", b.thumbnailUrl)
-                                .put("uploaderName", b.uploaderName)
-                                .put("positionMs", b.positionMs)
-                                .put("createdAt", b.createdAt))
-                        }
-                    })
-                }
+                // JSON building lives in BackupManager, shared with the weekly
+                // AutoBackupWorker so the two can never drift apart field-wise
+                val root = com.streamflow.data.BackupManager.buildBackupJson(db)
                 app.contentResolver.openOutputStream(uri)?.use {
                     it.write(root.toString(2).toByteArray())
                 } != null

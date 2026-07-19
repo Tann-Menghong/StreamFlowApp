@@ -252,6 +252,28 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _sponsorSegments = MutableStateFlow<List<SponsorSegment>>(emptyList())
     val sponsorSegments: StateFlow<List<SponsorSegment>> = _sponsorSegments
 
+    // ── Return YouTube Dislike + DeArrow (both pref-gated) ───────────────────
+    private val _dislikes = MutableStateFlow<Long?>(null)
+    val dislikes: StateFlow<Long?> = _dislikes
+
+    private val _altTitle = MutableStateFlow<String?>(null)
+    val altTitle: StateFlow<String?> = _altTitle
+
+    private fun loadExtras(videoUrl: String) {
+        viewModelScope.launch {
+            if (!prefs.showDislikes.first()) return@launch
+            val d = repo.getDislikes(videoUrl)
+            // Stale guard: same class as sponsor segments — a slow response for
+            // the previous video must not show under the new one
+            if (_currentUrl.value == videoUrl) _dislikes.value = d
+        }
+        viewModelScope.launch {
+            if (!prefs.deArrow.first()) return@launch
+            val t = repo.getDeArrowTitle(videoUrl)
+            if (_currentUrl.value == videoUrl) _altTitle.value = t
+        }
+    }
+
     // ── Audio-only (remembered across videos/sessions) ───────────────────────
     private val _audioOnly = MutableStateFlow(false)
     val audioOnly: StateFlow<Boolean> = _audioOnly
@@ -274,9 +296,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         commentsLoadedFor = ""
         commentsGeneration++
         _sponsorSegments.value = emptyList()
+        _dislikes.value = null
+        _altTitle.value = null
         _aiOutput.value = ""
         transcriptCache = null
         aiSession++
+        loadExtras(videoUrl)
         val gen = ++loadGeneration
         viewModelScope.launch {
             _uiState.value = PlayerUiState.Loading
@@ -404,7 +429,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadSponsorSegments(videoUrl: String) {
         viewModelScope.launch {
-            val segments = try { repo.getSponsorSegments(videoUrl) } catch (_: Exception) { emptyList() }
+            // User-chosen categories (Settings > Playback > SponsorBlock);
+            // an empty set means auto-skip is off entirely
+            val cats = prefs.sponsorCategories.first()
+            val segments = try { repo.getSponsorSegments(videoUrl, cats) } catch (_: Exception) { emptyList() }
             // Stale guard: a slow fetch for the previous video must not attach its
             // segments to the new one — auto-skip would jump at the wrong times
             if (_currentUrl.value == videoUrl) _sponsorSegments.value = segments

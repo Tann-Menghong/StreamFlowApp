@@ -112,6 +112,10 @@ fun PlayerScreen(
     // Settings > Playback > Auto-play. The countdown effect below ignored this
     // entirely, so turning the toggle off still auto-played the next video.
     val autoPlayEnabled by vm.autoPlay.collectAsState(initial = true)
+    // Return YouTube Dislike + DeArrow community title (both pref-gated in the VM)
+    val dislikesCount by vm.dislikes.collectAsState()
+    val altTitle by vm.altTitle.collectAsState()
+    val playerScope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -242,8 +246,9 @@ fun PlayerScreen(
         mc.prepare()
         mc.play()
 
-        val speedStr = prefs.defaultSpeed.first()
-        mc.setPlaybackSpeed(speedStr.toFloatOrNull() ?: 1f)
+        // Per-channel speed override wins over the global default
+        val chSpeed = if (d.uploaderUrl.isNotEmpty()) prefs.channelSpeeds.first()[d.uploaderUrl] else null
+        mc.setPlaybackSpeed(chSpeed ?: (prefs.defaultSpeed.first().toFloatOrNull() ?: 1f))
     }
 
     // ── Fullscreen orientation ───────────────────────────────────────────────
@@ -289,6 +294,12 @@ fun PlayerScreen(
     var currentSpeed by remember { mutableFloatStateOf(1f) }
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
     LaunchedEffect(Unit) { currentSpeed = prefs.defaultSpeed.first().toFloatOrNull() ?: 1f }
+    val channelSpeeds by prefs.channelSpeeds.collectAsState(initial = emptyMap())
+    // Keep the speed label in sync when a per-channel speed was applied on load
+    LaunchedEffect(state) {
+        val d = (state as? PlayerUiState.Ready)?.details ?: return@LaunchedEffect
+        if (d.uploaderUrl.isNotEmpty()) prefs.channelSpeeds.first()[d.uploaderUrl]?.let { currentSpeed = it }
+    }
     var skipMs by remember { mutableLongStateOf(10_000L) }
     LaunchedEffect(Unit) { skipMs = (prefs.skipSeconds.first().toLongOrNull() ?: 10L) * 1000L }
     // Swipe brightness/volume zones can be turned off in Settings > Playback
@@ -542,6 +553,33 @@ fun PlayerScreen(
         }
         // Preserve the play/pause state: unconditional play() force-started
         // playback when the user toggled subtitles while paused
+        val wasPlaying = mc.isPlaying || mc.playWhenReady
+        mc.setMediaItem(newItem, pos)
+        mc.prepare()
+        if (wasPlaying) mc.play()
+    }
+
+    // ── Audio track (multi-language videos) ──────────────────────────────────
+    var showAudioMenu by remember { mutableStateOf(false) }
+    var selectedAudioUrl by remember { mutableStateOf<String?>(null) }
+    var selectedAudioName by remember { mutableStateOf<String?>(null) }
+    var audioUrlSeenByEffect by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(videoUrl) {
+        selectedAudioUrl = null; selectedAudioName = null; audioUrlSeenByEffect = null
+    }
+    // Same setMediaItem-at-position pattern as the subtitle switch: swap the
+    // merged audio source (PlaybackService reads extras "audioUrl") in place
+    LaunchedEffect(selectedAudioUrl, mediaController) {
+        val sel = selectedAudioUrl ?: return@LaunchedEffect
+        if (sel == audioUrlSeenByEffect) return@LaunchedEffect
+        audioUrlSeenByEffect = sel
+        val mc = mediaController ?: return@LaunchedEffect
+        val item = mc.currentMediaItem ?: return@LaunchedEffect
+        val pos = mc.currentPosition
+        val newItem = item.buildUpon()
+            .setRequestMetadata(MediaItem.RequestMetadata.Builder()
+                .setExtras(Bundle().apply { putString("audioUrl", sel) }).build())
+            .build()
         val wasPlaying = mc.isPlaying || mc.playWhenReady
         mc.setMediaItem(newItem, pos)
         mc.prepare()
@@ -1571,8 +1609,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             item {
                 Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        // DeArrow community title when available (Settings-gated)
                         Text(
-                            details.title,
+                            altTitle ?: details.title,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold, lineHeight = 24.sp),
                             color = MaterialTheme.colorScheme.onBackground
@@ -1681,6 +1720,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 chipHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 vm.toggleFavorite()
                             }
+                            // Real dislike count via Return YouTube Dislike (display only)
+                            dislikesCount?.let { dk ->
+                                ActionChip(icon = Icons.Rounded.ThumbDownOffAlt, label = formatViews(dk)) {}
+                            }
                             ActionChip(icon = Icons.Rounded.Share, label = "Share") {
                                 // Share at the current position (YouTube-style ?t= link)
                                 val posSec = playerPosition / 1000
@@ -1729,6 +1772,26 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             onClick = { currentSpeed = speed; mediaController?.setPlaybackSpeed(speed); showSpeedMenu = false }
                                         )
                                     }
+                                    // Per-channel speed memory: this channel's videos
+                                    // will open at the remembered speed from now on
+                                    if (details.uploaderUrl.isNotEmpty()) {
+                                        HorizontalDivider()
+                                        val savedChSpeed = channelSpeeds[details.uploaderUrl]
+                                        DropdownMenuItem(
+                                            text = { Text(
+                                                if (savedChSpeed != null) "Forget channel speed (${savedChSpeed}x)"
+                                                else "Remember ${currentSpeed}x for this channel",
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                val target = if (savedChSpeed != null) null else currentSpeed
+                                                playerScope.launch {
+                                                    prefs.setChannelSpeed(details.uploaderUrl, target)
+                                                }
+                                                showSpeedMenu = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                             // Quality selector
@@ -1775,6 +1838,47 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                         vm.savePosition(videoUrl, mediaController?.currentPosition ?: 0L)
                                                         vm.rememberQuality(h)
                                                         vm.changeQuality(videoUrl, h)
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            // Audio language picker (only for multi-audio videos)
+                            if (details.audioTracks.size > 1) {
+                                Box {
+                                    TextButton(onClick = { showAudioMenu = true },
+                                        modifier = Modifier.height(34.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp)) {
+                                        Icon(Icons.Rounded.Translate, null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            selectedAudioName?.substringBefore(" (")
+                                                ?: details.audioTracks.firstOrNull { it.isOriginal }?.name?.substringBefore(" (")
+                                                ?: "Audio",
+                                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    DropdownMenu(expanded = showAudioMenu, onDismissRequest = { showAudioMenu = false }) {
+                                        details.audioTracks.forEach { track ->
+                                            val selected = track.url == (selectedAudioUrl
+                                                ?: details.audioTracks.firstOrNull { it.isOriginal }?.url)
+                                            DropdownMenuItem(
+                                                text = { Text(track.name,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
+                                                trailingIcon = {
+                                                    if (selected) Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
+                                                },
+                                                onClick = {
+                                                    showAudioMenu = false
+                                                    if (track.url != selectedAudioUrl) {
+                                                        selectedAudioUrl = track.url
+                                                        selectedAudioName = track.name
                                                     }
                                                 }
                                             )

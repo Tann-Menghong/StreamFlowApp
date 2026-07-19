@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -108,8 +109,11 @@ fun VideoCard(
         label         = "card_scale"
     )
 
-    // MODERN design: soft tonal card container; CLASSIC: original flat layout
-    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
+    // MODERN: soft tonal card; AURORA: translucent card with a gradient hairline
+    // border (the "glass" look); CLASSIC: original flat layout
+    val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
+    val modernStyle = designStyle != "CLASSIC"
+    val auroraStyle = designStyle == "AURORA"
     Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = if (modernStyle) 18.dp else 20.dp)) {
         Column(
             modifier = Modifier
@@ -118,10 +122,22 @@ fun VideoCard(
                     // MODERN: an elevated media card — real depth (shadow + a lighter
                     // surface than the page) with an edge-to-edge thumbnail, so the feed
                     // reads as a stack of distinct cards, not a flat wall of thumbnails.
-                    if (modernStyle) Modifier
-                        .shadow(6.dp, RoundedCornerShape((corner + 10).dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                    else Modifier
+                    when {
+                        auroraStyle -> Modifier
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(listOf(
+                                    MaterialTheme.colorScheme.primary.copy(0.55f),
+                                    MaterialTheme.colorScheme.tertiary.copy(0.35f),
+                                    MaterialTheme.colorScheme.primary.copy(0.15f))),
+                                shape = RoundedCornerShape((corner + 10).dp))
+                            .clip(RoundedCornerShape((corner + 10).dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.35f))
+                        modernStyle -> Modifier
+                            .shadow(6.dp, RoundedCornerShape((corner + 10).dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                        else -> Modifier
+                    }
                 )
                 // Keyed on the video: pointerInput(Unit) froze the FIRST video's
                 // click/long-press closures, so after an in-place feed refresh a tap

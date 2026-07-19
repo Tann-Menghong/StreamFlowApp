@@ -48,12 +48,20 @@ fun MiniPlayerBar(
         }
     }
 
-    // MODERN design: floating rounded card; CLASSIC: original full-width bar
-    val modernStyle = com.streamflow.ui.theme.LocalDesignStyle.current == "MODERN"
+    // MODERN: floating rounded card; AURORA: adds a gradient hairline border;
+    // CLASSIC: original full-width bar
+    val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
+    val modernStyle = designStyle != "CLASSIC"
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 8.dp,
         shadowElevation = 6.dp,
+        border = if (designStyle == "AURORA")
+            androidx.compose.foundation.BorderStroke(1.dp,
+                androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                    MaterialTheme.colorScheme.primary.copy(0.55f),
+                    MaterialTheme.colorScheme.tertiary.copy(0.35f))))
+        else null,
         shape = if (modernStyle) RoundedCornerShape(16.dp)
                 else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier

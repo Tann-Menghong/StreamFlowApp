@@ -24,6 +24,13 @@ data class SubtitleTrack(
     val mimeType: String = "text/vtt"
 )
 
+// A selectable audio language (YouTube multi-audio / dubbed tracks)
+data class AudioTrackOption(
+    val name: String,
+    val url: String,
+    val isOriginal: Boolean
+)
+
 // Seek-preview sprite sheets (YouTube storyboards): each url is a grid page of
 // frames laid out framesPerPageX × framesPerPageY, one frame per durationPerFrameMs
 data class Storyboard(
@@ -57,5 +64,7 @@ data class VideoDetails(
     val isLive: Boolean = false,
     val videoCodec: String = "",
     val storyboard: Storyboard? = null,
-    val uploadedAgo: String = ""
+    val uploadedAgo: String = "",
+    // Only populated when the video has MORE than one audio language
+    val audioTracks: List<AudioTrackOption> = emptyList()
 )

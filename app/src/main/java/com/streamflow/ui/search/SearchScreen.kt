@@ -130,11 +130,58 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     // Results animate in only once — scrolling back up used to
                     // replay the fade on every card that re-entered view
                     val animatedUrls = remember { mutableSetOf<String>() }
+                    val durFilter by vm.durationFilter.collectAsState()
+                    val dtFilter by vm.dateFilter.collectAsState()
+                    val shown = s.videos.filter {
+                        durFilter.matches(it.duration) && dtFilter.matches(it.uploadedEpoch)
+                    }
+                    Column(Modifier.fillMaxSize()) {
+                    // Filter chips: duration + upload date (applied client-side)
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        var showDurMenu by remember { mutableStateOf(false) }
+                        var showDateMenu by remember { mutableStateOf(false) }
+                        Box {
+                            FilterChip(
+                                selected = durFilter != DurationFilter.ANY,
+                                onClick = { showDurMenu = true },
+                                label = { Text(if (durFilter == DurationFilter.ANY) "Length" else durFilter.label) }
+                            )
+                            DropdownMenu(expanded = showDurMenu, onDismissRequest = { showDurMenu = false }) {
+                                DurationFilter.entries.forEach { f ->
+                                    DropdownMenuItem(text = { Text(f.label) },
+                                        onClick = { vm.durationFilter.value = f; showDurMenu = false })
+                                }
+                            }
+                        }
+                        Box {
+                            FilterChip(
+                                selected = dtFilter != DateFilter.ANY,
+                                onClick = { showDateMenu = true },
+                                label = { Text(if (dtFilter == DateFilter.ANY) "Upload date" else dtFilter.label) }
+                            )
+                            DropdownMenu(expanded = showDateMenu, onDismissRequest = { showDateMenu = false }) {
+                                DateFilter.entries.forEach { f ->
+                                    DropdownMenuItem(text = { Text(f.label) },
+                                        onClick = { vm.dateFilter.value = f; showDateMenu = false })
+                                }
+                            }
+                        }
+                    }
+                    if (shown.isEmpty() && s.videos.isNotEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No results match these filters",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else
                     LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    itemsIndexed(s.videos, key = { _, v -> v.url }) { index, video ->
+                    itemsIndexed(shown, key = { _, v -> v.url }) { index, video ->
                         var visible by remember { mutableStateOf(video.url in animatedUrls) }
                         LaunchedEffect(Unit) {
                             if (!visible) {
@@ -153,6 +200,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                             }
                         }
                     }
+                }
                 }
                 }
             }

@@ -80,6 +80,16 @@ class AppPreferences(private val context: Context) {
 
         val CACHED_FEED_KEY = stringPreferencesKey("cached_feed") // last home feed snapshot for instant startup
 
+        // Pro features (v4.2.0)
+        val SHOW_DISLIKES_KEY  = booleanPreferencesKey("show_dislikes")   // Return YouTube Dislike
+        val DEARROW_KEY        = booleanPreferencesKey("dearrow_titles")  // clickbait-free titles
+        val SPONSOR_CATS_KEY   = stringPreferencesKey("sponsor_categories") // CSV; empty = auto-skip off
+        val CHANNEL_SPEEDS_KEY = stringPreferencesKey("channel_speeds")   // JSON {channelUrl: speed}
+        val AUTO_BACKUP_KEY    = booleanPreferencesKey("auto_backup")     // weekly JSON backup
+
+        val DEFAULT_SPONSOR_CATS = setOf(
+            "sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic")
+
         @Volatile private var INSTANCE: AppPreferences? = null
         fun get(context: Context) = INSTANCE ?: synchronized(this) {
             AppPreferences(context.applicationContext).also { INSTANCE = it }
@@ -197,6 +207,34 @@ class AppPreferences(private val context: Context) {
             }
         } catch (_: Exception) { emptyList() }
     }
+
+    // ── Pro features (v4.2.0) ────────────────────────────────────────────────
+    val showDislikes: Flow<Boolean> = context.dataStore.data.map { it[SHOW_DISLIKES_KEY] ?: true }
+    val deArrow     : Flow<Boolean> = context.dataStore.data.map { it[DEARROW_KEY] ?: true }
+    // All SponsorBlock categories on by default; an empty set disables auto-skip
+    val sponsorCategories: Flow<Set<String>> = context.dataStore.data.map { p ->
+        p[SPONSOR_CATS_KEY]?.split(",")?.filter { it.isNotBlank() }?.toSet()
+            ?: DEFAULT_SPONSOR_CATS
+    }
+    val channelSpeeds: Flow<Map<String, Float>> = context.dataStore.data.map { p ->
+        try {
+            val o = org.json.JSONObject(p[CHANNEL_SPEEDS_KEY] ?: "{}")
+            o.keys().asSequence().associateWith { k -> o.getDouble(k).toFloat() }
+        } catch (_: Exception) { emptyMap() }
+    }
+    val autoBackup: Flow<Boolean> = context.dataStore.data.map { it[AUTO_BACKUP_KEY] ?: false }
+
+    suspend fun setShowDislikes(v: Boolean) = context.dataStore.edit { it[SHOW_DISLIKES_KEY] = v }
+    suspend fun setDeArrow(v: Boolean)      = context.dataStore.edit { it[DEARROW_KEY] = v }
+    suspend fun setSponsorCategories(v: Set<String>) =
+        context.dataStore.edit { it[SPONSOR_CATS_KEY] = v.joinToString(",") }
+    // speed == null removes the per-channel override
+    suspend fun setChannelSpeed(channelUrl: String, speed: Float?) = context.dataStore.edit { p ->
+        val o = try { org.json.JSONObject(p[CHANNEL_SPEEDS_KEY] ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+        if (speed == null) o.remove(channelUrl) else o.put(channelUrl, speed.toDouble())
+        p[CHANNEL_SPEEDS_KEY] = o.toString()
+    }
+    suspend fun setAutoBackup(v: Boolean)   = context.dataStore.edit { it[AUTO_BACKUP_KEY] = v }
 
     suspend fun setTheme(v: String)    = context.dataStore.edit { it[THEME_KEY]    = v }
     suspend fun setQuality(v: String)  = context.dataStore.edit { it[QUALITY_KEY]  = v }
