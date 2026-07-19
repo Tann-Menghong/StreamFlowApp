@@ -12,4 +12,7 @@
     <string name="shortcut_library">Library</string>
     <string name="widget_search">Search</string>
     <string name="widget_description">Quick actions: Search, Subscriptions and Library</string>
+    <string name="widget_latest_title">Latest uploads</string>
+    <string name="widget_latest_empty">New uploads from your subscriptions appear here</string>
+    <string name="widget_latest_description">Newest videos from your subscribed channels</string>
 </resources>

@@ -196,8 +196,13 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
     // nothing. MainActivity bumps the nonce on every routed intent.
     LaunchedEffect(startUrl, startDest, intentNonce) {
         if (startUrl != null) {
-            // Pure playlist links open the playlist screen; watch links open the player
-            if (startUrl.contains("/playlist") && startUrl.contains("list=")) {
+            // Channel links (incl. launcher shortcuts) open the channel screen;
+            // pure playlist links the playlist screen; watch links the player
+            val isChannelUrl = listOf("/channel/", "/@", "/c/", "/user/").any { startUrl.contains(it) } &&
+                !startUrl.contains("watch?") && !startUrl.contains("/shorts/")
+            if (isChannelUrl) {
+                navController.navigate(Screen.Channel.createRoute(startUrl))
+            } else if (startUrl.contains("/playlist") && startUrl.contains("list=")) {
                 navController.navigate(Screen.YtPlaylist.createRoute(startUrl))
             } else {
                 navController.navigate(Screen.Player.createRoute(startUrl))

@@ -26,6 +26,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.StreamFlow"
+        android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true">
 
         <!-- singleTask: sharing a link / tapping a shortcut while the app is open
@@ -83,6 +84,27 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_quick_access_info" />
         </receiver>
+
+        <receiver
+            android:name=".widget.LatestUploadsWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_latest_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.LatestUploadsService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <!-- "Watch later" action on new-upload notifications -->
+        <receiver
+            android:name=".data.WatchLaterReceiver"
+            android:exported="false" />
 
         <!-- Not exported: DownloadManager delivers ACTION_DOWNLOAD_COMPLETE directly
              to the app that enqueued the download, so exported=true only let other

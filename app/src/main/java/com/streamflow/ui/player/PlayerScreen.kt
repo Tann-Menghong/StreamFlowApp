@@ -115,6 +115,8 @@ fun PlayerScreen(
     // Return YouTube Dislike + DeArrow community title (both pref-gated in the VM)
     val dislikesCount by vm.dislikes.collectAsState()
     val altTitle by vm.altTitle.collectAsState()
+    // Clip-moment bookmarks shown as amber markers on the seekbar
+    val videoBookmarks by vm.videoBookmarks.collectAsState()
     val playerScope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = context as? Activity
@@ -594,6 +596,7 @@ fun PlayerScreen(
     // a remember{}-based timer died on every autoplay video switch (the player
     // entry is replaced), letting playback run all night. This is display only.
     val sleepDeadline by com.streamflow.data.SleepTimer.deadlineAt.collectAsState()
+    val sleepEndOfVideo by com.streamflow.data.SleepTimer.endOfVideo.collectAsState()
     var sleepRemaining by remember { mutableLongStateOf(0L) }
     var showSleepMenu by remember { mutableStateOf(false) }
 
@@ -647,6 +650,9 @@ fun PlayerScreen(
             delay(500L)
             val mc = mediaController ?: continue
             if (mc.playbackState == Player.STATE_ENDED && mc.currentPosition > 0L) {
+                // "End of video" sleep: the service pauses playback — nothing
+                // may auto-advance past it, not even the queue
+                if (sleepEndOfVideo) break
                 // Queue takes priority over related video auto-play (and plays
                 // regardless of the toggle — queueing is explicit user intent)
                 if (PlaybackQueue.hasNext()) {
@@ -1060,17 +1066,23 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             Box {
                                 IconButton(onClick = { showSleepMenu = true }) {
                                     Icon(Icons.Rounded.Bedtime, "Sleep timer",
-                                        tint = if (sleepRemaining > 0L) MaterialTheme.colorScheme.primary else Color.White)
+                                        tint = if (sleepRemaining > 0L || sleepEndOfVideo)
+                                            MaterialTheme.colorScheme.primary else Color.White)
                                 }
                                 DropdownMenu(expanded = showSleepMenu, onDismissRequest = { showSleepMenu = false }) {
                                     listOf(0 to "Off", 15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "60 min").forEach { (mins, label) ->
-                                        val active = if (mins == 0) sleepRemaining <= 0L
+                                        val active = if (mins == 0) sleepRemaining <= 0L && !sleepEndOfVideo
                                                      else sleepRemaining > 0L && com.streamflow.data.SleepTimer.activeMinutes == mins
                                         DropdownMenuItem(
                                             text = { Text(label, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal) },
                                             onClick = { com.streamflow.data.SleepTimer.set(mins); showSleepMenu = false }
                                         )
                                     }
+                                    DropdownMenuItem(
+                                        text = { Text("End of this video",
+                                            fontWeight = if (sleepEndOfVideo) FontWeight.Bold else FontWeight.Normal) },
+                                        onClick = { com.streamflow.data.SleepTimer.setEndOfVideo(); showSleepMenu = false }
+                                    )
                                 }
                             }
                             IconButton(onClick = { isLocked = true }) {
@@ -1520,6 +1532,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                     modifier = Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 4.dp)
                                                 )
                                                 ChapterTicks(s.details.chapters, playerDuration,
+                                                    Modifier.matchParentSize().padding(horizontal = 12.dp))
+                                                BookmarkTicks(videoBookmarks.map { it.positionMs }, playerDuration,
                                                     Modifier.matchParentSize().padding(horizontal = 12.dp))
                                             }
                                         }
@@ -2589,6 +2603,27 @@ private fun ChapterTicks(
                 color = Color.Black.copy(0.6f),
                 topLeft = Offset(x - tickW / 2, size.height / 2 - tickH / 2),
                 size = androidx.compose.ui.geometry.Size(tickW, tickH)
+            )
+        }
+    }
+}
+
+// Amber dots marking the user's "clip moment" bookmarks on the seekbar
+@Composable
+private fun BookmarkTicks(
+    positionsMs: List<Long>,
+    durationMs: Long,
+    modifier: Modifier
+) {
+    if (positionsMs.isEmpty() || durationMs <= 0L) return
+    androidx.compose.foundation.Canvas(modifier) {
+        val r = 3.dp.toPx()
+        positionsMs.forEach { pos ->
+            val x = (pos.toFloat() / durationMs).coerceIn(0f, 1f) * size.width
+            drawCircle(
+                color = Color(0xFFFFC107),
+                radius = r,
+                center = Offset(x, size.height / 2)
             )
         }
     }

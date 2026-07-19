@@ -42,19 +42,30 @@ class PlaybackService : MediaSessionService() {
     private var audioSessionId = 0
     private var equalizer: android.media.audiofx.Equalizer? = null
     private var eqPresetName = "OFF"
+    private var customBands: List<Int> = emptyList() // millibels, for CUSTOM
 
-    // Apply the user's chosen equalizer preset (matched by name — indices vary per device)
+    // Apply the user's chosen equalizer preset (matched by name — indices vary
+    // per device), or the hand-tuned band levels when the preset is "CUSTOM"
     private fun applyEq() {
         try {
             equalizer?.release()
             equalizer = null
             if (eqPresetName == "OFF" || audioSessionId == 0) return
             val eq = android.media.audiofx.Equalizer(0, audioSessionId)
-            val idx = (0 until eq.numberOfPresets).firstOrNull {
-                eq.getPresetName(it.toShort()).equals(eqPresetName, ignoreCase = true)
+            if (eqPresetName == "CUSTOM") {
+                val range = eq.bandLevelRange // [min, max] millibels
+                for (i in 0 until eq.numberOfBands) {
+                    val lvl = (customBands.getOrNull(i) ?: 0)
+                        .coerceIn(range[0].toInt(), range[1].toInt())
+                    eq.setBandLevel(i.toShort(), lvl.toShort())
+                }
+            } else {
+                val idx = (0 until eq.numberOfPresets).firstOrNull {
+                    eq.getPresetName(it.toShort()).equals(eqPresetName, ignoreCase = true)
+                }
+                if (idx == null) { eq.release(); return }
+                eq.usePreset(idx.toShort())
             }
-            if (idx == null) { eq.release(); return }
-            eq.usePreset(idx.toShort())
             eq.enabled = true
             equalizer = eq
         } catch (_: Exception) { equalizer = null }
@@ -135,6 +146,18 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         audioSessionId = player.audioSessionId
+        // "End of video" sleep mode: stop right here when the video finishes —
+        // enforced in the service (like the timed deadline) so autoplay screen
+        // churn can't cancel it
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == androidx.media3.common.Player.STATE_ENDED &&
+                    com.streamflow.data.SleepTimer.endOfVideo.value) {
+                    player.pause()
+                    com.streamflow.data.SleepTimer.clear()
+                }
+            }
+        })
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onAudioSessionIdChanged(
                 eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
@@ -158,6 +181,12 @@ class PlaybackService : MediaSessionService() {
             (application as StreamFlowApp).prefs.eqPreset.distinctUntilChanged().collect { v ->
                 eqPresetName = v
                 applyEq()
+            }
+        }
+        serviceScope.launch {
+            (application as StreamFlowApp).prefs.eqBands.distinctUntilChanged().collect { v ->
+                customBands = v
+                if (eqPresetName == "CUSTOM") applyEq()
             }
         }
 

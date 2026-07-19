@@ -86,6 +86,8 @@ class AppPreferences(private val context: Context) {
         val SPONSOR_CATS_KEY   = stringPreferencesKey("sponsor_categories") // CSV; empty = auto-skip off
         val CHANNEL_SPEEDS_KEY = stringPreferencesKey("channel_speeds")   // JSON {channelUrl: speed}
         val AUTO_BACKUP_KEY    = booleanPreferencesKey("auto_backup")     // weekly JSON backup
+        val EQ_BANDS_KEY       = stringPreferencesKey("eq_bands")         // CSV millibels for eqPreset=CUSTOM
+        val WIDGET_FEED_KEY    = stringPreferencesKey("widget_feed")      // JSON array feeding LatestUploadsWidget
 
         val DEFAULT_SPONSOR_CATS = setOf(
             "sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic")
@@ -223,6 +225,13 @@ class AppPreferences(private val context: Context) {
         } catch (_: Exception) { emptyMap() }
     }
     val autoBackup: Flow<Boolean> = context.dataStore.data.map { it[AUTO_BACKUP_KEY] ?: false }
+    // Custom equalizer band levels in millibels (used when eqPreset == "CUSTOM")
+    val eqBands: Flow<List<Int>> = context.dataStore.data.map { p ->
+        p[EQ_BANDS_KEY]?.split(",")?.mapNotNull { it.trim().toIntOrNull() } ?: emptyList()
+    }
+    // Latest-uploads feed cached for the home-screen widget (JSON array of
+    // {title,url,thumb,channel}); written by NewVideosWorker
+    val widgetFeed: Flow<String> = context.dataStore.data.map { it[WIDGET_FEED_KEY] ?: "[]" }
 
     suspend fun setShowDislikes(v: Boolean) = context.dataStore.edit { it[SHOW_DISLIKES_KEY] = v }
     suspend fun setDeArrow(v: Boolean)      = context.dataStore.edit { it[DEARROW_KEY] = v }
@@ -235,6 +244,8 @@ class AppPreferences(private val context: Context) {
         p[CHANNEL_SPEEDS_KEY] = o.toString()
     }
     suspend fun setAutoBackup(v: Boolean)   = context.dataStore.edit { it[AUTO_BACKUP_KEY] = v }
+    suspend fun setEqBands(v: List<Int>)    = context.dataStore.edit { it[EQ_BANDS_KEY] = v.joinToString(",") }
+    suspend fun setWidgetFeed(v: String)    = context.dataStore.edit { it[WIDGET_FEED_KEY] = v }
 
     suspend fun setTheme(v: String)    = context.dataStore.edit { it[THEME_KEY]    = v }
     suspend fun setQuality(v: String)  = context.dataStore.edit { it[QUALITY_KEY]  = v }

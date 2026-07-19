@@ -78,6 +78,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val sponsorCategories = prefs.sponsorCategories.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
         com.streamflow.data.local.AppPreferences.DEFAULT_SPONSOR_CATS)
     val autoBackup     = prefs.autoBackup.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val eqBands        = prefs.eqBands.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── On-device AI ──────────────────────────────────────────────
     val aiState = com.streamflow.data.ai.AiEngine.downloadState
@@ -207,6 +208,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setShowDislikes(v: Boolean)      = viewModelScope.launch { prefs.setShowDislikes(v) }
     fun setDeArrow(v: Boolean)           = viewModelScope.launch { prefs.setDeArrow(v) }
     fun setSponsorCategories(v: Set<String>) = viewModelScope.launch { prefs.setSponsorCategories(v) }
+    fun setEqBands(v: List<Int>)         = viewModelScope.launch { prefs.setEqBands(v) }
     fun setAutoBackup(v: Boolean) = viewModelScope.launch {
         prefs.setAutoBackup(v)
         val wm = androidx.work.WorkManager.getInstance(getApplication())
@@ -277,6 +279,42 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     if (imported > 0) "Subscribed to $imported channels"
                     else "Import failed — use a Takeout CSV or NewPipe JSON export",
                     android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // ── OPML export: standard subscriptions format for RSS/podcast apps ──────
+    fun exportOpml(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val ok = try {
+                fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;")
+                    .replace(">", "&gt;").replace("\"", "&quot;")
+                val subs = db.subscriptionDao().getAllOnce()
+                val sb = StringBuilder()
+                sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+                sb.append("<opml version=\"1.1\">\n<head><title>StreamFlow subscriptions</title></head>\n")
+                sb.append("<body>\n<outline text=\"YouTube\" title=\"YouTube\">\n")
+                subs.forEach { s ->
+                    // Channel-id URLs get the official RSS feed; handle/custom
+                    // URLs fall back to the channel page link
+                    val id = s.channelUrl.substringAfter("/channel/", "").substringBefore("/").substringBefore("?")
+                    val feed = if (id.isNotBlank())
+                        "https://www.youtube.com/feeds/videos.xml?channel_id=$id"
+                    else s.channelUrl
+                    val name = esc(s.name.ifBlank { s.channelUrl })
+                    sb.append("  <outline text=\"$name\" title=\"$name\" type=\"rss\" " +
+                        "xmlUrl=\"${esc(feed)}\" htmlUrl=\"${esc(s.channelUrl)}\"/>\n")
+                }
+                sb.append("</outline>\n</body>\n</opml>\n")
+                app.contentResolver.openOutputStream(uri)?.use {
+                    it.write(sb.toString().toByteArray())
+                } != null
+            } catch (_: Exception) { false }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(app,
+                    if (ok) "OPML exported" else "Export failed",
+                    android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,6 +40,32 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
+
+    // Voice search via the system speech recognizer (follows the device language)
+    val voiceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { spoken ->
+                query = spoken
+                vm.search(spoken)
+            }
+    }
+    val voiceContext = androidx.compose.ui.platform.LocalContext.current
+    fun startVoiceSearch() {
+        try {
+            voiceLauncher.launch(android.content.Intent(
+                android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search YouTube")
+            })
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(voiceContext,
+                "Voice search isn't available on this device",
+                android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -98,6 +125,11 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }, modifier = Modifier.size(20.dp)) {
                             Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                        }
+                    } else {
+                        IconButton(onClick = { startVoiceSearch() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Rounded.Mic, "Voice search",
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }
                     }
                 }

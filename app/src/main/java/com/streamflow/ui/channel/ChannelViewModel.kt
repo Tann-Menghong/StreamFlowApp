@@ -83,6 +83,7 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val result = repo.getChannelInfo(url, tab)
                 if (gen != loadGeneration) return@launch // superseded by a newer tab/channel switch
+                pushChannelShortcut(url, result.name)
                 _channel.value = ChannelData(
                     name = result.name,
                     avatarUrl = result.avatarUrl,
@@ -105,6 +106,27 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
     fun selectTab(tab: String) {
         if (tab == currentTab) return
         loadChannel(loadedUrl, tab)
+    }
+
+    // Long-press the launcher icon → jump straight to recently visited channels.
+    // pushDynamicShortcut handles the ranking/eviction against the app's
+    // static shortcuts automatically.
+    private fun pushChannelShortcut(channelUrl: String, name: String) {
+        if (name.isBlank()) return
+        try {
+            val ctx = getApplication<Application>()
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse(channelUrl), ctx, com.streamflow.MainActivity::class.java)
+            val shortcut = androidx.core.content.pm.ShortcutInfoCompat.Builder(
+                ctx, "channel_${channelUrl.hashCode()}")
+                .setShortLabel(name.take(24))
+                .setLongLabel(name.take(48))
+                .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(
+                    ctx, com.streamflow.R.mipmap.ic_launcher))
+                .setIntent(intent)
+                .build()
+            androidx.core.content.pm.ShortcutManagerCompat.pushDynamicShortcut(ctx, shortcut)
+        } catch (_: Exception) {}
     }
 
     fun loadMore() {

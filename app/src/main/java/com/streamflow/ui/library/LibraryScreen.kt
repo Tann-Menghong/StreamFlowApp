@@ -521,18 +521,75 @@ private fun HistoryStatsRow(history: List<HistoryEntity>) {
         if (totalMin >= 60) "${totalMin / 60}h ${totalMin % 60}m" else "${totalMin}m"
     }
 
+    // Watch activity for the last 7 days (today rightmost) + top channels —
+    // the local history is the only data source, nothing leaves the phone
+    val dayMs = 24L * 60 * 60 * 1000
+    val dayCounts = remember(history.size, dayStart) {
+        (6 downTo 0).map { d ->
+            val start = dayStart - d * dayMs
+            history.count { it.watchedAt >= start && it.watchedAt < start + dayMs }
+        }
+    }
+    val topChannels = remember(history.size) {
+        history.groupBy { it.uploaderName }
+            .filterKeys { it.isNotBlank() }
+            .map { (name, vids) -> name to vids.size }
+            .sortedByDescending { it.second }
+            .take(3)
+    }
+
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatCell("$today", "Today")
-            StatCell("$week", "This week")
-            StatCell(watchLabel, "Watch time")
+        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatCell("$today", "Today")
+                StatCell("$week", "This week")
+                StatCell(watchLabel, "Watch time")
+            }
+            val maxCount = dayCounts.max().coerceAtLeast(1)
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                dayCounts.forEach { c ->
+                    Box(
+                        Modifier
+                            .width(16.dp)
+                            .height((4 + 24 * c / maxCount).dp)
+                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                            .background(
+                                if (c > 0) MaterialTheme.colorScheme.primary.copy(0.85f)
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.15f))
+                    )
+                }
+            }
+            Text("Last 7 days", fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp))
+            if (topChannels.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Top channels:", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    topChannels.forEach { (name, count) ->
+                        Text("$name ($count)", fontSize = 11.sp, maxLines = 1,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
         }
     }
 }

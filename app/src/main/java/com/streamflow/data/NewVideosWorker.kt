@@ -41,10 +41,17 @@ class NewVideosWorker(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as? StreamFlowApp ?: return Result.success()
-        if (!app.prefs.notifyNewVideos.first()) return Result.success()
-        // During quiet hours skip entirely (baselines untouched, so the
-        // notification arrives on the first check after quiet hours end)
-        if (inQuietHours(app.prefs)) return Result.success()
+        // Notifications can be off while the latest-uploads widget still needs
+        // fresh data — only bail out when neither consumer wants the fetch.
+        // Quiet hours suppress notifications (baselines untouched, so the
+        // notification arrives on the first check after quiet hours end).
+        val notifyOn = app.prefs.notifyNewVideos.first() && !inQuietHours(app.prefs)
+        val widgetIds = try {
+            android.appwidget.AppWidgetManager.getInstance(applicationContext).getAppWidgetIds(
+                android.content.ComponentName(applicationContext,
+                    com.streamflow.widget.LatestUploadsWidget::class.java))
+        } catch (_: Exception) { IntArray(0) }
+        if (!notifyOn && widgetIds.isEmpty()) return Result.success()
 
         val repo = YouTubeRepository()
         // Only channels the user left the bell on for
@@ -65,6 +72,33 @@ class NewVideosWorker(
             }.awaitAll()
         }
 
+        // Refresh the widget feed regardless of notification settings
+        if (widgetIds.isNotEmpty()) {
+            try {
+                val arr = org.json.JSONArray()
+                latestByChannel.mapNotNull { (sub, latest) -> latest?.let { sub to it } }
+                    .sortedByDescending { it.second.uploadedEpoch }
+                    .take(10)
+                    .forEach { (sub, v) ->
+                        arr.put(org.json.JSONObject().apply {
+                            put("title", v.title)
+                            put("url", v.url)
+                            put("thumb", v.thumbnailUrl)
+                            put("channel", sub.name)
+                        })
+                    }
+                if (arr.length() > 0) {
+                    app.prefs.setWidgetFeed(arr.toString())
+                    android.appwidget.AppWidgetManager.getInstance(applicationContext)
+                        .notifyAppWidgetViewDataChanged(widgetIds, R.id.widget_latest_list)
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Baselines/notifications are skipped while notifications are off or
+        // quieted so the user still gets alerted for uploads they haven't seen
+        if (!notifyOn) return Result.success()
+
         latestByChannel.forEach { (sub, latest) ->
             if (latest == null) return@forEach
             try {
@@ -78,7 +112,7 @@ class NewVideosWorker(
                         // a new upload from the SAME channel correctly replaces its
                         // own older notification instead of stacking duplicates.
                         val notifId = 2000 + (sub.channelUrl.hashCode() and 0x7FFFFFFF) % 8000
-                        notify(notifId, sub.name, latest.title, latest.url)
+                        notify(notifId, sub.name, latest)
                         notified++
                     }
                 }
@@ -91,7 +125,7 @@ class NewVideosWorker(
         return Result.success()
     }
 
-    private fun notify(id: Int, channelName: String, videoTitle: String, videoUrl: String) {
+    private fun notify(id: Int, channelName: String, video: com.streamflow.data.model.VideoItem) {
         val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(NotificationChannel(
@@ -100,19 +134,34 @@ class NewVideosWorker(
         }
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
-            data = Uri.parse(videoUrl)
+            data = Uri.parse(video.url)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pi = PendingIntent.getActivity(
             applicationContext, id, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        // Quick-action: save to Watch later straight from the notification
+        val wlIntent = Intent(applicationContext, WatchLaterReceiver::class.java).apply {
+            putExtra("url", video.url)
+            putExtra("title", video.title)
+            putExtra("thumb", video.thumbnailUrl)
+            putExtra("channel", channelName)
+            putExtra("views", video.viewCount)
+            putExtra("duration", video.duration)
+            putExtra("notifId", id)
+        }
+        val wlPi = PendingIntent.getBroadcast(
+            applicationContext, id + 10000, wlIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(channelName)
-            .setContentText(videoTitle)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(videoTitle))
+            .setContentText(video.title)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(video.title))
             .setContentIntent(pi)
+            .addAction(0, "Watch later", wlPi)
             .setAutoCancel(true)
             .build()
         try { nm.notify(id, notification) } catch (_: Exception) {}

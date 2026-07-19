@@ -132,6 +132,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 val id = com.streamflow.data.DownloadHelper.enqueue(app, streamUrl, d.title, isAudio)
+                // Save captions alongside video downloads (English preferred)
+                if (!isAudio) {
+                    val sub = d.subtitles.firstOrNull { it.name.contains("english", ignoreCase = true) }
+                        ?: d.subtitles.firstOrNull()
+                    sub?.let { com.streamflow.data.DownloadHelper.enqueueSubtitle(app, it.url, d.title) }
+                }
                 db.downloadDao().insert(DownloadEntity(
                     url = d.url, title = d.title, thumbnailUrl = d.thumbnailUrl,
                     uploaderName = d.uploaderName, filePath = "", isAudio = isAudio,
@@ -284,6 +290,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Playback queue ────────────────────────────────────────────────────────
     val queue = PlaybackQueue.queue
+
+    // Clip-moment bookmarks for the current video (seekbar markers)
+    val videoBookmarks: StateFlow<List<com.streamflow.data.local.entity.BookmarkEntity>> = _currentUrl
+        .flatMapLatest { url ->
+            if (url.isEmpty()) flowOf(emptyList())
+            else db.bookmarkDao().getForVideo(url)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Bumped per load/quality-change so a slow older extraction can't clobber
     // a newer one (stale-response race — same pattern as ChannelViewModel)

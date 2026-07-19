@@ -279,6 +279,12 @@ fun HomeScreen(
                         }
                     },
                     actions = {
+                        // Search lives behind an icon now — the always-visible
+                        // pill was removed to keep the Home header compact
+                        IconButton(onClick = { searchExpanded = true }) {
+                            Icon(Icons.Rounded.Search, contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         if (onShortsClick != null) {
                             IconButton(onClick = onShortsClick) {
                                 Icon(Icons.Rounded.SlowMotionVideo, contentDescription = "Shorts",
@@ -326,7 +332,9 @@ fun HomeScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background)
                 )
-                // Persistent rounded search bar — always visible; tap to focus and type
+                // Search field — hidden by default, opened from the top-bar
+                // search icon (user asked for the Home search bar to be hidden)
+                if (searchExpanded) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -340,12 +348,6 @@ fun HomeScreen(
                         Modifier
                             .fillMaxWidth()
                             .height(48.dp)
-                            .then(
-                                if (!searchExpanded) Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication        = null
-                                ) { searchExpanded = true } else Modifier
-                            )
                             .padding(start = 16.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -353,7 +355,6 @@ fun HomeScreen(
                         Icon(Icons.Rounded.Search, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp))
-                        if (searchExpanded) {
                             BasicTextField(
                                 value          = searchText,
                                 onValueChange  = { searchText = it; vm.fetchSuggestions(it) },
@@ -417,24 +418,8 @@ fun HomeScreen(
                             LaunchedEffect(Unit) {
                                 delay(80); focusRequester.requestFocus()
                             }
-                        } else {
-                            Text(
-                                "Search YouTube…",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick  = launchVoiceSearch,
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(Icons.Rounded.Mic, "Voice search",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp))
-                            }
-                        }
                     }
+                }
                 }
                 // Recent searches — shown when search bar is open and user hasn't typed yet
                 AnimatedVisibility(

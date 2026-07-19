@@ -9,6 +9,10 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC")
     fun getAll(): Flow<List<BookmarkEntity>>
 
+    // Markers on the player seekbar for the video being watched
+    @Query("SELECT * FROM bookmarks WHERE videoUrl = :url ORDER BY positionMs ASC")
+    fun getForVideo(url: String): Flow<List<BookmarkEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: BookmarkEntity)
 

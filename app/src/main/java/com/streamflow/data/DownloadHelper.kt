@@ -44,6 +44,24 @@ object DownloadHelper {
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         return dm.enqueue(request)
     }
+
+    // Companion subtitle file for a video download (same base name, .vtt) —
+    // fire-and-forget: no Room row, failures just mean no offline captions
+    fun enqueueSubtitle(context: Context, subtitleUrl: String, title: String) {
+        try {
+            val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80)
+                .trim().ifBlank { "video-${System.currentTimeMillis()}" }
+            val request = DownloadManager.Request(Uri.parse(subtitleUrl))
+                .setTitle("$title (subtitles)")
+                .setMimeType("text/vtt")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+                .setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS, "StreamFlow/$safeName.vtt")
+                .setAllowedOverMetered(true)
+            (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager)
+                .enqueue(request)
+        } catch (_: Exception) {}
+    }
 }
 
 // Updates the Room record when the system DownloadManager finishes a download

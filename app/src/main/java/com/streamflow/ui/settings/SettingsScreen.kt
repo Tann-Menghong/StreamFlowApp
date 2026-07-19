@@ -334,6 +334,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val autoBackup           by vm.autoBackup.collectAsState()
     var showSponsorDialog    by remember { mutableStateOf(false) }
     var showDesignDialog     by remember { mutableStateOf(false) }
+    var showEqBandsDialog    by remember { mutableStateOf(false) }
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -344,6 +345,9 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val importSubsLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) vm.importSubscriptions(uri) }
+    val opmlLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/xml")
+    ) { uri -> if (uri != null) vm.exportOpml(uri) }
     val update               by vm.update.collectAsState()
     val context              = LocalContext.current
 
@@ -592,7 +596,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         ) { showBoostDialog = true }
                         SettingsDivider()
                         SettingsItem(Icons.Rounded.GraphicEq, "Equalizer",
-                            if (eqPreset == "OFF") "Off" else eqPreset
+                            when (eqPreset) { "OFF" -> "Off"; "CUSTOM" -> "Custom 🎚"; else -> eqPreset }
                         ) { showEqDialog = true }
                     }
                     SettingsGroupLabel("Smart extras")
@@ -710,6 +714,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         "From a Google Takeout CSV or NewPipe export"
                     ) { importSubsLauncher.launch(arrayOf("text/csv", "text/comma-separated-values",
                         "application/json", "text/*", "application/octet-stream")) }
+                    SettingsDivider()
+                    SettingsItem(Icons.Rounded.RssFeed, "Export subscriptions (OPML)",
+                        "Standard format for RSS & podcast apps"
+                    ) { opmlLauncher.launch("streamflow-subscriptions.opml") }
                 }
 
                 "About" -> SettingsCard {
@@ -785,13 +793,58 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     if (showEqDialog) {
         // Standard Android preset names; the playback service matches by name
         // and silently ignores presets a device doesn't have
-        val eqOpts = listOf("OFF" to "Off", "Normal" to "Normal", "Classical" to "Classical",
+        val eqOpts = listOf("OFF" to "Off", "CUSTOM" to "Custom (band sliders) 🎚",
+            "Normal" to "Normal", "Classical" to "Classical",
             "Dance" to "Dance", "Flat" to "Flat", "Folk" to "Folk",
             "Heavy Metal" to "Heavy metal", "Hip Hop" to "Hip hop",
             "Jazz" to "Jazz", "Pop" to "Pop", "Rock" to "Rock")
         PickerDialog("Equalizer", eqOpts.map { it.second },
             eqOpts.indexOfFirst { it.first == eqPreset }.coerceAtLeast(0),
-            { vm.setEqPreset(eqOpts[it].first); showEqDialog = false }, { showEqDialog = false })
+            { i ->
+                vm.setEqPreset(eqOpts[i].first); showEqDialog = false
+                if (eqOpts[i].first == "CUSTOM") showEqBandsDialog = true
+            }, { showEqDialog = false })
+    }
+    if (showEqBandsDialog) {
+        // Standard 5-band Android EQ center frequencies; extra device bands
+        // simply keep the closest slider's value
+        val bandLabels = listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz")
+        val savedBands = vm.eqBands.value
+        val levels = remember {
+            mutableStateListOf(*Array(5) { i -> (savedBands.getOrNull(i) ?: 0).toFloat() })
+        }
+        AlertDialog(
+            onDismissRequest = { showEqBandsDialog = false },
+            title = { Text("Custom equalizer") },
+            text = {
+                Column {
+                    bandLabels.forEachIndexed { i, label ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, fontSize = 11.sp, modifier = Modifier.width(52.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Slider(
+                                value = levels[i],
+                                onValueChange = { levels[i] = it },
+                                valueRange = -1500f..1500f,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text("${(levels[i] / 100).toInt()} dB", fontSize = 11.sp,
+                                modifier = Modifier.width(44.dp),
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.setEqBands(levels.map { it.toInt() })
+                    showEqBandsDialog = false
+                }) { Text("Apply") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEqBandsDialog = false }) { Text("Cancel") }
+            }
+        )
     }
     if (showAccentDialog) {
         AccentPickerDialog(accentColor, { vm.setAccentColor(it); showAccentDialog = false }, { showAccentDialog = false })
