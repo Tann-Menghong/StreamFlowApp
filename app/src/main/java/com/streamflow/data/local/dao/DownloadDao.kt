@@ -18,6 +18,11 @@ interface DownloadDao {
     @Query("DELETE FROM downloads WHERE url = :url")
     suspend fun delete(url: String)
 
+    // Removes only the tapped row — delete(url) would take the other format
+    // (video vs audio) of the same video down with it
+    @Query("DELETE FROM downloads WHERE url = :url AND isAudio = :isAudio")
+    suspend fun deleteVariant(url: String, isAudio: Boolean)
+
     @Query("SELECT COUNT(*) FROM downloads")
     fun count(): Flow<Int>
 }

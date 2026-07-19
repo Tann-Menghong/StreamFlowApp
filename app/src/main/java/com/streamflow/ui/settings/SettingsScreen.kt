@@ -303,6 +303,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val language             by vm.language.collectAsState()
     val fontScale            by vm.fontScale.collectAsState()
     val showDonghua          by vm.showDonghua.collectAsState()
+    val showDrama            by vm.showDrama.collectAsState()
     val startTab             by vm.startTab.collectAsState()
     val incognito            by vm.incognito.collectAsState()
     val qualityCellular      by vm.qualityCellular.collectAsState()
@@ -498,12 +499,16 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         "Hide it from the bottom bar if you don't use it", showDonghua
                     ) { vm.setShowDonghua(it) }
                     SettingsDivider()
+                    SettingsSwitchItem(Icons.Rounded.Theaters, "Show Drama tab",
+                        "Asian dramas & movies (KissKH) in the bottom bar", showDrama
+                    ) { vm.setShowDrama(it) }
+                    SettingsDivider()
                     SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
                         "Add a dedicated Search tab to the bottom bar", showSearchTab
                     ) { vm.setShowSearchTab(it) }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.Start, "Start screen",
-                        when (startTab) { "donghua" -> "Donghua"; "library" -> "Library"; else -> "Home" }
+                        when (startTab) { "donghua" -> "Donghua"; "drama" -> "Drama (KissKH)"; "library" -> "Library"; else -> "Home" }
                     ) { showStartTabDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
@@ -810,7 +815,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             { vm.setFontScale(fontOpts[it].first); showFontDialog = false }, { showFontDialog = false })
     }
     if (showStartTabDialog) {
-        val tabOpts = listOf("home" to "Home", "donghua" to "Donghua", "library" to "Library")
+        val tabOpts = listOf("home" to "Home", "donghua" to "Donghua", "drama" to "Drama (KissKH)", "library" to "Library")
         PickerDialog("Start screen", tabOpts.map { it.second },
             tabOpts.indexOfFirst { it.first == startTab }.coerceAtLeast(0),
             { vm.setStartTab(tabOpts[it].first); showStartTabDialog = false }, { showStartTabDialog = false })

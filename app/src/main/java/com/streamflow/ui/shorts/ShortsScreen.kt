@@ -62,6 +62,10 @@ fun ShortsScreen(
     val error by vm.error.collectAsState()
     val details by vm.details.collectAsState()
     val context = LocalContext.current
+    // Battery saver promises "no prefetching" — that must cover the next
+    // short's stream resolution too, not just the main player's warm-up
+    val batterySaverOn by com.streamflow.data.local.AppPreferences.get(context)
+        .batterySaver.collectAsState(initial = false)
 
     // One shared player swapped between pages. Audio focus is requested so
     // Shorts ducks/pauses other apps' audio instead of playing over it.
@@ -134,7 +138,8 @@ fun ShortsScreen(
                 // Resolve streams for the current page and prefetch the next one
                 LaunchedEffect(pagerState.currentPage, videos.size) {
                     videos.getOrNull(pagerState.currentPage)?.let { vm.loadDetails(it.url) }
-                    videos.getOrNull(pagerState.currentPage + 1)?.let { vm.loadDetails(it.url) }
+                    if (!batterySaverOn)
+                        videos.getOrNull(pagerState.currentPage + 1)?.let { vm.loadDetails(it.url) }
                     if (pagerState.currentPage >= videos.size - 3) vm.loadMore()
                 }
 

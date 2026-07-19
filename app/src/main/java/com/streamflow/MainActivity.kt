@@ -42,8 +42,16 @@ class MainActivity : ComponentActivity() {
     // (singleTask launch mode) can route into the already-running UI
     private var pendingUrl by mutableStateOf<String?>(null)
     private var pendingDest by mutableStateOf<String?>(null)
+    // Bumped on every routed intent so NavGraph re-navigates even when the
+    // url/dest string is identical to the previous one (same video shared twice)
+    private var intentNonce by mutableStateOf(0)
 
     private fun handleIntent(intent: Intent?) {
+        // Relaunching from Recents redelivers the ORIGINAL intent — without this
+        // guard, reopening the app after a share yanked the user back into that
+        // video instead of resuming where they were
+        if (intent != null &&
+            (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
         val url = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
                 Regex("https?://(?:www\\.|m\\.)?(?:youtube\\.com|youtu\\.be)\\S+").find(text)?.value
@@ -61,8 +69,8 @@ class MainActivity : ComponentActivity() {
         // Only overwrite on a real destination — a plain launcher re-open
         // (ACTION_MAIN) must not yank the user anywhere. Setting one side
         // clears the other so the newest request always wins.
-        if (url != null) { pendingUrl = url; pendingDest = null }
-        else if (dest != null) { pendingDest = dest; pendingUrl = null }
+        if (url != null) { pendingUrl = url; pendingDest = null; intentNonce++ }
+        else if (dest != null) { pendingDest = dest; pendingUrl = null; intentNonce++ }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -135,7 +143,8 @@ class MainActivity : ComponentActivity() {
                     when (onboardingDone) {
                         null  -> Unit // waiting for DataStore, hidden behind the splash
                         false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
-                        else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest)
+                        else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest,
+                                          intentNonce = intentNonce)
                     }
                 }
             }

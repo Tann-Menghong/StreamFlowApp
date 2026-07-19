@@ -1,11 +1,13 @@
 package com.streamflow.data.local.entity
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-@Entity(tableName = "downloads")
+// Composite key: with url alone, downloading the AUDIO of a video you'd already
+// downloaded as VIDEO replaced the row (REPLACE insert) — the first download's
+// completion update then matched nothing and the finished file was orphaned
+@Entity(tableName = "downloads", primaryKeys = ["url", "isAudio"])
 data class DownloadEntity(
-    @PrimaryKey val url: String,     // original video URL
+    val url: String,                 // original video URL
     val title: String,
     val thumbnailUrl: String,
     val uploaderName: String,

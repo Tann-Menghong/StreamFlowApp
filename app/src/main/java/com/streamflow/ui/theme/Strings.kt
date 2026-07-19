@@ -11,6 +11,7 @@ object KmStrings {
         "Search" to "ស្វែងរក",
         // Bottom-bar tabs that were missing (stayed English in Khmer mode)
         "Donghua" to "ដុងហួ",
+        "Drama" to "រឿងភាគ",
         "Shorts" to "វីដេអូខ្លី",
         "Feed" to "វីដេអូថ្មីៗ",
         "Favorites" to "ចូលចិត្ត",

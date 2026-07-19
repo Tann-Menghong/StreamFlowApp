@@ -65,7 +65,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun removeDownload(url: String) = viewModelScope.launch { db.downloadDao().delete(url) }
+    // Per-variant: with the composite (url, isAudio) key, removing the audio
+    // download of a video must leave its video download alone
+    fun removeDownload(d: DownloadEntity) = viewModelScope.launch {
+        db.downloadDao().deleteVariant(d.url, d.isAudio)
+    }
 
     // Failed downloads used to dead-end (delete was the only option) — re-extract
     // a fresh stream URL and re-enqueue with the system DownloadManager

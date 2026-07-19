@@ -58,6 +58,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Home     : Screen("home",     "Home",    Icons.Rounded.Home)
     object Search   : Screen("search",   "Search",  Icons.Rounded.Search)
     object Donghua  : Screen("donghua",  "Donghua", Icons.Rounded.LiveTv)
+    object Drama    : Screen("drama",    "Drama",   Icons.Rounded.Theaters)
     object Library  : Screen("library",  "Library", Icons.Rounded.VideoLibrary)
     object Settings : Screen("settings", "Settings",Icons.Rounded.Settings)
     object SettingsCategory : Screen("settings/{category}", "Settings", Icons.Rounded.Settings) {
@@ -80,12 +81,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 private val allBottomRoutes = listOf(
-    Screen.Home.route, Screen.Search.route, Screen.Donghua.route,
+    Screen.Home.route, Screen.Search.route, Screen.Donghua.route, Screen.Drama.route,
     Screen.Library.route, Screen.Settings.route
 )
 
 @Composable
-fun NavGraph(startUrl: String? = null, startDest: String? = null) {
+fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: Int = 0) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
@@ -101,6 +102,7 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
     val appPrefs = remember { com.streamflow.data.local.AppPreferences.get(context) }
     val uiLang by appPrefs.language.collectAsState(initial = "EN")
     val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
+    val showDrama by appPrefs.showDrama.collectAsState(initial = true)
     val showSearchTab by appPrefs.showSearchTab.collectAsState(initial = false)
     val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
     val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
@@ -119,11 +121,12 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val bottomItems = remember(showDonghua, showSearchTab) {
+    val bottomItems = remember(showDonghua, showDrama, showSearchTab) {
         buildList {
             add(Screen.Home)
             if (showSearchTab) add(Screen.Search)
             if (showDonghua) add(Screen.Donghua)
+            if (showDrama) add(Screen.Drama)
             add(Screen.Library)
             add(Screen.Settings)
         }
@@ -186,9 +189,12 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
         )
     }
 
-    // Both keys: with singleTask, onNewIntent updates these while the app runs —
-    // a shortcut after a shared link (or vice versa) must re-navigate
-    LaunchedEffect(startUrl, startDest) {
+    // All three keys: with singleTask, onNewIntent updates these while the app
+    // runs — a shortcut after a shared link (or vice versa) must re-navigate.
+    // The nonce covers repeats: sharing the SAME url twice left both string
+    // keys unchanged, so the effect never re-fired and the second share did
+    // nothing. MainActivity bumps the nonce on every routed intent.
+    LaunchedEffect(startUrl, startDest, intentNonce) {
         if (startUrl != null) {
             // Pure playlist links open the playlist screen; watch links open the player
             if (startUrl.contains("/playlist") && startUrl.contains("list=")) {
@@ -308,6 +314,14 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null) {
             }
             composable(Screen.Donghua.route) {
                 DonghuaScreen(onFullscreenChange = { isDonghuaFullscreen = it })
+            }
+            composable(Screen.Drama.route) {
+                com.streamflow.ui.browser.AdblockBrowserScreen(
+                    homeUrl = "https://kisskh.co/",
+                    prefsName = "kisskh_prefs",
+                    defaultTitle = "KissKH",
+                    onFullscreenChange = { isDonghuaFullscreen = it }
+                )
             }
             composable(Screen.Library.route) {
                 LibraryScreen(

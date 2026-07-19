@@ -80,6 +80,10 @@ fun LibraryScreen(
         .map { com.streamflow.ui.theme.KmStrings.t(it, uiLang) }
     val bookmarksList by vm.bookmarks.collectAsState()
 
+    // Clear-all needs a confirmation: the sweep icon used to wipe the whole
+    // tab in ONE tap with no undo. Holds the tab index being cleared.
+    var confirmClearTab by remember { mutableStateOf<Int?>(null) }
+
     // Swipe-to-delete with Undo
     val snackbarHostState = remember { SnackbarHostState() }
     val undoScope = rememberCoroutineScope()
@@ -109,17 +113,17 @@ fun LibraryScreen(
                     scrolledContainerColor = MaterialTheme.colorScheme.background),
                 actions = {
                     AnimatedVisibility(selectedTab == 0 && favorites.isNotEmpty()) {
-                        IconButton(onClick = { vm.clearFavorites() }) {
+                        IconButton(onClick = { confirmClearTab = 0 }) {
                             Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 1 && history.isNotEmpty()) {
-                        IconButton(onClick = { vm.clearHistory() }) {
+                        IconButton(onClick = { confirmClearTab = 1 }) {
                             Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 2 && watchLater.isNotEmpty()) {
-                        IconButton(onClick = { vm.clearWatchLater() }) {
+                        IconButton(onClick = { confirmClearTab = 2 }) {
                             Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -268,6 +272,32 @@ fun LibraryScreen(
             }
         }
     }
+
+    confirmClearTab?.let { tab ->
+        val (what, count) = when (tab) {
+            0 -> "favorites" to favorites.size
+            1 -> "watch history" to history.size
+            else -> "Watch Later videos" to watchLater.size
+        }
+        AlertDialog(
+            onDismissRequest = { confirmClearTab = null },
+            title = { Text("Clear all $what?") },
+            text = { Text("This removes all $count items and can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (tab) {
+                        0 -> vm.clearFavorites()
+                        1 -> vm.clearHistory()
+                        else -> vm.clearWatchLater()
+                    }
+                    confirmClearTab = null
+                }) { Text("Clear all", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearTab = null }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -358,7 +388,7 @@ private fun DownloadList(
     downloads: List<DownloadEntity>,
     onPlay: (DownloadEntity) -> Unit,
     onRetry: (DownloadEntity) -> Unit,
-    onRemove: (String) -> Unit
+    onRemove: (DownloadEntity) -> Unit
 ) {
     if (downloads.isEmpty()) {
         EmptyState(Icons.Rounded.Download, "No downloads",
@@ -366,7 +396,9 @@ private fun DownloadList(
         return
     }
     LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-        items(downloads, key = { it.url }) { d ->
+        // Key must include the format: video + audio of the SAME url can now
+        // coexist, and a bare url key would hard-crash on the duplicate
+        items(downloads, key = { "${it.url}|${it.isAudio}" }) { d ->
             Row(
                 Modifier.fillMaxWidth()
                     .clickable { onPlay(d) }
@@ -413,7 +445,7 @@ private fun DownloadList(
                             modifier = Modifier.size(20.dp))
                     }
                 }
-                IconButton(onClick = { onRemove(d.url) }) {
+                IconButton(onClick = { onRemove(d) }) {
                     Icon(Icons.Rounded.DeleteOutline, "Remove download",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f),
                         modifier = Modifier.size(20.dp))

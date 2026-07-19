@@ -24,7 +24,7 @@ import com.streamflow.data.local.entity.WatchLaterEntity
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class, DownloadEntity::class, PlaylistEntity::class, PlaylistItemEntity::class, com.streamflow.data.local.entity.BookmarkEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -121,10 +121,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // downloads: PRIMARY KEY(url) -> (url, isAudio) so the video and audio
+        // downloads of the same video can coexist instead of replacing each other
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `downloads_new` (" +
+                    "`url` TEXT NOT NULL, `title` TEXT NOT NULL, `thumbnailUrl` TEXT NOT NULL, " +
+                    "`uploaderName` TEXT NOT NULL, `filePath` TEXT NOT NULL, `isAudio` INTEGER NOT NULL, " +
+                    "`downloadId` INTEGER NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`url`, `isAudio`))"
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO `downloads_new` " +
+                    "SELECT `url`,`title`,`thumbnailUrl`,`uploaderName`,`filePath`,`isAudio`,`downloadId`,`status`,`createdAt` FROM `downloads`"
+                )
+                db.execSQL("DROP TABLE `downloads`")
+                db.execSQL("ALTER TABLE `downloads_new` RENAME TO `downloads`")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "streamflow.db")
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     // Destructive fallback ONLY from the ancient v1 schema (no
                     // migration exists for it). The blanket fallback was a data
                     // landmine: any future version bump missing a migration would
