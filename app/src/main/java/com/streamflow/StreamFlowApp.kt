@@ -38,9 +38,15 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
         NewPipe.init(OkHttpDownloader.instance)
 
         // Warm the TLS connections to YouTube's hosts right away so the first
-        // feed load / thumbnail / video extraction skips the handshake cost
+        // feed load / thumbnail / video extraction skips the handshake cost.
+        // SponsorBlock/RYD are hit on every video open, so warm those too.
         appScope.launch(Dispatchers.IO) {
-            listOf("https://www.youtube.com/generate_204", "https://i.ytimg.com/generate_204").forEach { url ->
+            listOf(
+                "https://www.youtube.com/generate_204",
+                "https://i.ytimg.com/generate_204",
+                "https://sponsor.ajay.app/",
+                "https://returnyoutubedislikeapi.com/"
+            ).forEach { url ->
                 try {
                     OkHttpDownloader.instance.client.newCall(
                         okhttp3.Request.Builder().url(url).head().build()
@@ -81,32 +87,36 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
             } catch (_: Exception) {}
         }
 
-        // Auto-download Watch Later videos, Wi-Fi only (the worker itself no-ops
-        // when the setting is off)
-        try {
-            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                com.streamflow.data.AutoDownloadWorker.WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<com.streamflow.data.AutoDownloadWorker>(6, TimeUnit.HOURS)
-                    .setConstraints(
-                        Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
-                    )
-                    .build()
-            )
-        } catch (_: Exception) {}
+        // Off the main thread: WorkManager.getInstance does disk I/O on first
+        // touch, and these two enqueues ran synchronously during cold start
+        appScope.launch {
+            // Auto-download Watch Later videos, Wi-Fi only (the worker itself
+            // no-ops when the setting is off)
+            try {
+                WorkManager.getInstance(this@StreamFlowApp).enqueueUniquePeriodicWork(
+                    com.streamflow.data.AutoDownloadWorker.WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    PeriodicWorkRequestBuilder<com.streamflow.data.AutoDownloadWorker>(6, TimeUnit.HOURS)
+                        .setConstraints(
+                            Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+                        )
+                        .build()
+                )
+            } catch (_: Exception) {}
 
-        // Twice-daily check for a new app release (notifies once per version)
-        try {
-            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                UpdateCheckWorker.WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<UpdateCheckWorker>(12, TimeUnit.HOURS)
-                    .setConstraints(
-                        Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-                    )
-                    .build()
-            )
-        } catch (_: Exception) {}
+            // Twice-daily check for a new app release (notifies once per version)
+            try {
+                WorkManager.getInstance(this@StreamFlowApp).enqueueUniquePeriodicWork(
+                    UpdateCheckWorker.WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    PeriodicWorkRequestBuilder<UpdateCheckWorker>(12, TimeUnit.HOURS)
+                        .setConstraints(
+                            Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+                        )
+                        .build()
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     // Aggressive thumbnail caching: YouTube sends no-cache headers, so without
@@ -126,6 +136,9 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
                 .build()
         }
         .respectCacheHeaders(false)
+        // Half the memory per thumbnail on devices without RAM to spare —
+        // faster decodes and less GC pressure while scrolling
+        .allowRgb565(!com.streamflow.data.DeviceCaps.isHighPerf)
         .crossfade(true)
         .build()
 }

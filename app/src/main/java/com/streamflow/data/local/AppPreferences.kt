@@ -37,6 +37,7 @@ class AppPreferences(private val context: Context) {
         val FONT_SCALE_KEY             = stringPreferencesKey("font_scale")
         val SHOW_DONGHUA_KEY           = booleanPreferencesKey("show_donghua")
         val SHOW_DRAMA_KEY             = booleanPreferencesKey("show_drama") // KissKH tab
+        val SHOW_PDTV_KEY              = booleanPreferencesKey("show_pdtv")  // pdtvhd.com tab
         val START_TAB_KEY              = stringPreferencesKey("start_tab")
         val INCOGNITO_KEY              = booleanPreferencesKey("incognito")
         // Player
@@ -123,6 +124,7 @@ class AppPreferences(private val context: Context) {
     val fontScale           : Flow<String>  = context.dataStore.data.map { it[FONT_SCALE_KEY] ?: "DEFAULT" }
     val showDonghua         : Flow<Boolean> = context.dataStore.data.map { it[SHOW_DONGHUA_KEY] ?: true }
     val showDrama           : Flow<Boolean> = context.dataStore.data.map { it[SHOW_DRAMA_KEY] ?: true }
+    val showPdTv            : Flow<Boolean> = context.dataStore.data.map { it[SHOW_PDTV_KEY] ?: true }
     val startTab            : Flow<String>  = context.dataStore.data.map { it[START_TAB_KEY] ?: "home" }
     val incognito           : Flow<Boolean> = context.dataStore.data.map { it[INCOGNITO_KEY] ?: false }
     // Player
@@ -269,6 +271,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setFontScale(v: String)             = context.dataStore.edit { it[FONT_SCALE_KEY]             = v }
     suspend fun setShowDonghua(v: Boolean)          = context.dataStore.edit { it[SHOW_DONGHUA_KEY]           = v }
     suspend fun setShowDrama(v: Boolean)            = context.dataStore.edit { it[SHOW_DRAMA_KEY]             = v }
+    suspend fun setShowPdTv(v: Boolean)             = context.dataStore.edit { it[SHOW_PDTV_KEY]              = v }
     suspend fun setStartTab(v: String)              = context.dataStore.edit { it[START_TAB_KEY]              = v }
     suspend fun setIncognito(v: Boolean)            = context.dataStore.edit { it[INCOGNITO_KEY]              = v }
     // Player

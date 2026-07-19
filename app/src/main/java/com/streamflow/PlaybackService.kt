@@ -93,7 +93,12 @@ class PlaybackService : MediaSessionService() {
         // Reuse the app-wide client (same UA headers) so media requests share the
         // warm connection pool instead of opening cold connections
         val httpClient = com.streamflow.data.OkHttpDownloader.instance.client
-        val dsf = OkHttpDataSource.Factory(httpClient)
+        // Read-through disk cache on top: replaying a video or seeking backwards
+        // past the back-buffer streams from disk instead of the network
+        val dsf = androidx.media3.datasource.cache.CacheDataSource.Factory()
+            .setCache(com.streamflow.data.MediaCache.get(this))
+            .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(httpClient))
+            .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
         val defaultMsf = DefaultMediaSourceFactory(dsf)
         val mediaSourceFactory = object : androidx.media3.exoplayer.source.MediaSource.Factory
@@ -138,12 +143,20 @@ class PlaybackService : MediaSessionService() {
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        val player = ExoPlayer.Builder(this)
+        // Decoder fallback: if the preferred hardware decoder fails to init or
+        // errors mid-stream, try the next decoder instead of stopping playback
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true)
+
+        val player = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+        // Seeks snap to the nearest keyframe instead of decoding the whole group
+        // of frames up to the exact position — double-tap skips land instantly
+        player.setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
 
         audioSessionId = player.audioSessionId
         // "End of video" sleep mode: stop right here when the video finishes —

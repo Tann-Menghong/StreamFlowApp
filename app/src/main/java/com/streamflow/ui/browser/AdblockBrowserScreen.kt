@@ -110,7 +110,8 @@ private val AD_BLOCK_JS = """
 
 /**
  * Ad-blocked in-app browser tab pinned to one streaming site. Used by the
- * Donghua (donghuafun.com) and Drama (kisskh.co) bottom-bar tabs.
+ * Donghua (donghuafun.com), Drama (kisskh.co) and PDTV (pdtvhd.com)
+ * bottom-bar tabs.
  *
  * [prefsName] keys the per-site "last page" persistence so each tab reopens
  * where the user left off.
@@ -160,7 +161,14 @@ fun AdblockBrowserScreen(
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             mediaPlaybackRequiresUserGesture = false
             allowContentAccess = true
-            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            // Pinch-zoom as a fallback for anything that still overflows,
+            // without the legacy on-screen +/- buttons
+            setSupportZoom(true)
+            builtInZoomControls = true
+            displayZoomControls = false
+            // MOBILE user agent: the old desktop UA made these sites serve
+            // their desktop layout, which never fit the phone screen
+            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)

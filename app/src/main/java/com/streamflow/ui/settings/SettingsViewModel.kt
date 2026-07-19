@@ -48,6 +48,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val fontScale = prefs.fontScale.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DEFAULT")
     val showDonghua = prefs.showDonghua.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val showDrama = prefs.showDrama.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val showPdTv = prefs.showPdTv.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val startTab = prefs.startTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "home")
     val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val qualityCellular = prefs.qualityCellular.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SAME")
@@ -205,6 +206,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontScale(v: String)          = viewModelScope.launch { prefs.setFontScale(v) }
     fun setShowDonghua(v: Boolean)       = viewModelScope.launch { prefs.setShowDonghua(v) }
     fun setShowDrama(v: Boolean)         = viewModelScope.launch { prefs.setShowDrama(v) }
+    fun setShowPdTv(v: Boolean)          = viewModelScope.launch { prefs.setShowPdTv(v) }
     fun setShowDislikes(v: Boolean)      = viewModelScope.launch { prefs.setShowDislikes(v) }
     fun setDeArrow(v: Boolean)           = viewModelScope.launch { prefs.setDeArrow(v) }
     fun setSponsorCategories(v: Set<String>) = viewModelScope.launch { prefs.setSponsorCategories(v) }

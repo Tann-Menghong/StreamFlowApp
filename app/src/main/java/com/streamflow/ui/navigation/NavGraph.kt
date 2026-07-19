@@ -59,6 +59,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Search   : Screen("search",   "Search",  Icons.Rounded.Search)
     object Donghua  : Screen("donghua",  "Donghua", Icons.Rounded.LiveTv)
     object Drama    : Screen("drama",    "Drama",   Icons.Rounded.Theaters)
+    object PdTv     : Screen("pdtv",     "PDTV",    Icons.Rounded.Movie)
     object Library  : Screen("library",  "Library", Icons.Rounded.VideoLibrary)
     object Settings : Screen("settings", "Settings",Icons.Rounded.Settings)
     object SettingsCategory : Screen("settings/{category}", "Settings", Icons.Rounded.Settings) {
@@ -82,7 +83,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 private val allBottomRoutes = listOf(
     Screen.Home.route, Screen.Search.route, Screen.Donghua.route, Screen.Drama.route,
-    Screen.Library.route, Screen.Settings.route
+    Screen.PdTv.route, Screen.Library.route, Screen.Settings.route
 )
 
 @Composable
@@ -103,6 +104,7 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
     val uiLang by appPrefs.language.collectAsState(initial = "EN")
     val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
     val showDrama by appPrefs.showDrama.collectAsState(initial = true)
+    val showPdTv by appPrefs.showPdTv.collectAsState(initial = true)
     val showSearchTab by appPrefs.showSearchTab.collectAsState(initial = false)
     val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
     val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
@@ -121,12 +123,13 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
             android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val bottomItems = remember(showDonghua, showDrama, showSearchTab) {
+    val bottomItems = remember(showDonghua, showDrama, showPdTv, showSearchTab) {
         buildList {
             add(Screen.Home)
             if (showSearchTab) add(Screen.Search)
             if (showDonghua) add(Screen.Donghua)
             if (showDrama) add(Screen.Drama)
+            if (showPdTv) add(Screen.PdTv)
             add(Screen.Library)
             add(Screen.Settings)
         }
@@ -325,6 +328,14 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                     homeUrl = "https://kisskh.co/",
                     prefsName = "kisskh_prefs",
                     defaultTitle = "KissKH",
+                    onFullscreenChange = { isDonghuaFullscreen = it }
+                )
+            }
+            composable(Screen.PdTv.route) {
+                com.streamflow.ui.browser.AdblockBrowserScreen(
+                    homeUrl = "https://www.pdtvhd.com/",
+                    prefsName = "pdtv_prefs",
+                    defaultTitle = "PDTV",
                     onFullscreenChange = { isDonghuaFullscreen = it }
                 )
             }
