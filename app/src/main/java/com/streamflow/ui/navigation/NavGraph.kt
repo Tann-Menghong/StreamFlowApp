@@ -226,6 +226,12 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
     }
 
     Scaffold(
+        // Zero insets here: every screen's own TopAppBar already applies the
+        // status-bar inset, and the default (systemBars) made this Scaffold's
+        // innerPadding add it AGAIN — pushing all content down by a status-bar
+        // height and leaving a black band under the clock ("app not fullscreen").
+        // The nav bar handles its own navigationBarsPadding.
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         bottomBar = {
             AnimatedVisibility(
                 visible = showBottom,
