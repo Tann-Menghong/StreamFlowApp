@@ -94,7 +94,27 @@ class PdTvViewModel(app: Application) : AndroidViewModel(app) {
                 PdChannel(o.optString("n"), o.optString("u"), o.optString("l"))
                     .takeIf { it.streamUrl.isNotEmpty() }
             }
+            warmStreamHosts(_channels.value)
         } catch (_: Exception) {}
+    }
+
+    // Open TLS connections to the channel CDNs ahead of time — switching to a
+    // channel on an already-warm host skips DNS + handshake, so zapping is
+    // nearly instant. Fire-and-forget; failures don't matter.
+    private var warmedHosts = false
+    private fun warmStreamHosts(list: List<PdChannel>) {
+        if (warmedHosts || list.isEmpty()) return
+        warmedHosts = true
+        viewModelScope.launch(Dispatchers.IO) {
+            list.mapNotNull { runCatching { java.net.URL(it.streamUrl).host }.getOrNull() }
+                .distinct().take(8).forEach { host ->
+                    try {
+                        OkHttpDownloader.instance.client.newCall(
+                            okhttp3.Request.Builder().url("https://$host/").head().build()
+                        ).execute().close()
+                    } catch (_: Exception) {}
+                }
+        }
     }
 
     fun refresh() {
@@ -121,6 +141,7 @@ class PdTvViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (parsed.isNotEmpty()) {
                     _channels.value = parsed
+                    warmStreamHosts(parsed)
                     val arr = JSONArray()
                     parsed.forEach { c ->
                         arr.put(JSONObject().apply {
@@ -159,24 +180,63 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
     var playerError by remember { mutableStateOf<String?>(null) }
 
-    // One ExoPlayer for the tab's lifetime. Shares the app's warm OkHttp pool;
-    // Referer mimics the site in case a stream host checks it.
+    // One ExoPlayer for the tab's lifetime, tuned for LIVE HLS. Shares the
+    // app's warm OkHttp pool; Referer mimics the site in case a host checks it.
     val exo = remember {
         val dsf = OkHttpDataSource.Factory(OkHttpDownloader.instance.client)
             .setDefaultRequestProperties(mapOf("Referer" to "https://www.pdtvhd.com/"))
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dsf))
+        // Everything here is HLS — use the HLS factory directly so we can turn
+        // on chunkless preparation (start without downloading a probe segment)
+        // and retry flaky live segments hard before surfacing an error
+        val msf = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dsf)
+            .setAllowChunklessPreparation(true)
+            .setLoadErrorHandlingPolicy(
+                androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(8))
+        // Live profile: start with ~0.7s buffered (channel zapping feels
+        // instant) but keep building to a deep buffer so jitter never stalls
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 60_000,
+                /* bufferForPlaybackMs = */ 700,
+                /* bufferForPlaybackAfterRebufferMs = */ 2_000
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+        val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+        ExoPlayer.Builder(context, renderers)
+            .setMediaSourceFactory(msf)
+            .setLoadControl(loadControl)
             .setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true)
+            .setHandleAudioBecomingNoisy(true)
             .build()
             .apply { playWhenReady = true }
     }
+    val scope = rememberCoroutineScope()
+    var retries by remember { mutableStateOf(0) }
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) {
-                playerError = "This channel isn't responding — try another one"
+                // Live windows slide forward — falling behind isn't fatal,
+                // just rejoin the live edge
+                if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    exo.seekToDefaultPosition(); exo.prepare(); exo.play(); return
+                }
+                // Transient network drops: reconnect silently a few times
+                // before admitting defeat
+                if (retries < 3) {
+                    retries++
+                    scope.launch {
+                        kotlinx.coroutines.delay(900L * retries)
+                        exo.prepare(); exo.play()
+                    }
+                } else {
+                    playerError = "This channel isn't responding — try another one"
+                }
             }
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) playerError = null
+                if (state == Player.STATE_READY) { playerError = null; retries = 0 }
             }
         }
         exo.addListener(listener)
@@ -200,6 +260,7 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
 
     fun play(url: String) {
         playerError = null
+        retries = 0
         currentUrl = url
         vm.lastChannelUrl = url
         exo.setMediaItem(MediaItem.fromUri(url))

@@ -3,13 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "4.5.0"
+    const val VERSION_NAME = "4.5.1"
 
     val notes = listOf(
-        "PDTV is now a real Live TV player 📺 — no more black screen",
-        "The PDTV tab shows a channel grid (sports, Khmer, news, movies…) and plays streams directly in the app's own player — instant start, zero ads",
-        "Tap a channel logo to switch, tap the fullscreen button to go big; your last channel auto-plays next time",
-        "Live TV keeps your screen awake and works with the phone's volume/audio controls",
-        "Next video starts instantly ⚡ — the app pre-buffers the beginning of the likely next video while you watch"
+        "Live TV turbo 📺⚡ — PDTV channels start faster and play smoother",
+        "Channels start in under a second and build a deep 60s safety buffer so network jitter doesn't cause stutters",
+        "Channel zapping is near-instant: connections to the channel servers are opened ahead of time",
+        "If a live stream drops, the app reconnects silently (up to 3 tries) and rejoins the live edge instead of stopping",
+        "Flaky live segments are retried much harder before showing any error",
+        "Hardware decoder fallback for live TV — playback recovers instead of freezing"
     )
 }
