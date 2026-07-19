@@ -113,8 +113,8 @@ private val AD_BLOCK_JS = """
 
 /**
  * Ad-blocked in-app browser tab pinned to one streaming site. Used by the
- * Donghua (donghuafun.com), Drama (kisskh.co) and PDTV (pdtvhd.com)
- * bottom-bar tabs.
+ * Donghua (donghuafun.com) and Drama (kisskh.co) bottom-bar tabs.
+ * (PDTV got its own native player — see ui/pdtv/PdTvScreen.)
  *
  * [prefsName] keys the per-site "last page" persistence so each tab reopens
  * where the user left off.

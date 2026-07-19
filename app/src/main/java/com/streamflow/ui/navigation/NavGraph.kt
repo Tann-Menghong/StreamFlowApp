@@ -332,10 +332,9 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                 )
             }
             composable(Screen.PdTv.route) {
-                com.streamflow.ui.browser.AdblockBrowserScreen(
-                    homeUrl = "https://www.pdtvhd.com/",
-                    prefsName = "pdtv_prefs",
-                    defaultTitle = "PDTV",
+                // Native live-TV player (the site's own web player doesn't
+                // survive a WebView) — parses the channel list, plays via ExoPlayer
+                com.streamflow.ui.pdtv.PdTvScreen(
                     onFullscreenChange = { isDonghuaFullscreen = it }
                 )
             }

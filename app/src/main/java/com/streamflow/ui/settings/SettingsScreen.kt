@@ -518,7 +518,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { vm.setShowDrama(it) }
                     SettingsDivider()
                     SettingsSwitchItem(Icons.Rounded.Movie, "Show PDTV tab",
-                        "Movies & series (pdtvhd.com) in the bottom bar", showPdTv
+                        "Live TV channels (pdtvhd.com) in the bottom bar", showPdTv
                     ) { vm.setShowPdTv(it) }
                     SettingsDivider()
                     SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
