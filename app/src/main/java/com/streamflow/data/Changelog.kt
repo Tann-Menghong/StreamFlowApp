@@ -3,14 +3,13 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "4.0.0"
+    const val VERSION_NAME = "4.0.1"
 
     val notes = listOf(
-        "StreamFlow 4.0 — the complete release 🎉",
-        "After 17 improvement passes and 155 fixes, StreamFlow is feature-complete and stable: fast ad-free playback up to 1080p, Shorts, live streams, comments with badges, SponsorBlock, chapters, subtitles, and picture-in-picture",
-        "Your whole library lives on your phone: subscriptions with groups and bells, favorites, history with resume, watch later, bookmarks, playlists, downloads, and a persistent queue",
-        "Private by design: no account, no ads, no tracking, incognito mode, and full local backup/restore",
-        "Personal touches: endless For-You feed, on-device AI summaries, Khmer + English, deep theming, and performance tuned to your phone's hardware",
-        "The app keeps updating itself — future releases appear right here in Settings"
+        "The Auto-play setting now actually works — turn it off and videos no longer jump to the next one when they end (your queue still plays, as intended)",
+        "Cancel on the \"Next in 5s\" countdown now stops it instantly — before, the timer kept ticking after you pressed Cancel",
+        "The Library now really opens on Favorites by default, matching what Settings says — it silently opened History on fresh installs",
+        "Bookmarks can now be chosen as your default Library tab in Settings",
+        "Fixed a rare double-trigger when tapping \"Start watching\" twice at the end of first-launch setup"
     )
 }

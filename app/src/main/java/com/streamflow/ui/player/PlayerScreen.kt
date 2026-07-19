@@ -109,6 +109,9 @@ fun PlayerScreen(
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val isSubscribed by vm.isSubscribed.collectAsState()
     val autoQuality by vm.autoQuality.collectAsState()
+    // Settings > Playback > Auto-play. The countdown effect below ignored this
+    // entirely, so turning the toggle off still auto-played the next video.
+    val autoPlayEnabled by vm.autoPlay.collectAsState(initial = true)
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -606,12 +609,20 @@ fun PlayerScreen(
             delay(500L)
             val mc = mediaController ?: continue
             if (mc.playbackState == Player.STATE_ENDED && mc.currentPosition > 0L) {
-                // Queue takes priority over related video auto-play
+                // Queue takes priority over related video auto-play (and plays
+                // regardless of the toggle — queueing is explicit user intent)
                 if (PlaybackQueue.hasNext()) {
                     PlaybackQueue.popNext()?.let { onVideoClick(it.url) }; break
                 }
+                if (!autoPlayEnabled) continue
                 autoPlayTarget = nextUrl
-                for (i in 5 downTo 1) { autoPlayCountdown = i; delay(1000L) }
+                // Bail out mid-countdown when Cancel clears the target — the
+                // timer used to keep ticking with a Cancel that did nothing
+                for (i in 5 downTo 1) {
+                    if (autoPlayTarget.isEmpty()) break
+                    autoPlayCountdown = i
+                    delay(1000L)
+                }
                 autoPlayCountdown = 0
                 if (autoPlayTarget.isNotEmpty()) onVideoClick(autoPlayTarget)
                 break
@@ -1176,7 +1187,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         Text("Auto-playing next in", color = Color.White.copy(0.8f), fontSize = 11.sp)
                         Text("$autoPlayCountdown", color = MaterialTheme.colorScheme.primary,
                             fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                        TextButton(onClick = { autoPlayTarget = "" }) {
+                        TextButton(onClick = { autoPlayTarget = ""; autoPlayCountdown = 0 }) {
                             Text("Cancel", color = Color.White, fontSize = 11.sp)
                         }
                     }
@@ -1544,7 +1555,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Next in $autoPlayCountdown s", color = Color.White, fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold)
-                            TextButton(onClick = { autoPlayTarget = "" },
+                            TextButton(onClick = { autoPlayTarget = ""; autoPlayCountdown = 0 },
                                 contentPadding = PaddingValues(0.dp)) {
                                 Text("Cancel", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
                             }

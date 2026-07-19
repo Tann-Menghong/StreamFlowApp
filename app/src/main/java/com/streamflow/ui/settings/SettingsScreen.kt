@@ -507,7 +507,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { showStartTabDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
-                        listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+                        listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
                             .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
                     ) { showLibTabDialog = true }
                 }
@@ -854,9 +854,9 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             { vm.setFontFamily(famOpts[it].first); showFontFamilyDialog = false }, { showFontFamilyDialog = false })
     }
     if (showLibTabDialog) {
-        val tabNames = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads")
+        val tabNames = listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
         PickerDialog("Default Library tab", tabNames,
-            (libraryTab.toIntOrNull() ?: 0).coerceIn(0, 5),
+            (libraryTab.toIntOrNull() ?: 0).coerceIn(0, 6),
             { vm.setLibraryTab(it.toString()); showLibTabDialog = false }, { showLibTabDialog = false })
     }
     if (showCornerDialog) {

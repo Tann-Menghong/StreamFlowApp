@@ -27,6 +27,10 @@ import kotlinx.coroutines.launch
 fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
     val pager = rememberPagerState { 3 }
     val scope = rememberCoroutineScope()
+    // Guards a double-tap on "Start watching" — the finish writes several
+    // DataStore prefs before onDone(), so a second tap in that window used to
+    // launch a second save + a second onDone()
+    var finishing by remember { mutableStateOf(false) }
     var country by remember { mutableStateOf("US") }
     val interests = remember { mutableStateListOf("Music", "Gaming", "News") }
     var theme by remember { mutableStateOf("DARK") }
@@ -148,7 +152,8 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 onClick = {
                     if (pager.currentPage < 2) {
                         scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
-                    } else {
+                    } else if (!finishing) {
+                        finishing = true
                         scope.launch {
                             prefs.setCountry(country)
                             if (interests.isNotEmpty()) prefs.setHomeCategories(interests.toList())

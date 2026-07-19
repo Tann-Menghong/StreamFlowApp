@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 107
-        versionName "4.0.0"
+        versionCode 108
+        versionName "4.0.1"
         vectorDrawables {
             useSupportLibrary true
         }
