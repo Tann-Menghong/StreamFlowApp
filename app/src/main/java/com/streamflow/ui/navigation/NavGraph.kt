@@ -60,6 +60,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Donghua  : Screen("donghua",  "Donghua", Icons.Rounded.LiveTv)
     object Drama    : Screen("drama",    "Drama",   Icons.Rounded.Theaters)
     object PdTv     : Screen("pdtv",     "PDTV",    Icons.Rounded.Movie)
+    object Mkiss    : Screen("mkiss",    "MKissa",  Icons.Rounded.OndemandVideo)
     object Library  : Screen("library",  "Library", Icons.Rounded.VideoLibrary)
     object Settings : Screen("settings", "Settings",Icons.Rounded.Settings)
     object SettingsCategory : Screen("settings/{category}", "Settings", Icons.Rounded.Settings) {
@@ -83,7 +84,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 private val allBottomRoutes = listOf(
     Screen.Home.route, Screen.Search.route, Screen.Donghua.route, Screen.Drama.route,
-    Screen.PdTv.route, Screen.Library.route, Screen.Settings.route
+    Screen.PdTv.route, Screen.Mkiss.route, Screen.Library.route, Screen.Settings.route
 )
 
 @Composable
@@ -105,6 +106,7 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
     val showDonghua by appPrefs.showDonghua.collectAsState(initial = true)
     val showDrama by appPrefs.showDrama.collectAsState(initial = true)
     val showPdTv by appPrefs.showPdTv.collectAsState(initial = true)
+    val showMkiss by appPrefs.showMkiss.collectAsState(initial = true)
     val showSearchTab by appPrefs.showSearchTab.collectAsState(initial = false)
     val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
     val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
@@ -123,13 +125,14 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
             android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val bottomItems = remember(showDonghua, showDrama, showPdTv, showSearchTab) {
+    val bottomItems = remember(showDonghua, showDrama, showPdTv, showMkiss, showSearchTab) {
         buildList {
             add(Screen.Home)
             if (showSearchTab) add(Screen.Search)
             if (showDonghua) add(Screen.Donghua)
             if (showDrama) add(Screen.Drama)
             if (showPdTv) add(Screen.PdTv)
+            if (showMkiss) add(Screen.Mkiss)
             add(Screen.Library)
             add(Screen.Settings)
         }
@@ -335,6 +338,14 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                 // Native live-TV player (the site's own web player doesn't
                 // survive a WebView) — parses the channel list, plays via ExoPlayer
                 com.streamflow.ui.pdtv.PdTvScreen(
+                    onFullscreenChange = { isDonghuaFullscreen = it }
+                )
+            }
+            composable(Screen.Mkiss.route) {
+                com.streamflow.ui.browser.AdblockBrowserScreen(
+                    homeUrl = "https://mkissa.to/",
+                    prefsName = "mkissa_prefs",
+                    defaultTitle = "MKissa",
                     onFullscreenChange = { isDonghuaFullscreen = it }
                 )
             }

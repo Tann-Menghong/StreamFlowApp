@@ -305,6 +305,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val showDonghua          by vm.showDonghua.collectAsState()
     val showDrama            by vm.showDrama.collectAsState()
     val showPdTv             by vm.showPdTv.collectAsState()
+    val showMkiss            by vm.showMkiss.collectAsState()
     val startTab             by vm.startTab.collectAsState()
     val incognito            by vm.incognito.collectAsState()
     val qualityCellular      by vm.qualityCellular.collectAsState()
@@ -435,10 +436,6 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
                     ) { showCornerDialog = true }
                     SettingsDivider()
-                    SettingsItem(Icons.Rounded.Label, "Bottom bar labels",
-                        when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
-                    ) { showNavLabelDialog = true }
-                    SettingsDivider()
                     SettingsSwitchItem(Icons.Rounded.Animation, "Reduce motion",
                         "Calmer, faster screen transitions", reduceMotion, vm::setReduceMotion)
                     SettingsDivider()
@@ -492,47 +489,65 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     SettingsFooter("New-video alerts follow the schedule above and stay silent during quiet hours.")
                 }
 
-                "Home" -> SettingsCard {
-                    SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
-                        "Show videos in a grid instead of list", homeLayout == "GRID"
-                    ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.ViewModule, "Grid columns",
-                        "$gridColumns columns"
-                    ) { showColumnsDialog = true }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.History, "Continue Watching row",
-                        "Show partially watched videos at the top", showContinueWatching
-                    ) { vm.setShowContinueWatching(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.Stars, "Hero featured card",
-                        "Show first trending video as a large banner", showHeroCard
-                    ) { vm.setShowHeroCard(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.LiveTv, "Show Donghua tab",
-                        "Hide it from the bottom bar if you don't use it", showDonghua
-                    ) { vm.setShowDonghua(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.Theaters, "Show Drama tab",
-                        "Asian dramas & movies (KissKH) in the bottom bar", showDrama
-                    ) { vm.setShowDrama(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.Movie, "Show PDTV tab",
-                        "Live TV channels (pdtvhd.com) in the bottom bar", showPdTv
-                    ) { vm.setShowPdTv(it) }
-                    SettingsDivider()
-                    SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
-                        "Add a dedicated Search tab to the bottom bar", showSearchTab
-                    ) { vm.setShowSearchTab(it) }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.Start, "Start screen",
-                        when (startTab) { "donghua" -> "Donghua"; "drama" -> "Drama (KissKH)"; "pdtv" -> "PDTV"; "library" -> "Library"; else -> "Home" }
-                    ) { showStartTabDialog = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
-                        listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
-                            .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
-                    ) { showLibTabDialog = true }
+                // Restructured into labeled groups (same professional pattern as
+                // Playback): layout options, then a clean tab manager, then defaults
+                "Home" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SettingsGroupLabel("Layout")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.GridView, "Grid layout",
+                            "Show videos in a grid instead of list", homeLayout == "GRID"
+                        ) { vm.setHomeLayout(if (it) "GRID" else "LIST") }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.ViewModule, "Grid columns",
+                            "$gridColumns columns"
+                        ) { showColumnsDialog = true }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.History, "Continue Watching row",
+                            "Show partially watched videos at the top", showContinueWatching
+                        ) { vm.setShowContinueWatching(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.Stars, "Hero featured card",
+                            "Show first trending video as a large banner", showHeroCard
+                        ) { vm.setShowHeroCard(it) }
+                    }
+                    SettingsGroupLabel("Bottom navigation")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.Search, "Search tab",
+                            "Dedicated YouTube search tab", showSearchTab
+                        ) { vm.setShowSearchTab(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.LiveTv, "Donghua tab",
+                            "Chinese anime — donghuafun.com", showDonghua
+                        ) { vm.setShowDonghua(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.Theaters, "Drama tab",
+                            "Asian dramas & movies — KissKH", showDrama
+                        ) { vm.setShowDrama(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.Movie, "PDTV tab",
+                            "Live TV — Khmer, sports & news channels", showPdTv
+                        ) { vm.setShowPdTv(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.OndemandVideo, "MKissa tab",
+                            "Dramas & movies — mkissa.to", showMkiss
+                        ) { vm.setShowMkiss(it) }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Label, "Bottom bar labels",
+                            when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
+                        ) { showNavLabelDialog = true }
+                    }
+                    SettingsGroupLabel("Start & defaults")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.Start, "Start screen",
+                            when (startTab) { "donghua" -> "Donghua"; "drama" -> "Drama (KissKH)"; "pdtv" -> "PDTV"; "mkiss" -> "MKissa"; "library" -> "Library"; else -> "Home" }
+                        ) { showStartTabDialog = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.VideoLibrary, "Default Library tab",
+                            listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
+                                .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
+                        ) { showLibTabDialog = true }
+                    }
+                    SettingsFooter("Hidden tabs disappear from the bottom bar instantly — nothing is deleted.")
                 }
 
                 "Playback" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -904,7 +919,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             { vm.setFontScale(fontOpts[it].first); showFontDialog = false }, { showFontDialog = false })
     }
     if (showStartTabDialog) {
-        val tabOpts = listOf("home" to "Home", "donghua" to "Donghua", "drama" to "Drama (KissKH)", "pdtv" to "PDTV", "library" to "Library")
+        val tabOpts = listOf("home" to "Home", "donghua" to "Donghua", "drama" to "Drama (KissKH)", "pdtv" to "PDTV", "mkiss" to "MKissa", "library" to "Library")
         PickerDialog("Start screen", tabOpts.map { it.second },
             tabOpts.indexOfFirst { it.first == startTab }.coerceAtLeast(0),
             { vm.setStartTab(tabOpts[it].first); showStartTabDialog = false }, { showStartTabDialog = false })
