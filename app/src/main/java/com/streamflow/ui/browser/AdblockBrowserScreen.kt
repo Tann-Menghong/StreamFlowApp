@@ -58,6 +58,10 @@ private val AD_DOMAINS = setOf(
     "revenuehits.com", "coinzilla.com", "cointraffic.io", "a-ads.com",
     "bebi.com", "mgid.com", "clicksgear.com", "adplusplus.fr", "adbutler.com",
     "servedbyadbutler.com", "pushpad.xyz", "pushwhy.com", "richpush.co",
+    // Web-push notification-ad networks (the ones that spam the notification bar)
+    "onesignal.com", "os.tc", "wonderpush.com", "pushengage.com", "pushnami.com",
+    "webpushs.com", "pushpushgo.com", "notix.co", "notix.io", "sendpulse.com",
+    "subscribers.com", "izooto.com", "truepush.com", "foxpush.net", "cleverpush.com",
     "vibrantmedia.com", "adthrive.com", "mediavine.com", "ezoic.net",
     "histats.com", "luckyorange.com", "luckyorange.net", "statcounter.com",
     "yandex.ru", "mc.yandex.ru", "vidoomy.com", "admixer.net",
@@ -73,7 +77,11 @@ private val AD_URL_PATTERNS = listOf(
     "prebid", "bidder", "openrtb", "vast.xml", "vpaid",
     "popunder", "pop-under", "/popup", "/pop.js", "/pop.php",
     "/aclk", "/adx/", "syndication", "notification-ad", "push-ad",
-    "/sw-ad", "adblock-detect", "/interstitial"
+    "/sw-ad", "adblock-detect", "/interstitial",
+    // Web-push / service-worker ad plumbing
+    "onesignalsdk", "onesignal", "wonderpush", "pushengage", "pushnami",
+    "webpush", "web-push", "/push.js", "pushsdk", "push-sdk", "/push/subscribe",
+    "service-worker-ad", "sw-push", "/notification.js", "notifications.js"
 )
 
 // Infra hosts that main-frame navigation may legitimately reach (captcha /
@@ -111,6 +119,29 @@ private val AD_BLOCK_JS = """
   // these sites; blackhole it (and the rarer showModalDialog).
   try{ window.open = function(){ return null; }; }catch(e){}
   try{ window.showModalDialog = noop; }catch(e){}
+  // ── Web-push / notification ADS ──────────────────────────────────────────
+  // These sites hook you into a push-ad network (via a background service
+  // worker) that then spams NOTIFICATION ads even after you leave the page.
+  // Deny the Notification API, block service-worker registration, tear down
+  // any worker already installed, and kill PushManager. None of this affects
+  // video playback (players don't use push).
+  try{
+    var denyPerm = function(cb){ try{ if(typeof cb==='function') cb('denied'); }catch(e){} return Promise.resolve('denied'); };
+    if(window.Notification){
+      try{ Object.defineProperty(window,'Notification',{value:function(){ return {close:noop,onclick:null,addEventListener:noop,removeEventListener:noop}; },writable:false,configurable:false}); }catch(e){}
+      try{ window.Notification.permission='denied'; }catch(e){}
+      try{ window.Notification.requestPermission=denyPerm; }catch(e){}
+    }
+  }catch(e){}
+  try{
+    if(navigator.serviceWorker){
+      try{ navigator.serviceWorker.register=function(){ return Promise.reject(new Error('blocked')); }; }catch(e){}
+      try{ Object.getPrototypeOf(navigator.serviceWorker).register=function(){ return Promise.reject(new Error('blocked')); }; }catch(e){}
+      try{ navigator.serviceWorker.getRegistrations().then(function(rs){ (rs||[]).forEach(function(r){ try{r.unregister();}catch(e){} }); }); }catch(e){}
+    }
+  }catch(e){}
+  try{ if(window.PushManager){ delete window.PushManager; } }catch(e){}
+  try{ if('PushManager' in window){ window.PushManager=undefined; } }catch(e){}
   // The registrable domain of THIS page — anything pointing elsewhere is off-site.
   var BASE = (function(){ var p=location.hostname.split('.'); return p.slice(-2).join('.'); })();
   // Popunder pattern: a tap on the player/page opens an ad in a new tab or
@@ -183,7 +214,11 @@ private val AD_BLOCK_JS = """
  * onCreateWindow all refused so no popup tab can spawn, (3) a capture-phase
  * click guard that cancels off-site and app-open anchor taps (the popunder
  * pattern) while same-site navigation and the player pass through, (4) a
- * gesture-scoped cross-domain main-frame block for tap-triggered redirects.
+ * gesture-scoped cross-domain main-frame block for tap-triggered redirects,
+ * (5) web-push / NOTIFICATION-ad defense: the Notification API is denied,
+ * service-worker registration is blocked and existing workers are unregistered
+ * (JS), device-permission + geolocation prompts are auto-denied, and any
+ * already-installed push-ad worker's requests are dropped via ServiceWorkerClient.
  *
  * [prefsName] keys the per-site "last page" persistence so each tab reopens
  * where the user left off.
@@ -235,6 +270,8 @@ fun AdblockBrowserScreen(
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             mediaPlaybackRequiresUserGesture = false
             allowContentAccess = true
+            // No geolocation — ad frames use it to fingerprint; video needs none.
+            setGeolocationEnabled(false)
             // Refuse pop-up windows outright: with this off, window.open and
             // target=_blank cannot spawn the ad tabs these sites rely on. The
             // video always plays inline, so nothing legitimate needs a new window.
@@ -252,6 +289,24 @@ fun AdblockBrowserScreen(
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(wv, true)
+        }
+
+        // Network-level backstop against push/notification ADS delivered by a
+        // service worker. A push-ad worker keeps fetching and firing notification
+        // ads even with no tab open; the JS blocks NEW registrations, and this
+        // starves any worker already installed on a previous visit by dropping
+        // its ad requests (API 24+). Global controller — safe to set repeatedly.
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            try {
+                android.webkit.ServiceWorkerController.getInstance().setServiceWorkerClient(
+                    object : android.webkit.ServiceWorkerClient() {
+                        override fun shouldInterceptRequest(
+                            request: WebResourceRequest
+                        ): WebResourceResponse? =
+                            if (isAdRequest(request.url.toString())) emptyResponse() else null
+                    }
+                )
+            } catch (_: Exception) {}
         }
 
         wv.webViewClient = object : WebViewClient() {
@@ -331,6 +386,17 @@ fun AdblockBrowserScreen(
                 isUserGesture: Boolean,
                 resultMsg: android.os.Message
             ): Boolean = false
+
+            // Deny every device-permission prompt (mic, camera, protected media,
+            // and geolocation below). Ad frames request these to fingerprint or
+            // to re-enable push-notification ads; the site's video needs none.
+            override fun onPermissionRequest(request: PermissionRequest) {
+                mainHandler.post { request.deny() }
+            }
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: GeolocationPermissions.Callback
+            ) { callback.invoke(origin, false, false) }
 
             override fun onShowCustomView(
                 view: android.view.View,
