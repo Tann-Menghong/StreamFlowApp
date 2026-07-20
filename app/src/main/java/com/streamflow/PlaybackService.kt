@@ -53,7 +53,18 @@ class PlaybackService : MediaSessionService() {
     // command reproduces the on-screen "next" behaviour: play the queued video,
     // else the current video's first related video.
     private val nextCommand = SessionCommand(CUSTOM_NEXT, android.os.Bundle.EMPTY)
+    private val prevCommand = SessionCommand(CUSTOM_PREV, android.os.Bundle.EMPTY)
     private var advancing = false // guard against double-taps while resolving
+
+    // Play-history back-stack for the notification's Previous button. We record
+    // every media-item change (from the app OR the notification's Next), so
+    // Previous replays the video you were just watching. Bounded so a long
+    // session can't grow it without limit.
+    private val backStack = ArrayDeque<String>()
+    private var lastMediaId: String? = null
+    // Set right before a Previous-initiated switch so the resulting transition
+    // isn't itself pushed onto the stack (which would make prev/next oscillate).
+    private var skipHistoryPush = false
     private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
     private var boostGainMb = 0
     private var audioSessionId = 0
@@ -192,6 +203,23 @@ class PlaybackService : MediaSessionService() {
                     com.streamflow.data.SleepTimer.clear()
                 }
             }
+            // Track play history for the Previous button: whenever the item changes
+            // to a genuinely different video, remember the one we just left.
+            override fun onMediaItemTransition(
+                mediaItem: MediaItem?, reason: Int
+            ) {
+                val newId = mediaItem?.mediaId
+                if (skipHistoryPush) {
+                    skipHistoryPush = false // this transition WAS the Previous jump
+                } else {
+                    val prev = lastMediaId
+                    if (prev != null && prev != newId) {
+                        backStack.addLast(prev)
+                        while (backStack.size > 50) backStack.removeFirst()
+                    }
+                }
+                lastMediaId = newId
+            }
         })
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onAudioSessionIdChanged(
@@ -244,7 +272,15 @@ class PlaybackService : MediaSessionService() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
-        // The "Next" button shown in the notification + lock-screen controls
+        // Previous + Next buttons for the notification + lock-screen controls.
+        // Order matters: [Prev, Next] renders as the familiar |◀  ▶| pair around
+        // play/pause in the compact notification.
+        val prevButton = CommandButton.Builder()
+            .setDisplayName("Previous")
+            .setIconResId(R.drawable.ic_notif_prev)
+            .setSessionCommand(prevCommand)
+            .setEnabled(true)
+            .build()
         val nextButton = CommandButton.Builder()
             .setDisplayName("Next")
             .setIconResId(R.drawable.ic_notif_next)
@@ -254,16 +290,17 @@ class PlaybackService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
-            .setCustomLayout(listOf(nextButton))
+            .setCustomLayout(listOf(prevButton, nextButton))
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(
                     session: MediaSession,
                     controller: MediaSession.ControllerInfo
                 ): MediaSession.ConnectionResult {
-                    // Grant the custom NEXT command on top of the defaults, or the
-                    // notification button would be rejected as an unavailable command
+                    // Grant the custom PREV/NEXT commands on top of the defaults, or
+                    // the notification buttons would be rejected as unavailable
                     val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                         .add(nextCommand)
+                        .add(prevCommand)
                         .build()
                     return MediaSession.ConnectionResult.accept(
                         sessionCommands,
@@ -277,9 +314,9 @@ class PlaybackService : MediaSessionService() {
                     customCommand: SessionCommand,
                     args: android.os.Bundle
                 ): ListenableFuture<SessionResult> {
-                    if (customCommand.customAction == CUSTOM_NEXT) {
-                        playNext()
-                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    when (customCommand.customAction) {
+                        CUSTOM_NEXT -> { playNext(); return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS)) }
+                        CUSTOM_PREV -> { playPrevious(); return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS)) }
                     }
                     return super.onCustomCommand(session, controller, customCommand, args)
                 }
@@ -357,6 +394,25 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    // Replay the previously watched video from the play-history stack.
+    private fun playPrevious() {
+        if (advancing) return
+        val prevUrl = backStack.removeLastOrNull()
+        if (prevUrl == null) {
+            android.widget.Toast.makeText(this, "No previous video", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        advancing = true
+        // Don't let the resulting item change push onto the back-stack, or Prev
+        // and Next would just bounce between the same two videos.
+        skipHistoryPush = true
+        serviceScope.launch {
+            try { resolveAndPlay(prevUrl, null) }
+            catch (_: Exception) { skipHistoryPush = false }
+            finally { advancing = false }
+        }
+    }
+
     private suspend fun relatedOfCurrent(): String? {
         val currentUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return null
         if (isLocalOrDirectUrl(currentUrl)) return null
@@ -383,8 +439,9 @@ class PlaybackService : MediaSessionService() {
     // [hint] carries title/thumb for a DIRECT stream (which can't be extracted).
     private suspend fun resolveAndPlay(url: String, hint: com.streamflow.data.model.VideoItem?) {
         val player = mediaSession?.player ?: return
-        // Don't reload the video that's already playing (queue head == current)
-        if (player.currentMediaItem?.mediaId == url) return
+        // Don't reload the video that's already playing (queue head == current).
+        // Clear the history-skip flag too: no transition will fire to consume it.
+        if (player.currentMediaItem?.mediaId == url) { skipHistoryPush = false; return }
         val app = application as StreamFlowApp
 
         // Direct stream / downloaded file: play as-is, no YouTube extraction
@@ -451,6 +508,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         serviceScope.cancel()
+        backStack.clear()
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
         loudnessEnhancer = null
         try { equalizer?.release() } catch (_: Exception) {}
@@ -465,5 +523,6 @@ class PlaybackService : MediaSessionService() {
 
     companion object {
         private const val CUSTOM_NEXT = "com.streamflow.action.NEXT"
+        private const val CUSTOM_PREV = "com.streamflow.action.PREV"
     }
 }

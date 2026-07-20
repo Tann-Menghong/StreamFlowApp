@@ -83,14 +83,19 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        // Request notification permission for media player controls on Android 13+
+        // Request notification permission for media player controls on Android 13+.
+        // Ask at most ONCE automatically — re-prompting on every launch after a
+        // denial is nagging (and Android auto-denies after two refusals anyway).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val flags = getSharedPreferences("app_flags", MODE_PRIVATE)
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
+                != PackageManager.PERMISSION_GRANTED &&
+                !flags.getBoolean("asked_notif_perm", false)
             ) {
                 ActivityCompat.requestPermissions(
                     this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1
                 )
+                flags.edit().putBoolean("asked_notif_perm", true).apply()
             }
         }
 
