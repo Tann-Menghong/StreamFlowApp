@@ -116,6 +116,15 @@ internal fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byt
 
 private val AD_BLOCK_JS = """
 (function(){
+  // ── Desktop mode ─────────────────────────────────────────────────────────
+  // Paired with the desktop Chrome UA, force a desktop-width viewport so these
+  // sites lay out as their (far-less-ad-infested) desktop version but still fit
+  // the phone screen via useWideViewPort + loadWithOverviewMode scaling.
+  try{
+    var mv=document.querySelector('meta[name="viewport"]');
+    if(!mv){ mv=document.createElement('meta'); mv.name='viewport'; (document.head||document.documentElement).appendChild(mv); }
+    mv.setAttribute('content','width=1024');
+  }catch(e){}
   var noop = function(){};
   var noopObj = new Proxy({}, { get: function(){ return noop; } });
   ['adsbygoogle','googletag','ga','_gaq','dataLayer','pbjs','apntag',
@@ -366,14 +375,17 @@ fun AdblockBrowserScreen(
             // video always plays inline, so nothing legitimate needs a new window.
             setSupportMultipleWindows(false)
             javaScriptCanOpenWindowsAutomatically = false
-            // Pinch-zoom as a fallback for anything that still overflows,
-            // without the legacy on-screen +/- buttons
+            // Pinch-zoom to read the desktop layout on a phone, without the
+            // legacy on-screen +/- buttons. Combined with useWideViewPort +
+            // loadWithOverviewMode (above) the desktop page scales to fit width.
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
-            // MOBILE user agent: the old desktop UA made these sites serve
-            // their desktop layout, which never fit the phone screen
-            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+            // DESKTOP mode (user request: "show in Brave, desktop mode"). Desktop
+            // Chrome UA makes these sites serve their desktop site, which carries
+            // far fewer of the aggressive mobile popunder/notification ads; the
+            // AD_BLOCK_JS also forces a desktop-width viewport so it fits the screen.
+            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
