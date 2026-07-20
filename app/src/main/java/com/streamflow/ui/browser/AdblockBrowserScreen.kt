@@ -91,10 +91,18 @@ private val INFRA_ALLOW = setOf(
     "challenges.cloudflare.com", "hcaptcha.com"
 )
 
-private fun isAdRequest(url: String): Boolean {
+// internal: also reused by the PlayerScreen direct-stream WebView so ad defense
+// is identical everywhere the app renders web content.
+internal fun isAdRequest(url: String): Boolean {
     val lower = url.lowercase()
     return AD_DOMAINS.any { lower.contains(it) } || AD_URL_PATTERNS.any { lower.contains(it) }
 }
+
+// Titles ad scripts set on document.title to fake a notification in the tab bar.
+private val AD_TITLE_RE = Regex(
+    """\(\d+\)\s*new\s*message|you.?ve\s+won|new\s+message\s*!|premium\s+account|claim\s+your|congratulation""",
+    RegexOption.IGNORE_CASE
+)
 
 /** Registrable domain ("www.kisskh.co" -> "kisskh.co") for same-site checks. */
 private fun baseDomainOf(url: String): String =
@@ -104,7 +112,7 @@ private fun baseDomainOf(url: String): String =
 // A fresh response per request: shouldInterceptRequest runs on multiple WebView
 // threads, and a single shared WebResourceResponse (one InputStream instance)
 // handed to concurrent requests is not thread-safe
-private fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
+internal fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byteInputStream())
 
 private val AD_BLOCK_JS = """
 (function(){
@@ -187,6 +195,42 @@ private val AD_BLOCK_JS = """
   s.textContent = css + '{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   (document.head||document.documentElement).appendChild(s);
   var blocked = /doubleclick|googlesyndication|adsbygoogle|exoclick|propellerads|popcash|popads|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|onclick(algo|max|ads|predictiv)|galaksion|revenuehits|coinhive|cryptoloot/i;
+  // ── In-page overlay / fake-dialog ADS ────────────────────────────────────
+  // The nastiest ones inject a DOM element styled as a "New message / your
+  // premium account is activated" popup whose Accept/Cancel lead off-site.
+  // Kill any FLOATING element that carries scam text or an off-site link — the
+  // video player is explicitly protected so playback is never touched.
+  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction on the next page|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app/i;
+  function adHasOffsite(el){
+    try{
+      var as = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
+      for(var i=0;i<as.length;i++){ var h=''; try{ h=as[i].hostname||''; }catch(e){}
+        if(h && BASE && h.indexOf(BASE)===-1) return true; }
+    }catch(e){} return false;
+  }
+  function adIsPlayer(el){
+    try{ return !!(el.querySelector && el.querySelector('video,[class*="player" i],[id*="player" i],[class*="jwplayer" i],[class*="clappr" i],[class*="plyr" i]')); }catch(e){ return false; }
+  }
+  function adScan(n){
+    if(!n||n.nodeType!==1) return;
+    var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
+    var pos=s.position, z=parseInt(s.zIndex,10)||0;
+    if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
+    if(adIsPlayer(n)) return;                       // never remove the player
+    var txt=''; try{ txt=(n.innerText||n.textContent||''); }catch(e){}
+    var offsite=(pos==='fixed'||z>=100) && adHasOffsite(n);
+    if(AD_TXT.test(txt) || offsite){
+      try{ n.style.setProperty('display','none','important'); }catch(e){}
+      try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
+    }
+  }
+  function adSweep(){
+    try{ var els=document.body?document.body.querySelectorAll('div,ins,aside,section,a'):[];
+      for(var i=0;i<els.length;i++) adScan(els[i]); }catch(e){}
+  }
+  // These ads inject on a delay and re-inject, so sweep a few times then keep watch.
+  [250,700,1400,2400,3800,6000,9000].forEach(function(t){ setTimeout(adSweep,t); });
+  setInterval(adSweep, 2500);
   new MutationObserver(function(muts){
     muts.forEach(function(m){
       m.addedNodes.forEach(function(n){
@@ -197,7 +241,9 @@ private val AD_BLOCK_JS = """
         var own = (n.src||'')+' '+(n.id||'')+' '+(n.className||'');
         if(blocked.test(own)){
           try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
+          return;
         }
+        adScan(n);                                  // catch injected overlays too
       });
     });
   }).observe(document.documentElement,{childList:true,subtree:true});
@@ -442,6 +488,9 @@ fun AdblockBrowserScreen(
             }
 
             override fun onReceivedTitle(view: WebView, title: String) {
+                // Ads hijack document.title to fake a notification ("(1) New
+                // Message!", "You won!"). Ignore those and keep the real title.
+                if (AD_TITLE_RE.containsMatchIn(title)) return
                 mainHandler.post { pageTitle = title }
             }
         }

@@ -792,11 +792,44 @@ fun PlayerScreen(
                             userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                             allowContentAccess = true
+                            // Same no-popup posture as the streaming tabs, so this
+                            // player can never spawn an ad tab even if a stream URL
+                            // turns out to be a full web page.
+                            setSupportMultipleWindows(false)
+                            javaScriptCanOpenWindowsAutomatically = false
                         }
                         android.webkit.CookieManager.getInstance().apply {
                             setAcceptCookie(true); setAcceptThirdPartyCookies(wv, true)
                         }
-                        wv.webChromeClient = android.webkit.WebChromeClient()
+                        wv.webChromeClient = object : android.webkit.WebChromeClient() {
+                            override fun onCreateWindow(
+                                view: android.webkit.WebView, isDialog: Boolean,
+                                isUserGesture: Boolean, resultMsg: android.os.Message
+                            ): Boolean = false
+                            override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+                                request.deny()
+                            }
+                        }
+                        // Drop any ad/tracker/popup request the shared blocklist knows.
+                        wv.webViewClient = object : android.webkit.WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: android.webkit.WebView,
+                                request: android.webkit.WebResourceRequest
+                            ): Boolean {
+                                if (com.streamflow.ui.browser.isAdRequest(request.url.toString())) return true
+                                val scheme = request.url.scheme?.lowercase()
+                                return request.isForMainFrame && scheme != null &&
+                                    scheme != "http" && scheme != "https"
+                            }
+                            override fun shouldInterceptRequest(
+                                view: android.webkit.WebView,
+                                request: android.webkit.WebResourceRequest
+                            ): android.webkit.WebResourceResponse? {
+                                if (request.isForMainFrame) return null
+                                return if (com.streamflow.ui.browser.isAdRequest(request.url.toString()))
+                                    com.streamflow.ui.browser.emptyResponse() else null
+                            }
+                        }
                         val safeUrl = videoUrl.replace("\\", "\\\\").replace("\"", "\\\"")
                         val html = """<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
