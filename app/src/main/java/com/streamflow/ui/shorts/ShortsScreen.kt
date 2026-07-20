@@ -67,20 +67,41 @@ fun ShortsScreen(
     val batterySaverOn by com.streamflow.data.local.AppPreferences.get(context)
         .batterySaver.collectAsState(initial = false)
 
+    // Read-through disk cache so scrolling back to (or looping) a short replays
+    // from disk instead of re-downloading — shared with the main player's cache.
+    val dataSourceFactory = remember {
+        androidx.media3.datasource.cache.CacheDataSource.Factory()
+            .setCache(com.streamflow.data.MediaCache.get(context))
+            .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(OkHttpDownloader.instance.client))
+            .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
+
     // One shared player swapped between pages. Audio focus is requested so
     // Shorts ducks/pauses other apps' audio instead of playing over it.
     val player = remember {
-        ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
-            playWhenReady = true
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                    .build(),
-                /* handleAudioFocus = */ true
-            )
-        }
+        // Decoder fallback: a flaky hardware decoder falls back to another instead
+        // of a black frame. Small buffer for a fast tap-to-play start on shorts.
+        val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, 30_000, 400, 800)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+        ExoPlayer.Builder(context, renderers)
+            .setLoadControl(loadControl)
+            .build().apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                playWhenReady = true
+                // Unplugging headphones pauses instead of blasting the speaker
+                setHandleAudioBecomingNoisy(true)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                        .build(),
+                    /* handleAudioFocus = */ true
+                )
+            }
     }
     DisposableEffect(Unit) { onDispose { player.release() } }
 
@@ -151,7 +172,7 @@ fun ShortsScreen(
                     // big Play icon showed over the next short's loading spinner
                     isPaused = false
                     val d = currentDetails ?: return@LaunchedEffect
-                    val dsf = OkHttpDataSource.Factory(OkHttpDownloader.instance.client)
+                    val dsf = dataSourceFactory
                     val videoSource = ProgressiveMediaSource.Factory(dsf)
                         .createMediaSource(MediaItem.fromUri(d.streamUrl))
                     val source = if (d.audioUrl != null) {

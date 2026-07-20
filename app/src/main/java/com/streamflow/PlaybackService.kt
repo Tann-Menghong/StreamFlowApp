@@ -304,11 +304,8 @@ class PlaybackService : MediaSessionService() {
                             // Headset resume can happen on mobile data — honour the
                             // battery/data-saver 480p cap instead of pulling a full
                             // 1080p stream the user asked us not to on the go.
-                            val quality =
-                                if (app.prefs.batterySaver.first() || app.prefs.dataSaver.first())
-                                    "480P" else "AUTO"
                             val details = com.streamflow.data.YouTubeRepository()
-                                .getVideoDetails(last.url, quality)
+                                .getVideoDetails(last.url, resumeQuality())
                             val extras = Bundle().apply {
                                 details.audioUrl?.let { putString("audioUrl", it) }
                             }
@@ -344,8 +341,15 @@ class PlaybackService : MediaSessionService() {
         serviceScope.launch {
             try {
                 val queued = com.streamflow.data.PlaybackQueue.popNext()
-                val nextUrl = queued?.url ?: relatedOfCurrent() ?: return@launch
-                resolveAndPlay(nextUrl)
+                when {
+                    queued != null -> resolveAndPlay(queued.url, queued)
+                    else -> {
+                        val rel = relatedOfCurrent()
+                        if (rel != null) resolveAndPlay(rel, null)
+                        else android.widget.Toast.makeText(
+                            this@PlaybackService, "Nothing up next", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             } catch (_: Exception) {
             } finally {
                 advancing = false
@@ -369,11 +373,45 @@ class PlaybackService : MediaSessionService() {
         return if (prefs.batterySaver.first() || prefs.dataSaver.first()) "480P" else "AUTO"
     }
 
-    private suspend fun resolveAndPlay(url: String) {
+    // Per-channel speed override wins over the global default (mirrors PlayerScreen)
+    private suspend fun playbackSpeedFor(uploaderUrl: String?): Float {
+        val prefs = (application as StreamFlowApp).prefs
+        val ch = if (!uploaderUrl.isNullOrEmpty()) prefs.channelSpeeds.first()[uploaderUrl] else null
+        return ch ?: (prefs.defaultSpeed.first().toFloatOrNull() ?: 1f)
+    }
+
+    // [hint] carries title/thumb for a DIRECT stream (which can't be extracted).
+    private suspend fun resolveAndPlay(url: String, hint: com.streamflow.data.model.VideoItem?) {
+        val player = mediaSession?.player ?: return
+        // Don't reload the video that's already playing (queue head == current)
+        if (player.currentMediaItem?.mediaId == url) return
         val app = application as StreamFlowApp
+
+        // Direct stream / downloaded file: play as-is, no YouTube extraction
+        if (isLocalOrDirectUrl(url)) {
+            val item = MediaItem.Builder()
+                .setUri(url).setMediaId(url)
+                .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(hint?.title ?: "Video")
+                    .setArtist(hint?.uploaderName ?: "")
+                    .apply {
+                        hint?.thumbnailUrl?.takeIf { it.isNotEmpty() }
+                            ?.let { setArtworkUri(android.net.Uri.parse(it)) }
+                    }.build())
+                .build()
+            player.setMediaItem(item); player.prepare(); player.play()
+            player.setPlaybackSpeed(playbackSpeedFor(hint?.uploaderUrl))
+            com.streamflow.ui.components.MiniPlayerState.update(
+                com.streamflow.ui.components.MiniPlayerData(
+                    url = url, title = hint?.title ?: "Video",
+                    thumbnailUrl = hint?.thumbnailUrl ?: "",
+                    uploaderName = hint?.uploaderName ?: "", isPlaying = true))
+            return
+        }
+
         val details = com.streamflow.data.YouTubeRepository().getVideoDetails(url, resumeQuality())
         val extras = Bundle().apply { details.audioUrl?.let { putString("audioUrl", it) } }
-        val item = MediaItem.Builder()
+        val builder = MediaItem.Builder()
             .setUri(details.streamUrl)
             .setMediaId(details.url)
             .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder()
@@ -382,11 +420,17 @@ class PlaybackService : MediaSessionService() {
                 .setArtworkUri(android.net.Uri.parse(details.thumbnailUrl))
                 .build())
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
-            .build()
-        val player = mediaSession?.player ?: return
-        player.setMediaItem(item)
+        // Live manifests often lack a file extension — hint the type (as PlayerScreen does)
+        if (details.isLive) {
+            builder.setMimeType(
+                if (details.streamUrl.contains("mpd", true) || details.streamUrl.contains("dash", true))
+                    androidx.media3.common.MimeTypes.APPLICATION_MPD
+                else androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+        }
+        player.setMediaItem(builder.build())
         player.prepare()
         player.play()
+        player.setPlaybackSpeed(playbackSpeedFor(details.uploaderUrl))
         // Keep the in-app mini player in sync with what the notification advanced to
         com.streamflow.ui.components.MiniPlayerState.update(
             com.streamflow.ui.components.MiniPlayerData(
