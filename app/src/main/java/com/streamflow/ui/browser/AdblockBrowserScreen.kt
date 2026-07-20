@@ -26,7 +26,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
-// ── Ad-blocking (shared by the Donghua and Drama tabs) ───────────────────────
+// ── Ad-blocking (shared by the Donghua, Drama and MKissa tabs) ───────────────
 private val AD_DOMAINS = setOf(
     "doubleclick.net", "googlesyndication.com", "googletagmanager.com",
     "googletagservices.com", "google-analytics.com", "googleadservices.com",
@@ -48,20 +48,50 @@ private val AD_DOMAINS = setOf(
     "hotjar.com", "mixpanel.com", "segment.io", "segment.com",
     "fullstory.com", "mouseflow.com", "clarity.ms", "quantserve.com",
     "chartbeat.com", "parsely.com", "optimizely.com", "ab.tasty.com",
-    "connect.facebook.net"
+    "connect.facebook.net",
+    // Streaming-site popunder / redirect / push-ad networks (the big offenders
+    // on donghua/drama/mkissa-style sites — these are what open ad tabs on tap)
+    "propu.sh", "propellerads.net", "poptm.com", "popmyads.com", "popunder.net",
+    "onclickalgo.com", "onclckads.com", "onclickmax.com", "onclickpredictiv.com",
+    "onclickperformance.com", "clickadilla.com", "adcash.com", "cpmstar.com",
+    "admaven.com", "ad-maven.com", "admaven.pro", "galaksion.com", "adnium.com",
+    "revenuehits.com", "coinzilla.com", "cointraffic.io", "a-ads.com",
+    "bebi.com", "mgid.com", "clicksgear.com", "adplusplus.fr", "adbutler.com",
+    "servedbyadbutler.com", "pushpad.xyz", "pushwhy.com", "richpush.co",
+    "vibrantmedia.com", "adthrive.com", "mediavine.com", "ezoic.net",
+    "histats.com", "luckyorange.com", "luckyorange.net", "statcounter.com",
+    "yandex.ru", "mc.yandex.ru", "vidoomy.com", "admixer.net",
+    // Common in-page crypto-miners bundled with pirate-stream ads
+    "coinhive.com", "coin-hive.com", "jsecoin.com", "cryptoloot.pro",
+    "webminepool.com", "crypto-loot.com", "minero.cc"
 )
 
 private val AD_URL_PATTERNS = listOf(
     "/ads/", "/ad/", "/advert", "banner_ad", "pop-ad", "popup_ad",
     "/pagead/", "/adframe", "ad_slot", "adsense", "/serve/",
     "adclick", "clickthrough", "impression", "/track/", "/pixel/",
-    "prebid", "bidder", "openrtb", "vast.xml", "vpaid"
+    "prebid", "bidder", "openrtb", "vast.xml", "vpaid",
+    "popunder", "pop-under", "/popup", "/pop.js", "/pop.php",
+    "/aclk", "/adx/", "syndication", "notification-ad", "push-ad",
+    "/sw-ad", "adblock-detect", "/interstitial"
+)
+
+// Infra hosts that main-frame navigation may legitimately reach (captcha /
+// CDN challenge pages) even though they differ from the site's own domain.
+private val INFRA_ALLOW = setOf(
+    "google.com", "gstatic.com", "recaptcha.net", "cloudflare.com",
+    "challenges.cloudflare.com", "hcaptcha.com"
 )
 
 private fun isAdRequest(url: String): Boolean {
     val lower = url.lowercase()
     return AD_DOMAINS.any { lower.contains(it) } || AD_URL_PATTERNS.any { lower.contains(it) }
 }
+
+/** Registrable domain ("www.kisskh.co" -> "kisskh.co") for same-site checks. */
+private fun baseDomainOf(url: String): String =
+    runCatching { android.net.Uri.parse(url).host ?: "" }.getOrDefault("")
+        .split('.').filter { it.isNotEmpty() }.takeLast(2).joinToString(".")
 
 // A fresh response per request: shouldInterceptRequest runs on multiple WebView
 // threads, and a single shared WebResourceResponse (one InputStream instance)
@@ -77,23 +107,55 @@ private val AD_BLOCK_JS = """
    'PopAds','popns','adsbytrafficjunky'].forEach(function(k){
     try{ if(!window[k]) Object.defineProperty(window,k,{get:function(){return noopObj},set:noop}); }catch(e){}
   });
-  window.open = noop;
+  // Kill popups/popunders at the source. window.open is the #1 ad vector on
+  // these sites; blackhole it (and the rarer showModalDialog).
+  try{ window.open = function(){ return null; }; }catch(e){}
+  try{ window.showModalDialog = noop; }catch(e){}
+  // The registrable domain of THIS page — anything pointing elsewhere is off-site.
+  var BASE = (function(){ var p=location.hostname.split('.'); return p.slice(-2).join('.'); })();
+  // Popunder pattern: a tap on the player/page opens an ad in a new tab or
+  // redirects the whole page to an ad domain. Capture clicks before the site's
+  // own handlers run and cancel any anchor that targets a NEW window or an
+  // OFF-SITE URL. Same-site links (the site's own navigation, play buttons)
+  // pass through untouched, so the player is never affected.
+  document.addEventListener('click', function(e){
+    try{
+      var a = e.target && e.target.closest ? e.target.closest('a') : null;
+      if(!a) return;
+      if(a.target && a.target !== '_self' && a.target !== '_top' && a.target !== '_parent'){
+        a.target = '_self';
+      }
+      var href = a.getAttribute('href') || '';
+      if(/^https?:/i.test(href)){
+        var host = '';
+        try{ host = a.hostname || ''; }catch(_){}
+        if(host && BASE && host.indexOf(BASE) === -1){
+          e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        }
+      } else if(/^(intent:|market:|tg:|whatsapp:)/i.test(href)){
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      }
+    }catch(err){}
+  }, true);
   // NOTE: no setInterval/setTimeout source-sniffing here. Substring checks for
   // 'ad'/'pop' false-positive on ordinary code ('load', 'padding', queue.pop())
   // and silently killed main-frame players (broke Clappr/hls.js on pdtvhd.com).
   var css = [
     '[class*="ad-"],[class*="-ad"],[id*="ad-"],[id*="-ad"]',
-    '.ads,.advertisement,.adsbygoogle,.ad-banner,.ad-slot,.ad-unit',
-    'iframe[src*="ad"],iframe[src*="doubleclick"],iframe[src*="pagead"]',
-    '[class*="popup"],[class*="overlay"],[id*="overlay"],[class*="modal-ad"]',
+    '.ads,.advertisement,.adsbygoogle,.ad-banner,.ad-slot,.ad-unit,.ad-container,.ad-wrapper',
+    'iframe[src*="ads"],iframe[src*="doubleclick"],iframe[src*="pagead"],iframe[src*="popunder"]',
+    // Ad-specific overlays only — a bare [class*="overlay"] also hides many
+    // video players own control overlays, so keep these tightly ad-scoped.
+    '[class*="popup-ad"],[class*="ad-popup"],[class*="popunder"],[class*="ads-overlay"]',
+    '[class*="ad-overlay"],[class*="adoverlay"],[class*="modal-ad"],[id*="ad-modal"]',
     '.gdpr-overlay,.cookie-consent-overlay,.consent-banner',
-    '[class*="interstitial"],[class*="splash-ad"]',
+    '[class*="interstitial"],[class*="splash-ad"],[class*="banner-ad"]',
     'ins.adsbygoogle'
   ].join(',');
   var s = document.createElement('style');
   s.textContent = css + '{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   (document.head||document.documentElement).appendChild(s);
-  var blocked = /doubleclick|googlesyndication|adsbygoogle|exoclick|propellerads|popcash|popads/i;
+  var blocked = /doubleclick|googlesyndication|adsbygoogle|exoclick|propellerads|popcash|popads|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|onclick(algo|max|ads|predictiv)|galaksion|revenuehits|coinhive|cryptoloot/i;
   new MutationObserver(function(muts){
     muts.forEach(function(m){
       m.addedNodes.forEach(function(n){
@@ -113,8 +175,15 @@ private val AD_BLOCK_JS = """
 
 /**
  * Ad-blocked in-app browser tab pinned to one streaming site. Used by the
- * Donghua (donghuafun.com) and Drama (kisskh.co) bottom-bar tabs.
+ * Donghua (donghuafun.com), Drama (kisskh.co) and MKissa (mkissa.to) tabs.
  * (PDTV got its own native player — see ui/pdtv/PdTvScreen.)
+ *
+ * Ad defense is layered so nothing legitimate breaks: (1) network blocklist of
+ * ad/tracker/miner hosts + URL patterns, (2) window.open / target=_blank /
+ * onCreateWindow all refused so no popup tab can spawn, (3) a capture-phase
+ * click guard that cancels off-site and app-open anchor taps (the popunder
+ * pattern) while same-site navigation and the player pass through, (4) a
+ * gesture-scoped cross-domain main-frame block for tap-triggered redirects.
  *
  * [prefsName] keys the per-site "last page" persistence so each tab reopens
  * where the user left off.
@@ -155,6 +224,8 @@ fun AdblockBrowserScreen(
     BackHandler(enabled = canGoBack && customView == null) { webViewRef?.goBack() }
     BackHandler(enabled = customView != null) { customViewCallback?.onCustomViewHidden() }
 
+    val siteBase = remember(homeUrl) { baseDomainOf(homeUrl) }
+
     fun buildWebView(ctx: Context): WebView = WebView(ctx).also { wv ->
         wv.settings.apply {
             javaScriptEnabled = true
@@ -164,6 +235,11 @@ fun AdblockBrowserScreen(
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             mediaPlaybackRequiresUserGesture = false
             allowContentAccess = true
+            // Refuse pop-up windows outright: with this off, window.open and
+            // target=_blank cannot spawn the ad tabs these sites rely on. The
+            // video always plays inline, so nothing legitimate needs a new window.
+            setSupportMultipleWindows(false)
+            javaScriptCanOpenWindowsAutomatically = false
             // Pinch-zoom as a fallback for anything that still overflows,
             // without the legacy on-screen +/- buttons
             setSupportZoom(true)
@@ -198,15 +274,37 @@ fun AdblockBrowserScreen(
             }
             // Popunder/redirect blocking: streaming sites love navigating the
             // whole page to an ad URL on the first tap — swallow those instead
-            // of letting them replace the site
+            // of letting them replace the site.
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: WebResourceRequest
-            ): Boolean = isAdRequest(request.url.toString())
+            ): Boolean {
+                if (isAdRequest(request.url.toString())) return true
+                if (request.isForMainFrame) {
+                    val scheme = request.url.scheme?.lowercase()
+                    // intent://, market://, tg:// … = "open another app" ad links.
+                    if (scheme != null && scheme != "http" && scheme != "https") return true
+                    // Block ONLY user-tap-triggered jumps to another site — that's
+                    // the popunder/redirect ad. Gesture-less redirects (a site
+                    // moving itself to a new mirror domain on load) are allowed
+                    // through so the tab doesn't dead-end.
+                    if (request.hasGesture()) {
+                        val host = request.url.host?.lowercase().orEmpty()
+                        if (host.isNotEmpty() && siteBase.isNotEmpty() &&
+                            !host.endsWith(siteBase) &&
+                            INFRA_ALLOW.none { host.endsWith(it) }
+                        ) return true
+                    }
+                }
+                return false
+            }
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest
             ): WebResourceResponse? {
+                // Never blank the main document — only sub-resources get filtered,
+                // so a slipped-through ad URL can't turn the whole tab white.
+                if (request.isForMainFrame) return null
                 val url = request.url.toString()
                 if (isAdRequest(url)) return emptyResponse()
                 return null
@@ -223,6 +321,17 @@ fun AdblockBrowserScreen(
         }
 
         wv.webChromeClient = object : WebChromeClient() {
+            // Deny every request to spawn a new window. Combined with
+            // setSupportMultipleWindows(false) this is the hard backstop for
+            // popunders that slip past the JS guard — the site cannot open an
+            // ad tab because the host simply refuses to create one.
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: android.os.Message
+            ): Boolean = false
+
             override fun onShowCustomView(
                 view: android.view.View,
                 callback: CustomViewCallback

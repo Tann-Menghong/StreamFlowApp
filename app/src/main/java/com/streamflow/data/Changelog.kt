@@ -3,11 +3,12 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "5.1.1"
+    const val VERSION_NAME = "5.2.0"
 
     val notes = listOf(
-        "True fullscreen fix 📱 — the black band below the status bar is gone",
-        "Every screen sat too low because the status-bar spacing was applied twice; all tabs now use the full height of your screen",
-        "Plus from 5.1.0: MKissa tab and the redesigned tab settings"
+        "Total ad block 🛡️ — the Donghua, Drama and MKissa tabs now block ads much harder",
+        "No more pop-up/pop-under ad tabs: tapping the player just plays the video instead of opening an ad",
+        "Blocks redirect ads, app-open ('open in Play Store') ad links, trackers and in-page crypto-miners",
+        "Video players are untouched — same-site taps and the play button work exactly as before"
     )
 }
