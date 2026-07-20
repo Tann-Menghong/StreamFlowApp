@@ -28,9 +28,13 @@ import kotlinx.coroutines.launch
 // through the extractor during Bluetooth playback resumption would just throw
 private fun isLocalOrDirectUrl(url: String): Boolean {
     val lower = url.lowercase()
+    // Kept in sync with PlayerViewModel.isDirectStream: a /hls/ or /stream/ URL is
+    // a direct media link too, and skipping it here meant Bluetooth resume would
+    // hand it to the YouTube extractor (which throws) and abort resumption.
     return lower.startsWith("file://") || lower.startsWith("content://") ||
         lower.contains(".m3u8") || lower.contains(".mp4") ||
-        lower.contains(".m4a") || lower.contains(".webm")
+        lower.contains(".m4a") || lower.contains(".webm") ||
+        lower.contains("/hls/") || lower.contains("/stream/")
 }
 
 class PlaybackService : MediaSessionService() {
@@ -157,6 +161,11 @@ class PlaybackService : MediaSessionService() {
         // Seeks snap to the nearest keyframe instead of decoding the whole group
         // of frames up to the exact position — double-tap skips land instantly
         player.setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
+        // Hold a network wake lock while playing so background / screen-off audio
+        // (and audio-only mode) doesn't stall when the device tries to doze — the
+        // WAKE_LOCK permission is already declared. Released automatically when
+        // playback pauses/stops, so it costs nothing while idle.
+        player.setWakeMode(C.WAKE_MODE_NETWORK)
 
         audioSessionId = player.audioSessionId
         // "End of video" sleep mode: stop right here when the video finishes —
@@ -254,8 +263,14 @@ class PlaybackService : MediaSessionService() {
                             val last = app.database.historyDao().getAll().first()
                                 .firstOrNull { !isLocalOrDirectUrl(it.url) }
                                 ?: throw Exception("no resumable history")
+                            // Headset resume can happen on mobile data — honour the
+                            // battery/data-saver 480p cap instead of pulling a full
+                            // 1080p stream the user asked us not to on the go.
+                            val quality =
+                                if (app.prefs.batterySaver.first() || app.prefs.dataSaver.first())
+                                    "480P" else "AUTO"
                             val details = com.streamflow.data.YouTubeRepository()
-                                .getVideoDetails(last.url)
+                                .getVideoDetails(last.url, quality)
                             val extras = Bundle().apply {
                                 details.audioUrl?.let { putString("audioUrl", it) }
                             }

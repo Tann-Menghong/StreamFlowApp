@@ -51,8 +51,13 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     // leaving the corruption permanent.
     fun primeBookmarkPosition(b: com.streamflow.data.local.entity.BookmarkEntity, then: () -> Unit) {
         viewModelScope.launch {
-            val hasExisting = try { db.historyDao().getPosition(b.videoUrl); true } catch (_: Exception) { false }
-            if (hasExisting) {
+            // Detect existence with getByUrl (nullable), NOT getPosition: that query
+            // returns 0L for a missing row, so it never threw and the branch below
+            // always took the "update" path — for a bookmark whose video isn't in
+            // history yet, updatePosition matched 0 rows and the resume point was
+            // silently lost (the video opened from the start instead of the moment).
+            val existing = try { db.historyDao().getByUrl(b.videoUrl) } catch (_: Exception) { null }
+            if (existing != null) {
                 db.historyDao().updatePosition(b.videoUrl, b.positionMs)
             } else {
                 db.historyDao().insert(HistoryEntity(

@@ -88,7 +88,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun fetchSuggestions(query: String) {
         suggestionsJob?.cancel()
-        if (query.isBlank()) { _suggestions.value = emptyList(); return }
+        // Below 2 chars the suggestions are noise and just waste a round-trip on
+        // every keystroke — wait until there's something to actually complete.
+        if (query.trim().length < 2) { _suggestions.value = emptyList(); return }
         suggestionsJob = viewModelScope.launch {
             kotlinx.coroutines.delay(250) // debounce typing
             _suggestions.value = try { repo.getSearchSuggestions(query) } catch (_: Exception) { emptyList() }

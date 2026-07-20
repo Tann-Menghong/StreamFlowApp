@@ -11,6 +11,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 data class UpdateInfo(
     val latestVersion: String,
@@ -20,7 +21,15 @@ data class UpdateInfo(
 
 class UpdateManager(private val context: Context) {
 
-    private val client = OkHttpClient()
+    // Default OkHttpClient has a 10s READ timeout — far too tight for streaming a
+    // ~30 MB APK, where a single slow chunk on a mobile connection would abort the
+    // whole update. Give the read/write phases room; NO callTimeout so a genuinely
+    // large download on a slow link isn't capped by an overall deadline.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
 
     // Returns null when already up to date; THROWS when the check itself failed
     // (offline, rate-limited) — swallowing that here made the Settings row claim
@@ -74,7 +83,7 @@ class UpdateManager(private val context: Context) {
         var done = 0L
         FileOutputStream(file).use { out ->
             body.byteStream().use { inp ->
-                val buf = ByteArray(8192)
+                val buf = ByteArray(64 * 1024) // 64 KB: fewer syscalls on a big APK
                 var n: Int
                 while (inp.read(buf).also { n = it } != -1) {
                     out.write(buf, 0, n)

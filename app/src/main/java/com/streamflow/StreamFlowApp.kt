@@ -123,6 +123,10 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
     // respectCacheHeaders(false) every scroll re-downloads the same thumbnails.
     // High-RAM devices get bigger caches — smoother scroll-back, fewer re-fetches.
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        // Share the app-wide OkHttp client so thumbnails reuse the already-warm
+        // connection pool (and its timeouts) instead of Coil spinning up its own
+        // cold connections to the same ytimg hosts the extractor already talks to.
+        .okHttpClient { OkHttpDownloader.instance.client }
         .memoryCache {
             MemoryCache.Builder(this)
                 .maxSizePercent(if (com.streamflow.data.DeviceCaps.isHighPerf) 0.35 else 0.25)

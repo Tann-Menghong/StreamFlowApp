@@ -54,8 +54,18 @@ class NewVideosWorker(
         if (!notifyOn && widgetIds.isEmpty()) return Result.success()
 
         val repo = YouTubeRepository()
-        // Only channels the user left the bell on for
-        val subs = app.database.subscriptionDao().getAllOnce().filter { it.notify }.take(20)
+        // Only channels the user left the bell on for. If there are more than the
+        // per-run cap, ROTATE which window gets checked each run (the window start
+        // advances with the current time bucket) — otherwise channels past the
+        // first 20 were never checked at all and would never notify.
+        val bellOn = app.database.subscriptionDao().getAllOnce().filter { it.notify }
+        val cap = 20
+        val subs = if (bellOn.size <= cap) bellOn else {
+            val freqHours = (app.prefs.notifyFreq.first().toLongOrNull() ?: 6L).coerceAtLeast(1L)
+            val bucket = System.currentTimeMillis() / (freqHours * 3600_000L)
+            val start = ((bucket % bellOn.size).toInt()).coerceAtLeast(0)
+            (0 until cap).map { bellOn[(start + it) % bellOn.size] }
+        }
         val maxNotifs = app.prefs.notifyMax.first().toIntOrNull() ?: 5
         var notified = 0
         var newCount = 0
@@ -111,7 +121,9 @@ class NewVideosWorker(
                         // overwritten by an unrelated channel's alert hours later —
                         // a new upload from the SAME channel correctly replaces its
                         // own older notification instead of stacking duplicates.
-                        val notifId = 2000 + (sub.channelUrl.hashCode() and 0x7FFFFFFF) % 8000
+                        // Base 20000, away from the app-update notifications (3000-3002)
+                        // so a per-channel id can't collide with and overwrite them.
+                        val notifId = 20000 + (sub.channelUrl.hashCode() and 0x7FFFFFFF) % 8000
                         notify(notifId, sub.name, latest)
                         notified++
                     }

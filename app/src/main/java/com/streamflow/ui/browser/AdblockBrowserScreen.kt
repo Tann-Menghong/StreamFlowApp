@@ -92,7 +92,12 @@ private val AD_URL_PATTERNS = listOf(
     // Web-push / service-worker ad plumbing
     "onesignalsdk", "onesignal", "wonderpush", "pushengage", "pushnami",
     "webpush", "web-push", "/push.js", "pushsdk", "push-sdk", "/push/subscribe",
-    "service-worker-ad", "sw-push", "/notification.js", "notifications.js"
+    "service-worker-ad", "sw-push", "/notification.js", "notifications.js",
+    // More ad-serving path markers seen on pirate-stream mirrors. Kept specific
+    // (ad*/pop*/redirector query shapes) so they can't match legitimate slugs.
+    "/adserver", "/adserve", "/adservice", "/adman", "/adhandler", "/adengine",
+    "popunder.js", "/pu.php", "/click.php", "/redirect.php?", "/go.php?u=",
+    "/smartpop", "/native-ad", "/adtag"
 )
 
 // Infra hosts that main-frame navigation may legitimately reach (captcha /
