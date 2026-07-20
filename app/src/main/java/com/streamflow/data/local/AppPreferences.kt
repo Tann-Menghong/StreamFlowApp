@@ -41,6 +41,12 @@ class AppPreferences(private val context: Context) {
         val SHOW_MKISS_KEY             = booleanPreferencesKey("show_mkiss") // mkissa.to tab
         val START_TAB_KEY              = stringPreferencesKey("start_tab")
         val INCOGNITO_KEY              = booleanPreferencesKey("incognito")
+        val APP_LOCK_KEY              = booleanPreferencesKey("app_lock")
+        // Mirror of app_lock in plain prefs so MainActivity can read it
+        // synchronously at cold start (DataStore is async → would flash content
+        // before the lock engaged).
+        const val LOCK_MIRROR_PREFS = "app_flags"
+        const val LOCK_MIRROR_KEY   = "app_lock"
         // Player
         val SKIP_SECONDS_KEY = stringPreferencesKey("skip_seconds")
         val AUDIO_ONLY_KEY   = booleanPreferencesKey("audio_only_mode")
@@ -129,6 +135,7 @@ class AppPreferences(private val context: Context) {
     val showMkiss           : Flow<Boolean> = context.dataStore.data.map { it[SHOW_MKISS_KEY] ?: true }
     val startTab            : Flow<String>  = context.dataStore.data.map { it[START_TAB_KEY] ?: "home" }
     val incognito           : Flow<Boolean> = context.dataStore.data.map { it[INCOGNITO_KEY] ?: false }
+    val appLock             : Flow<Boolean> = context.dataStore.data.map { it[APP_LOCK_KEY] ?: false }
     // Player
     val skipSeconds: Flow<String> = context.dataStore.data.map { it[SKIP_SECONDS_KEY] ?: "10" }
     val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
@@ -277,6 +284,12 @@ class AppPreferences(private val context: Context) {
     suspend fun setShowMkiss(v: Boolean)            = context.dataStore.edit { it[SHOW_MKISS_KEY]             = v }
     suspend fun setStartTab(v: String)              = context.dataStore.edit { it[START_TAB_KEY]              = v }
     suspend fun setIncognito(v: Boolean)            = context.dataStore.edit { it[INCOGNITO_KEY]              = v }
+    suspend fun setAppLock(v: Boolean) {
+        context.dataStore.edit { it[APP_LOCK_KEY] = v }
+        // Keep the synchronous mirror in step for the next cold start
+        context.getSharedPreferences(LOCK_MIRROR_PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(LOCK_MIRROR_KEY, v).apply()
+    }
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }

@@ -344,6 +344,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val showMkiss            by vm.showMkiss.collectAsState()
     val startTab             by vm.startTab.collectAsState()
     val incognito            by vm.incognito.collectAsState()
+    val appLock              by vm.appLock.collectAsState()
     val qualityCellular      by vm.qualityCellular.collectAsState()
     val historyRetention     by vm.historyRetention.collectAsState()
     val notifyFreq           by vm.notifyFreq.collectAsState()
@@ -686,6 +687,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
                             "Watch without saving to history", incognito
                         ) { vm.setIncognito(it) }
+                        SettingsDivider()
+                        SettingsSwitchItem(Icons.Rounded.Lock, "App lock",
+                            "Require fingerprint / PIN to open the app", appLock
+                        ) { vm.setAppLock(it) }
                         SettingsDivider()
                         SettingsItem(Icons.Rounded.Language, "Trending country",
                             countryOptions.firstOrNull { it.first == country }?.second ?: country

@@ -1,6 +1,7 @@
 package com.streamflow
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,8 @@ import android.os.Bundle
 import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +48,33 @@ class MainActivity : ComponentActivity() {
     // Bumped on every routed intent so NavGraph re-navigates even when the
     // url/dest string is identical to the previous one (same video shared twice)
     private var intentNonce by mutableStateOf(0)
+
+    // ── App lock (Settings > App lock) ───────────────────────────────────────
+    // appLockEnabled is read synchronously from a plain-prefs mirror at cold
+    // start (DataStore is async → would flash content before locking), then kept
+    // live by a collector. appUnlocked drives the Compose gate.
+    private var appLockEnabled = false
+    private var appUnlocked by mutableStateOf(true)
+    private var unlockInFlight = false
+    private lateinit var unlockLauncher: ActivityResultLauncher<Intent>
+
+    private fun deviceSecure(): Boolean =
+        (getSystemService(KEYGUARD_SERVICE) as? KeyguardManager)?.isDeviceSecure == true
+
+    private fun requestUnlock() {
+        if (unlockInFlight) return
+        val km = getSystemService(KEYGUARD_SERVICE) as? KeyguardManager
+        @Suppress("DEPRECATION")
+        val intent = km?.createConfirmDeviceCredentialIntent("StreamFlow", "Unlock to continue")
+        if (intent != null) {
+            unlockInFlight = true
+            try { unlockLauncher.launch(intent) }
+            catch (_: Exception) { unlockInFlight = false; appUnlocked = true }
+        } else {
+            // No secure lock configured on the device — can't lock, so allow in
+            appUnlocked = true
+        }
+    }
 
     private fun handleIntent(intent: Intent?) {
         // Relaunching from Recents redelivers the ORIGINAL intent — without this
@@ -104,6 +134,21 @@ class MainActivity : ComponentActivity() {
             prefs.autoPip.collect { autoPipEnabled = it }
         }
 
+        // App lock: read the synchronous mirror so the gate is decided on the very
+        // first frame (no content flash), then keep it live for re-lock decisions.
+        appLockEnabled = getSharedPreferences(
+            AppPreferences.LOCK_MIRROR_PREFS, MODE_PRIVATE
+        ).getBoolean(AppPreferences.LOCK_MIRROR_KEY, false)
+        appUnlocked = !(appLockEnabled && deviceSecure())
+        unlockLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            unlockInFlight = false
+            if (result.resultCode == RESULT_OK) appUnlocked = true
+            // else: stay locked — the lock screen offers a manual retry
+        }
+        lifecycleScope.launch { prefs.appLock.collect { appLockEnabled = it } }
+
         handleIntent(intent)
 
         enableHighRefreshRate()
@@ -145,7 +190,11 @@ class MainActivity : ComponentActivity() {
                     val onboardingDone by androidx.compose.runtime.produceState<Boolean?>(null) {
                         prefs.onboardingDone.collect { value = it }
                     }
-                    when (onboardingDone) {
+                    if (appLockEnabled && !appUnlocked) {
+                        // Locked: authenticate before anything else is shown
+                        com.streamflow.ui.lock.LockScreen(onUnlock = { requestUnlock() })
+                        androidx.compose.runtime.LaunchedEffect(Unit) { requestUnlock() }
+                    } else when (onboardingDone) {
                         null  -> Unit // waiting for DataStore, hidden behind the splash
                         false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
                         else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest,
@@ -153,6 +202,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Re-lock when the app actually leaves the foreground. Skip while the
+        // system credential sheet is up (that itself stops us), during PiP (still
+        // in use), and across config changes.
+        if (appLockEnabled && deviceSecure() && !unlockInFlight &&
+            !isInPip && !isChangingConfigurations
+        ) {
+            appUnlocked = false
         }
     }
 

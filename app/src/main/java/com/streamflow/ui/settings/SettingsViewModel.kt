@@ -52,6 +52,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val showMkiss = prefs.showMkiss.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val startTab = prefs.startTab.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "home")
     val incognito = prefs.incognito.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val appLock = prefs.appLock.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun setAppLock(v: Boolean) = viewModelScope.launch { prefs.setAppLock(v) }
     val qualityCellular = prefs.qualityCellular.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SAME")
     val historyRetention = prefs.historyRetention.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "0")
     // Notifications
