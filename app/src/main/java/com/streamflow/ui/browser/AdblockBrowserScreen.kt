@@ -127,6 +127,20 @@ private val AD_BLOCK_JS = """
   // these sites; blackhole it (and the rarer showModalDialog).
   try{ window.open = function(){ return null; }; }catch(e){}
   try{ window.showModalDialog = noop; }catch(e){}
+  // ── Timer-sniffing (restored from the old "Brave-level" build) ────────────
+  // Ad/pop scriptlets — including the fake-notification overlay — schedule
+  // themselves via setTimeout/setInterval. Refuse any timer whose function
+  // source carries pop / window.open / obfuscation / ad-network / scam markers.
+  // Targeted tokens (NOT a bare 'ad'/'pop') so the video player's own timers
+  // (buffer/append/load) survive; the players run in iframes this main-frame
+  // override never reaches anyway. This was only removed because PDTV used to be
+  // a WebView — it's a native ExoPlayer screen now, so it's safe to bring back.
+  try{
+    var _si=window.setInterval, _st=window.setTimeout;
+    var AD_FN=/popunder|popup|popmagic|popns|window\.open|adsby|exoloader|onclick(algo|max|ads)|nativead|showad|_0x[0-9a-f]{4}|atob\(|premium account|new message|congratulation|claim your|you.?ve won|activate.{0,14}account/i;
+    window.setInterval=function(fn){ try{ if(AD_FN.test(String(fn))) return 0; }catch(e){} return _si.apply(window, arguments); };
+    window.setTimeout =function(fn){ try{ if(AD_FN.test(String(fn))) return 0; }catch(e){} return _st.apply(window, arguments); };
+  }catch(e){}
   // ── Web-push / notification ADS ──────────────────────────────────────────
   // These sites hook you into a push-ad network (via a background service
   // worker) that then spams NOTIFICATION ads even after you leave the page.
@@ -200,7 +214,10 @@ private val AD_BLOCK_JS = """
   // premium account is activated" popup whose Accept/Cancel lead off-site.
   // Kill any FLOATING element that carries scam text or an off-site link — the
   // video player is explicitly protected so playback is never touched.
-  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction on the next page|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app/i;
+  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction on the next page|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app|new message.{0,40}(account|proceed|instruction)/i;
+  // Ad hosts we recognise in an iframe src even when the iframe is cross-origin
+  // (its DOM can't be read, but the iframe ELEMENT can still be removed).
+  var AD_HOST = /doubleclick|googlesyndication|adservice|adsystem|adnxs|exoclick|propellerads|propu\.sh|popads|popcash|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|galaksion|revenuehits|onclick(algo|max|ads|predictiv)|mgid|outbrain|taboola|trafficjunky|onesignal|wonderpush|pushengage|pushnami|clickadilla|a-ads|coinzilla|bidgear|adprovider/i;
   function adHasOffsite(el){
     try{
       var as = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
@@ -211,26 +228,52 @@ private val AD_BLOCK_JS = """
   function adIsPlayer(el){
     try{ return !!(el.querySelector && el.querySelector('video,[class*="player" i],[id*="player" i],[class*="jwplayer" i],[class*="clappr" i],[class*="plyr" i]')); }catch(e){ return false; }
   }
+  function adKill(n){
+    try{ n.style.setProperty('display','none','important'); }catch(e){}
+    try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
+  }
   function adScan(n){
     if(!n||n.nodeType!==1) return;
+    // 1) An ad iframe (by src) — remove it whether or not we can read inside it.
+    try{ if(n.tagName==='IFRAME'){ var isrc=n.src||n.getAttribute('src')||''; if(isrc && AD_HOST.test(isrc)){ adKill(n); return; } } }catch(e){}
     var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
     var pos=s.position, z=parseInt(s.zIndex,10)||0;
     if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
     if(adIsPlayer(n)) return;                       // never remove the player
+    // 2) Scam-text overlay (the fake "premium account activated" dialog).
     var txt=''; try{ txt=(n.innerText||n.textContent||''); }catch(e){}
-    var offsite=(pos==='fixed'||z>=100) && adHasOffsite(n);
-    if(AD_TXT.test(txt) || offsite){
-      try{ n.style.setProperty('display','none','important'); }catch(e){}
-      try{ n.parentNode&&n.parentNode.removeChild(n); }catch(e){}
-    }
+    if(AD_TXT.test(txt)){ adKill(n); return; }
+    // 3) Floating box that links off-site (Accept -> ad site).
+    if((pos==='fixed'||z>=100) && adHasOffsite(n)){ adKill(n); return; }
+    // 4) A floating box that WRAPS an ad iframe.
+    try{ var ifr=n.querySelector&&n.querySelector('iframe'); if(ifr){ var s2=ifr.src||''; if(s2 && AD_HOST.test(s2)){ adKill(n); return; } } }catch(e){}
+    // 5) A screen-covering fixed overlay that carries any ad signal (off-site
+    //    link or an iframe). Gated on a signal so the player is never removed.
+    try{
+      if(pos==='fixed'){
+        var r=n.getBoundingClientRect();
+        var vw=window.innerWidth||document.documentElement.clientWidth;
+        var vh=window.innerHeight||document.documentElement.clientHeight;
+        if(r.width>=vw*0.9 && r.height>=vh*0.6 && (adHasOffsite(n) || (n.querySelector&&n.querySelector('iframe')))){ adKill(n); return; }
+      }
+    }catch(e){}
   }
   function adSweep(){
-    try{ var els=document.body?document.body.querySelectorAll('div,ins,aside,section,a'):[];
-      for(var i=0;i<els.length;i++) adScan(els[i]); }catch(e){}
+    try{
+      var sel='div,ins,aside,section,a,dialog,center,table,iframe';
+      var els=document.body?document.body.querySelectorAll(sel):[];
+      for(var i=0;i<els.length;i++) adScan(els[i]);
+      // Also every direct child of body/html regardless of tag (custom elements,
+      // <dialog>, ad frames appended straight to the root).
+      var roots=[document.body,document.documentElement];
+      for(var r=0;r<roots.length;r++){ if(!roots[r]) continue; var ch=roots[r].children;
+        for(var j=0;j<ch.length;j++) adScan(ch[j]); }
+    }catch(e){}
   }
-  // These ads inject on a delay and re-inject, so sweep a few times then keep watch.
-  [250,700,1400,2400,3800,6000,9000].forEach(function(t){ setTimeout(adSweep,t); });
-  setInterval(adSweep, 2500);
+  // These ads inject on a delay and re-inject, so sweep immediately, a few more
+  // times, then keep watch on a short interval.
+  [0,200,500,1000,1800,2800,4200,6000,9000].forEach(function(t){ setTimeout(adSweep,t); });
+  setInterval(adSweep, 2000);
   new MutationObserver(function(muts){
     muts.forEach(function(m){
       m.addedNodes.forEach(function(n){
