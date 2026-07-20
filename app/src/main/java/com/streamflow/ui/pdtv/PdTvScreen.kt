@@ -238,6 +238,15 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) { playerError = null; retries = 0 }
             }
+            // Keep the screen awake only while a channel is actually PLAYING —
+            // holding FLAG_KEEP_SCREEN_ON the whole time the tab is open (even
+            // paused or after an error) needlessly drained the battery.
+            override fun onIsPlayingChanged(playing: Boolean) {
+                activity?.window?.let { w ->
+                    if (playing) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
         }
         exo.addListener(listener)
         onDispose {
@@ -250,12 +259,6 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
                 act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
         }
-    }
-
-    // Live TV keeps the screen awake while the tab is open
-    DisposableEffect(Unit) {
-        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { }
     }
 
     fun play(url: String) {

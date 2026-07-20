@@ -87,10 +87,16 @@ class SearchViewModel : ViewModel() {
         }
     }
 
+    // Synchronous re-entrancy guard: the scroll trigger can fire again before the
+    // coroutine flips isLoadingMore, which let two identical page fetches run at
+    // once (double network for the same page).
+    private var loadingMorePage = false
+
     fun loadMore() {
         val current = _uiState.value as? SearchUiState.Success ?: return
         val page = nextPage ?: return
-        if (current.isLoadingMore) return
+        if (current.isLoadingMore || loadingMorePage) return
+        loadingMorePage = true
         val gen = searchGeneration
         viewModelScope.launch {
             _uiState.value = current.copy(isLoadingMore = true)
@@ -112,6 +118,10 @@ class SearchViewModel : ViewModel() {
                 // after a new search started would resurrect the old query's results
                 if (gen != searchGeneration) return@launch
                 _uiState.value = current.copy(isLoadingMore = false)
+            } finally {
+                // Always release — including the stale-generation early return —
+                // or a new search mid-load would pin it and block pagination.
+                loadingMorePage = false
             }
         }
     }

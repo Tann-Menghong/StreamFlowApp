@@ -47,13 +47,50 @@ class AutoBackupWorker(
                 val dir = applicationContext.getExternalFilesDir(null) ?: applicationContext.filesDir
                 File(dir, name).writeText(json)
             }
+            pruneOldBackups()
             Result.success()
         } catch (_: Exception) {
             Result.retry()
         }
     }
 
+    // A weekly job runs forever, so without pruning the Documents/StreamFlow
+    // folder fills with dozens of date-stamped JSONs. Keep only the newest few.
+    private fun pruneOldBackups() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = applicationContext.contentResolver
+                val uri = MediaStore.Files.getContentUri("external")
+                val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME)
+                val selection = MediaStore.MediaColumns.DISPLAY_NAME + " LIKE ? AND " +
+                    MediaStore.MediaColumns.RELATIVE_PATH + " LIKE ?"
+                val args = arrayOf("StreamFlow-backup-%.json", "%StreamFlow%")
+                // Newest first by row id (monotonic for our inserts)
+                val order = MediaStore.MediaColumns._ID + " DESC"
+                resolver.query(uri, projection, selection, args, order)?.use { c ->
+                    val idCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                    var index = 0
+                    while (c.moveToNext()) {
+                        if (index++ < KEEP) continue // keep the newest KEEP
+                        val id = c.getLong(idCol)
+                        try {
+                            resolver.delete(
+                                android.content.ContentUris.withAppendedId(uri, id), null, null)
+                        } catch (_: Exception) {}
+                    }
+                }
+            } else {
+                val dir = applicationContext.getExternalFilesDir(null) ?: applicationContext.filesDir
+                dir.listFiles { f -> f.name.startsWith("StreamFlow-backup-") && f.name.endsWith(".json") }
+                    ?.sortedByDescending { it.name } // date-stamped name sorts chronologically
+                    ?.drop(KEEP)
+                    ?.forEach { runCatching { it.delete() } }
+            }
+        } catch (_: Exception) {}
+    }
+
     companion object {
         const val WORK_NAME = "auto_backup"
+        private const val KEEP = 6
     }
 }

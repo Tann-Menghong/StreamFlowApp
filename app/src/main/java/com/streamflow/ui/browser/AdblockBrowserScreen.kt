@@ -67,7 +67,18 @@ private val AD_DOMAINS = setOf(
     "yandex.ru", "mc.yandex.ru", "vidoomy.com", "admixer.net",
     // Common in-page crypto-miners bundled with pirate-stream ads
     "coinhive.com", "coin-hive.com", "jsecoin.com", "cryptoloot.pro",
-    "webminepool.com", "crypto-loot.com", "minero.cc"
+    "webminepool.com", "crypto-loot.com", "minero.cc",
+    // More popunder / redirect / interstitial networks seen on pirate-stream
+    // mirrors — these are the ones that keep opening ad tabs and full-page redirects
+    "hilltopads.com", "adnntwrk.com", "adexchangeprebid.com", "adkernel.com",
+    "adtng.com", "adtng.net", "syndication.exdynsrv.com", "exdynsrv.com",
+    "go.pub2srv.com", "pubads.g.doubleclick.net", "servedby-buysellads.com",
+    "buysellads.com", "highperformanceformat.com", "displaycontentnetwork.com",
+    "brainlyads.com", "admatterra.com", "adsbnativ.com", "asoftwareadvice.com",
+    "monetag.com", "clickaine.com", "adpaths.com", "runnative.com", "adnimation.com",
+    "chumsradar.com", "chumsads.com", "mm9nu.com", "luckypushh.com", "pushvibe.com",
+    "notifica.click", "pushzilla.co", "getpushads.com", "push-notifications.io",
+    "adventurefeeds.com", "smartnativeads.com", "popup.click", "popmonetize.com"
 )
 
 private val AD_URL_PATTERNS = listOf(
@@ -386,6 +397,13 @@ fun AdblockBrowserScreen(
             // far fewer of the aggressive mobile popunder/notification ads; the
             // AD_BLOCK_JS also forces a desktop-width viewport so it fits the screen.
             userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            // Google Safe Browsing: an extra network-level shield that blocks
+            // navigation to known malware / social-engineering domains — many of
+            // the popunder/redirect ad destinations on pirate mirrors are already
+            // on that list, so this stops them before a page even loads.
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                try { safeBrowsingEnabled = true } catch (_: Throwable) {}
+            }
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)

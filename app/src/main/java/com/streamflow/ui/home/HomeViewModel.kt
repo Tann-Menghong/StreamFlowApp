@@ -267,6 +267,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var feedSeeds: List<String> = emptyList()
     private var seedIndex = 0
     private val seenUrls = HashSet<String>()
+    // Consecutive load-more rounds that produced no new videos. Once a full pass
+    // over every seed yields nothing new twice in a row, the feed is genuinely
+    // exhausted — stop advertising hasMore so scrolling to the bottom doesn't
+    // keep firing a dozen wasted searches on every attempt. One blank round is
+    // tolerated so a brief offline blip doesn't end the feed. Reset on reload.
+    private var emptyFeedRounds = 0
 
     // Bumped whenever the feed is replaced (reload/search/category) so an
     // in-flight loadMore can't append stale results into the new feed
@@ -333,6 +339,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 feedSeeds = buildSeeds()
                 seedIndex = 0
                 seenUrls.clear()
+                emptyFeedRounds = 0
 
                 // Trending + one personalized chunk in parallel; shuffle trending
                 // so every refresh has a different order
@@ -462,14 +469,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val base = _uiState.value as? HomeUiState.Success ?: return@launch
             // Final dedupe at append time — duplicate LazyColumn keys crash the app
             val existing = base.videos.mapTo(HashSet()) { it.url }
+            val added = fresh.filter { it.url !in existing }
+            // Track exhaustion so an all-seeds-seen feed stops re-searching forever
+            emptyFeedRounds = if (added.isEmpty()) emptyFeedRounds + 1 else 0
             _uiState.value = base.copy(
-                videos        = base.videos + fresh.filter { it.url !in existing },
+                videos        = base.videos + added,
                 isLoadingMore = false,
                 // Feed mode: seeds are endless, so one empty/failed round (e.g. a
-                // brief offline moment) must not end the feed forever — keep
-                // hasMore true while seeds exist and let the next scroll retry
+                // brief offline moment) must not end the feed — keep hasMore true
+                // and retry once more; only after two blank rounds is it truly
+                // exhausted and we stop, so scrolling the bottom quits hammering
+                // the network with searches that only return already-seen videos.
                 hasMore       = if (isSearchMode) nextPage != null
-                                else fresh.isNotEmpty() || feedSeeds.isNotEmpty()
+                                else feedSeeds.isNotEmpty() && emptyFeedRounds < 2
             )
         }
     }

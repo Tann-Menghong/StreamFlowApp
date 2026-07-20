@@ -53,11 +53,17 @@ private class LatestUploadsFactory(private val context: Context) :
         rows.forEach { row ->
             if (row.thumb.isNotEmpty() && row.thumb !in thumbs) {
                 thumbs[row.thumb] = try {
-                    java.net.URL(row.thumb).openStream().use { input ->
-                        val bytes = input.readBytes()
-                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                    }
+                    // Use the shared client, which has connect/read/call timeouts —
+                    // a raw URL.openStream() has NONE, so a dead network could hang
+                    // this binder thread (and the launcher's widget refresh) forever.
+                    val req = okhttp3.Request.Builder().url(row.thumb).build()
+                    com.streamflow.data.OkHttpDownloader.instance.client.newCall(req)
+                        .execute().use { resp ->
+                            val bytes = resp.body?.bytes() ?: ByteArray(0)
+                            val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                            if (bytes.isEmpty()) null
+                            else BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                        }
                 } catch (_: Exception) { null }
             }
         }

@@ -129,10 +129,17 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
         } catch (_: Exception) {}
     }
 
+    // Synchronous re-entrancy guard: the scroll-driven trigger can fire twice
+    // before the coroutine flips data.isLoadingMore, so relying on that state
+    // snapshot alone let two identical page fetches run at once (double network,
+    // and only the dedupe at append time saved the list from a crash).
+    private var loadingMorePage = false
+
     fun loadMore() {
         val data = _channel.value
         val nextPage = data.nextPage ?: return
-        if (data.isLoadingMore) return
+        if (data.isLoadingMore || loadingMorePage) return
+        loadingMorePage = true
         val url = loadedUrl
         val tab = currentTab
         val gen = loadGeneration
@@ -154,6 +161,11 @@ class ChannelViewModel(app: Application) : AndroidViewModel(app) {
             } catch (_: Exception) {
                 if (gen != loadGeneration) return@launch
                 _channel.value = _channel.value.copy(isLoadingMore = false)
+            } finally {
+                // Always release the guard — including on the stale-generation
+                // early returns above — or a tab/channel switch mid-load would
+                // pin it true and block all future pagination on this VM.
+                loadingMorePage = false
             }
         }
     }

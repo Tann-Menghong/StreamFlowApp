@@ -18,6 +18,12 @@ class OkHttpDownloader private constructor() : Downloader() {
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        // Overall per-call hang cap: connect+read timeouts only bound each phase,
+        // so a server that trickles bytes forever (or a stuck TLS handshake on a
+        // dead network) could keep a call — and the coroutine behind it — pinned
+        // indefinitely. callTimeout puts a hard ceiling on the whole request.
+        .callTimeout(45, TimeUnit.SECONDS)
         .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
         .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .followRedirects(true)

@@ -203,7 +203,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             try { AiEngine.fetchTranscript(it.url) } catch (_: Exception) { "" }
         }.orEmpty()
         val text = transcript.ifBlank { d.description }
-        transcriptCache = d.url to text
+        // Only cache a non-blank source. Caching an empty string (transcript
+        // fetch failed AND the video has no description) would pin "no source"
+        // for this video, so a later Summarize/Ask could never retry the fetch.
+        if (text.isNotBlank()) transcriptCache = d.url to text
         return text
     }
 
