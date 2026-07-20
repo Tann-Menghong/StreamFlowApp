@@ -12,8 +12,13 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +46,14 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Custom "Next" button for the media notification / lock screen. The app plays
+    // one MediaItem at a time (the queue + related auto-play are app-managed, not
+    // an ExoPlayer playlist), so the native next button never appears — this
+    // command reproduces the on-screen "next" behaviour: play the queued video,
+    // else the current video's first related video.
+    private val nextCommand = SessionCommand(CUSTOM_NEXT, android.os.Bundle.EMPTY)
+    private var advancing = false // guard against double-taps while resolving
     private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
     private var boostGainMb = 0
     private var audioSessionId = 0
@@ -231,19 +244,44 @@ class PlaybackService : MediaSessionService() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
+        // The "Next" button shown in the notification + lock-screen controls
+        val nextButton = CommandButton.Builder()
+            .setDisplayName("Next")
+            .setIconResId(R.drawable.ic_notif_next)
+            .setSessionCommand(nextCommand)
+            .setEnabled(true)
+            .build()
+
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
+            .setCustomLayout(listOf(nextButton))
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(
                     session: MediaSession,
                     controller: MediaSession.ControllerInfo
                 ): MediaSession.ConnectionResult {
+                    // Grant the custom NEXT command on top of the defaults, or the
+                    // notification button would be rejected as an unavailable command
                     val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                        .add(nextCommand)
                         .build()
                     return MediaSession.ConnectionResult.accept(
                         sessionCommands,
                         Player.Commands.Builder().addAllCommands().build()
                     )
+                }
+
+                override fun onCustomCommand(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    customCommand: SessionCommand,
+                    args: android.os.Bundle
+                ): ListenableFuture<SessionResult> {
+                    if (customCommand.customAction == CUSTOM_NEXT) {
+                        playNext()
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
+                    return super.onCustomCommand(session, controller, customCommand, args)
                 }
 
                 // Bluetooth/headset "play" after the app was killed: re-extract the
@@ -297,6 +335,74 @@ class PlaybackService : MediaSessionService() {
             .build()
     }
 
+    // Advance to the next video, mirroring the on-screen "next": the queued video
+    // takes priority (explicit user intent), otherwise the current video's first
+    // related video. Runs off-main for extraction, then plays on the main thread.
+    private fun playNext() {
+        if (advancing) return
+        advancing = true
+        serviceScope.launch {
+            try {
+                val queued = com.streamflow.data.PlaybackQueue.popNext()
+                val nextUrl = queued?.url ?: relatedOfCurrent() ?: return@launch
+                resolveAndPlay(nextUrl)
+            } catch (_: Exception) {
+            } finally {
+                advancing = false
+            }
+        }
+    }
+
+    private suspend fun relatedOfCurrent(): String? {
+        val currentUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return null
+        if (isLocalOrDirectUrl(currentUrl)) return null
+        return try {
+            com.streamflow.data.YouTubeRepository()
+                .getVideoDetails(currentUrl, resumeQuality())
+                .relatedVideos.firstOrNull()?.url
+        } catch (_: Exception) { null }
+    }
+
+    // Battery/data-saver cap, shared with headset resume
+    private suspend fun resumeQuality(): String {
+        val prefs = (application as StreamFlowApp).prefs
+        return if (prefs.batterySaver.first() || prefs.dataSaver.first()) "480P" else "AUTO"
+    }
+
+    private suspend fun resolveAndPlay(url: String) {
+        val app = application as StreamFlowApp
+        val details = com.streamflow.data.YouTubeRepository().getVideoDetails(url, resumeQuality())
+        val extras = Bundle().apply { details.audioUrl?.let { putString("audioUrl", it) } }
+        val item = MediaItem.Builder()
+            .setUri(details.streamUrl)
+            .setMediaId(details.url)
+            .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder()
+                .setTitle(details.title)
+                .setArtist(details.uploaderName)
+                .setArtworkUri(android.net.Uri.parse(details.thumbnailUrl))
+                .build())
+            .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
+            .build()
+        val player = mediaSession?.player ?: return
+        player.setMediaItem(item)
+        player.prepare()
+        player.play()
+        // Keep the in-app mini player in sync with what the notification advanced to
+        com.streamflow.ui.components.MiniPlayerState.update(
+            com.streamflow.ui.components.MiniPlayerData(
+                url = details.url, title = details.title,
+                thumbnailUrl = details.thumbnailUrl,
+                uploaderName = details.uploaderName, isPlaying = true))
+        // Record history (unless incognito), carrying any existing resume position
+        if (!app.prefs.incognito.first()) {
+            val prevPos = try { app.database.historyDao().getPosition(details.url) } catch (_: Exception) { 0L }
+            app.database.historyDao().insert(com.streamflow.data.local.entity.HistoryEntity(
+                url = details.url, title = details.title, thumbnailUrl = details.thumbnailUrl,
+                uploaderName = details.uploaderName, viewCount = details.viewCount,
+                duration = details.duration, position = prevPos))
+        }
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
     override fun onDestroy() {
@@ -311,5 +417,9 @@ class PlaybackService : MediaSessionService() {
         }
         mediaSession = null
         super.onDestroy()
+    }
+
+    companion object {
+        private const val CUSTOM_NEXT = "com.streamflow.action.NEXT"
     }
 }

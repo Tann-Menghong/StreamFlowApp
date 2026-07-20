@@ -60,19 +60,24 @@ private val countryOptions = listOf(
 
 // The 8 dashboard categories: name (also the nav-route key + KmStrings key), icon, color
 private data class SettingsTile(val name: String, val icon: ImageVector, val color: Color)
-private val settingsTiles = listOf(
-    listOf(
+
+// Grouped into labelled sections like a system Settings app: each section is one
+// rounded card of full-width rows, so subtitles get room and the page reads as a
+// clean single column instead of a cramped 2-across tile grid.
+private data class SettingsSection(val header: String, val tiles: List<SettingsTile>)
+private val settingsSections = listOf(
+    SettingsSection("Personalization", listOf(
         SettingsTile("Appearance", Icons.Rounded.Palette, Color(0xFFAF52DE)),
-        SettingsTile("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF))),
-    listOf(
-        SettingsTile("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)),
-        SettingsTile("Home", Icons.Rounded.Home, Color(0xFF34C759))),
-    listOf(
+        SettingsTile("Home", Icons.Rounded.Home, Color(0xFF34C759)))),
+    SettingsSection("Playback & alerts", listOf(
+        SettingsTile("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF)),
+        SettingsTile("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)))),
+    SettingsSection("Intelligence & data", listOf(
         SettingsTile("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)),
-        SettingsTile("Storage", Icons.Rounded.Storage, Color(0xFF26A69A))),
-    listOf(
-        SettingsTile("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)),
-        SettingsTile("About", Icons.Rounded.Info, Color(0xFFFF7043)))
+        SettingsTile("Storage", Icons.Rounded.Storage, Color(0xFF26A69A)),
+        SettingsTile("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)))),
+    SettingsSection("System", listOf(
+        SettingsTile("About", Icons.Rounded.Info, Color(0xFFFF7043))))
 )
 
 private fun accentLabel(accentColor: String): String = when {
@@ -184,47 +189,40 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 }
             }
 
-            // ── Dashboard: every category, with its current state at a glance.
-            // Tapping a tile opens that category's own page.
-            Column(
-                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                settingsTiles.forEach { rowTiles ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        rowTiles.forEach { tile ->
-                            // Premium-minimal tile: flat surface + hairline border,
-                            // a soft tinted icon chip carries the category colour.
-                            Surface(
-                                onClick = { onCategoryClick(tile.name) },
-                                shape = RoundedCornerShape(18.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    Modifier.padding(horizontal = 13.dp, vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(11.dp)
-                                ) {
-                                    Box(
-                                        Modifier.size(34.dp).background(tile.color.copy(0.14f), RoundedCornerShape(11.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(tile.icon, null, tint = tile.color, modifier = Modifier.size(18.dp))
-                                    }
-                                    Column(Modifier.weight(1f)) {
-                                        Text(com.streamflow.ui.theme.KmStrings.t(tile.name, language),
-                                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
-                                        Text(tileSubtitles[tile.name] ?: "",
-                                            fontSize = 11.sp, maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                            }
+            // ── Dashboard: every category grouped into labelled sections, each a
+            // single rounded card of full-width rows. Tapping a row opens that
+            // category's own page.
+            settingsSections.forEach { section ->
+                // Muted uppercase section label
+                Text(
+                    section.header.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.4.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
+                    modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.outline.copy(0.6f))
+                ) {
+                    section.tiles.forEachIndexed { i, tile ->
+                        SettingsDashboardRow(
+                            tile = tile,
+                            title = com.streamflow.ui.theme.KmStrings.t(tile.name, language),
+                            subtitle = tileSubtitles[tile.name] ?: "",
+                            onClick = { onCategoryClick(tile.name) }
+                        )
+                        if (i < section.tiles.lastIndex) {
+                            Divider(
+                                modifier = Modifier.padding(start = 62.dp),
+                                thickness = 0.7.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(0.35f)
+                            )
                         }
                     }
                 }
@@ -274,6 +272,44 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 }
             }
         }
+    }
+}
+
+// One full-width dashboard row: soft-tinted icon chip, title + live subtitle,
+// and a trailing chevron — the system-Settings look.
+@Composable
+private fun SettingsDashboardRow(
+    tile: SettingsTile,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
+        Box(
+            Modifier.size(34.dp).background(tile.color.copy(0.14f), RoundedCornerShape(11.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(tile.icon, null, tint = tile.color, modifier = Modifier.size(19.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
+            if (subtitle.isNotEmpty()) {
+                Text(subtitle, fontSize = 12.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Icon(Icons.Rounded.ChevronRight, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
+            modifier = Modifier.size(20.dp))
     }
 }
 
