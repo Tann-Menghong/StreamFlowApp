@@ -132,15 +132,6 @@ internal fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byt
 
 private val AD_BLOCK_JS = """
 (function(){
-  // ── Desktop mode ─────────────────────────────────────────────────────────
-  // Paired with the desktop Chrome UA, force a desktop-width viewport so these
-  // sites lay out as their (far-less-ad-infested) desktop version but still fit
-  // the phone screen via useWideViewPort + loadWithOverviewMode scaling.
-  try{
-    var mv=document.querySelector('meta[name="viewport"]');
-    if(!mv){ mv=document.createElement('meta'); mv.name='viewport'; (document.head||document.documentElement).appendChild(mv); }
-    mv.setAttribute('content','width=1024');
-  }catch(e){}
   var noop = function(){};
   var noopObj = new Proxy({}, { get: function(){ return noop; } });
   ['adsbygoogle','googletag','ga','_gaq','dataLayer','pbjs','apntag',
@@ -397,11 +388,11 @@ fun AdblockBrowserScreen(
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
-            // DESKTOP mode (user request: "show in Brave, desktop mode"). Desktop
-            // Chrome UA makes these sites serve their desktop site, which carries
-            // far fewer of the aggressive mobile popunder/notification ads; the
-            // AD_BLOCK_JS also forces a desktop-width viewport so it fits the screen.
-            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            // MOBILE UA: the desktop-mode experiment made some of these sites
+            // (donghuafun in particular) load unreliably AND surfaced more ads,
+            // so we serve their responsive mobile layout — it fits the phone and
+            // is what the ad-blocking script below is tuned against.
+            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
             // Google Safe Browsing: an extra network-level shield that blocks
             // navigation to known malware / social-engineering domains — many of
             // the popunder/redirect ad destinations on pirate mirrors are already
@@ -445,7 +436,11 @@ fun AdblockBrowserScreen(
                 mainHandler.post {
                     isLoading = false
                     canGoBack = view.canGoBack()
-                    if (url.startsWith("http")) {
+                    // Only remember SAME-SITE pages. Saving an off-site ad/redirect
+                    // URL (or an about:blank) meant the tab reopened on a broken /
+                    // ad page next time — "the Donghua tab isn't working".
+                    if (url.startsWith("http") && baseDomainOf(url) == siteBase &&
+                        !isAdRequest(url)) {
                         sitePrefs.edit().putString("last_url", url).apply()
                     }
                 }
@@ -573,7 +568,13 @@ fun AdblockBrowserScreen(
             }
         }
 
-        wv.loadUrl(sitePrefs.getString("last_url", homeUrl) ?: homeUrl)
+        // Restore the last page only if it's still a valid same-site URL;
+        // otherwise (blank, off-site ad page, or an old rotated domain) fall back
+        // to the home page so the tab always opens on something that works.
+        val saved = sitePrefs.getString("last_url", null)
+        val startUrl = if (saved != null && saved.startsWith("http") &&
+            baseDomainOf(saved) == siteBase && !isAdRequest(saved)) saved else homeUrl
+        wv.loadUrl(startUrl)
     }
 
     // ── Fullscreen video overlay ──────────────────────────────────────────────
