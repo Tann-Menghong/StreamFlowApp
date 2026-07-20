@@ -144,10 +144,14 @@ fun LibraryScreen(
             ) {
                 tabs.forEachIndexed { i, title ->
                     val selected = selectedTab == i
+                    // Premium-minimal segmented tabs: unselected are quiet text,
+                    // the selected one gets a soft neutral pill + a hairline edge.
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
+                        color = if (selected) MaterialTheme.colorScheme.onSurface.copy(0.07f)
+                                else androidx.compose.ui.graphics.Color.Transparent,
+                        border = if (selected) androidx.compose.foundation.BorderStroke(
+                                    1.dp, MaterialTheme.colorScheme.outline.copy(0.7f)) else null,
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .clickable { selectedTab = i }
@@ -159,26 +163,19 @@ fun LibraryScreen(
                         ) {
                             Text(
                                 title,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                 fontSize   = 13.sp,
-                                color      = if (selected) MaterialTheme.colorScheme.onPrimary
+                                color      = if (selected) MaterialTheme.colorScheme.onSurface
                                              else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (tabCounts[i] > 0) {
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(0.22f)
-                                            else MaterialTheme.colorScheme.primary.copy(0.15f)
-                                ) {
-                                    Text(
-                                        tabCounts[i].toString(),
-                                        fontSize   = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color      = if (selected) MaterialTheme.colorScheme.onPrimary
-                                                     else MaterialTheme.colorScheme.primary,
-                                        modifier   = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
-                                }
+                                Text(
+                                    tabCounts[i].toString(),
+                                    fontSize   = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color      = if (selected) MaterialTheme.colorScheme.primary
+                                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f)
+                                )
                             }
                         }
                     }
@@ -539,8 +536,10 @@ private fun HistoryStatsRow(history: List<HistoryEntity>) {
     }
 
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
@@ -990,14 +989,19 @@ private fun LibraryStatsHeader(favoritesCount: Int, history: List<HistoryEntity>
 
 @Composable
 private fun StatTile(title: String, value: String, sub: String, modifier: Modifier) {
+    // Premium-minimal: flat surface + hairline border, a big confident number.
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primary.copy(0.10f),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
         modifier = modifier
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary, maxLines = 1)
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.5).sp,
+                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
             Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface.copy(0.85f), maxLines = 1)
             Text(sub, fontSize = 10.sp,

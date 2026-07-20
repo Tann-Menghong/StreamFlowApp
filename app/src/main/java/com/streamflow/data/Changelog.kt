@@ -3,12 +3,12 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "5.2.0"
+    const val VERSION_NAME = "5.3.0"
 
     val notes = listOf(
-        "Total ad block 🛡️ — the Donghua, Drama and MKissa tabs now block ads much harder",
-        "No more pop-up/pop-under ad tabs: tapping the player just plays the video instead of opening an ad",
-        "Blocks redirect ads, app-open ('open in Play Store') ad links, trackers and in-page crypto-miners",
-        "Video players are untouched — same-site taps and the play button work exactly as before"
+        "New Premium Minimal look ✨ — Settings and Library redesigned to feel calm and professional",
+        "Cards now use clean hairline borders instead of heavy grey blocks; softer icon chips, quieter section headers, more breathing room",
+        "Bigger, more confident numbers on the Library stat tiles and a refined tab bar",
+        "Full ad blocking stays on across the Donghua, Drama and MKissa tabs — no pop-ups, redirects or trackers"
     )
 }

@@ -149,41 +149,37 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 .padding(bottom = 32.dp)
         ) {
 
-            // ── App hero card: gradient brand banner with version ─────────
+            // ── App hero card: clean bordered brand row with version ──────
+            // Premium-minimal — an accent-tinted logo mark on a flat hairline
+            // card instead of a loud full-bleed gradient banner.
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.outline.copy(0.6f))
             ) {
                 Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.tertiary
-                                )
-                            )
-                        )
-                        .padding(18.dp),
+                    Modifier.fillMaxWidth().padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Box(
-                        Modifier.size(46.dp).background(
-                            androidx.compose.ui.graphics.Color.White.copy(0.22f), CircleShape),
+                        Modifier.size(48.dp).background(
+                            MaterialTheme.colorScheme.primary.copy(0.12f), RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Rounded.PlayArrow, null,
-                            tint = androidx.compose.ui.graphics.Color.White,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(28.dp))
                     }
-                    Column {
-                        Text("StreamFlow", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
-                            color = androidx.compose.ui.graphics.Color.White)
+                    Column(Modifier.weight(1f)) {
+                        Text("StreamFlow", fontWeight = FontWeight.ExtraBold, fontSize = 19.sp,
+                            color = MaterialTheme.colorScheme.onSurface)
                         Text("Version ${com.streamflow.BuildConfig.VERSION_NAME}",
                             fontSize = 12.sp,
-                            color = androidx.compose.ui.graphics.Color.White.copy(0.85f))
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -197,29 +193,33 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 settingsTiles.forEach { rowTiles ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         rowTiles.forEach { tile ->
+                            // Premium-minimal tile: flat surface + hairline border,
+                            // a soft tinted icon chip carries the category colour.
                             Surface(
                                 onClick = { onCategoryClick(tile.name) },
-                                shape = RoundedCornerShape(16.dp),
-                                color = tile.color.copy(0.13f),
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Row(
-                                    Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                    Modifier.padding(horizontal = 13.dp, vertical = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(11.dp)
                                 ) {
                                     Box(
-                                        Modifier.size(30.dp).background(tile.color, RoundedCornerShape(9.dp)),
+                                        Modifier.size(34.dp).background(tile.color.copy(0.14f), RoundedCornerShape(11.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(tile.icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Icon(tile.icon, null, tint = tile.color, modifier = Modifier.size(18.dp))
                                     }
                                     Column(Modifier.weight(1f)) {
                                         Text(com.streamflow.ui.theme.KmStrings.t(tile.name, language),
-                                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                                             maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
                                         Text(tileSubtitles[tile.name] ?: "",
-                                            fontSize = 10.sp, maxLines = 1,
+                                            fontSize = 11.sp, maxLines = 1,
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -1073,21 +1073,24 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    // Premium-minimal: a flat card defined by a crisp hairline border rather than
+    // a tonal fill. Reads as "quiet & expensive" (Linear/Things) instead of a
+    // stack of grey blocks — and it separates cleanly on any theme.
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape     = RoundedCornerShape(18.dp),
-        // Slight tonal lift so cards read as clear groups on the background
-        colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.32f)),
-        elevation = CardDefaults.cardElevation(0.dp)
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border    = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f))
     ) { Column(content = content) }
 }
 
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 62.dp),
-        color    = MaterialTheme.colorScheme.outline.copy(0.25f)
+        modifier = Modifier.padding(start = 64.dp),
+        color    = MaterialTheme.colorScheme.outline.copy(0.4f)
     )
 }
 
@@ -1103,22 +1106,19 @@ private val badgePalette = listOf(
 private fun SettingsIconBadge(icon: ImageVector, title: String) {
     val badgeStyle = com.streamflow.ui.theme.LocalDesignStyle.current
     if (badgeStyle != "CLASSIC") {
+        // Premium-minimal: a soft tinted chip with a colour-matched glyph, not a
+        // saturated block with a white icon. Keeps the per-row colour cue while
+        // staying calm and expensive-looking.
         val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
         Box(
-            Modifier.size(32.dp).background(
-                // AURORA: gradient badge instead of a flat tile
-                if (badgeStyle == "AURORA")
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(color, color.copy(alpha = 0.55f)))
-                else androidx.compose.ui.graphics.SolidColor(color),
-                RoundedCornerShape(9.dp)),
+            Modifier.size(34.dp).background(color.copy(0.14f), RoundedCornerShape(11.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
+            Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
         }
     } else {
-        // CLASSIC: plain tinted icon, no badge
-        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+        // CLASSIC: plain tinted icon, no chip
+        Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp))
         }
@@ -1135,26 +1135,18 @@ private fun SettingsFooter(text: String) {
     )
 }
 
-// Accent-bar group heading that splits a long settings page into labeled sections
+// Quiet, wide-tracked section heading (premium-minimal). Muted rather than
+// accent-coloured so the eye lands on the settings themselves, not the labels.
 @Composable
 private fun SettingsGroupLabel(text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            Modifier.width(3.dp).height(13.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.primary)
-        )
-        Text(
-            text.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = 22.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)
+    )
 }
 
 @Composable
