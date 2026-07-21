@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -76,6 +78,13 @@ private val AD_DOMAINS = setOf(
     "buysellads.com", "highperformanceformat.com", "displaycontentnetwork.com",
     "brainlyads.com", "admatterra.com", "adsbnativ.com", "asoftwareadvice.com",
     "monetag.com", "clickaine.com", "adpaths.com", "runnative.com", "adnimation.com",
+    // Monetag / PropellerAds delivery hosts + common streaming-mirror ad CDNs
+    "vignette.wiki", "zeusadx.com", "zeus-adx.com", "dsp.adfarm1.adition.com",
+    "waframedia5.com", "wpadmngr.com", "cdn.adsafeprotected.com", "adsafeprotected.com",
+    "onclickclear.com", "onclicksuper.com", "onclickperformancetrack.com",
+    "gotrackier.com", "trackwilltrk.com", "prpops.com", "pushground.com",
+    "adservetx.media.net", "smartyads.com", "adop.cc", "bidgear.com",
+    "toponad.com", "unityads.unity3d.com", "applovin.com", "startapp.com",
     "chumsradar.com", "chumsads.com", "mm9nu.com", "luckypushh.com", "pushvibe.com",
     "notifica.click", "pushzilla.co", "getpushads.com", "push-notifications.io",
     "adventurefeeds.com", "smartnativeads.com", "popup.click", "popmonetize.com"
@@ -125,6 +134,10 @@ private fun baseDomainOf(url: String): String =
     runCatching { android.net.Uri.parse(url).host ?: "" }.getOrDefault("")
         .split('.').filter { it.isNotEmpty() }.takeLast(2).joinToString(".")
 
+// How long after a page starts loading a gesture-less off-site navigation is
+// still treated as a legitimate mirror redirect rather than an ad hijack.
+private const val REDIRECT_GRACE_MS = 3500L
+
 // A fresh response per request: shouldInterceptRequest runs on multiple WebView
 // threads, and a single shared WebResourceResponse (one InputStream instance)
 // handed to concurrent requests is not thread-safe
@@ -143,6 +156,24 @@ private val AD_BLOCK_JS = """
   // these sites; blackhole it (and the rarer showModalDialog).
   try{ window.open = function(){ return null; }; }catch(e){}
   try{ window.showModalDialog = noop; }catch(e){}
+  // Exit traps: ad scripts hook beforeunload so leaving the page throws a
+  // "Are you sure you want to leave?" dialog (and a second ad on confirm).
+  try{
+    window.onbeforeunload = null;
+    var _ael = window.addEventListener;
+    window.addEventListener = function(t){
+      if(String(t).toLowerCase() === 'beforeunload') return;
+      return _ael.apply(window, arguments);
+    };
+  }catch(e){}
+  // document.write ad injection: many popunder loaders write a whole
+  // <script src="//adnetwork/..."> or ad <iframe> straight into the document.
+  try{
+    var AD_WRITE=/adsbygoogle|googlesyndication|doubleclick|popunder|popads|propu|exoclick|adsterra|hilltopads|onclick(algo|max|ads)|juicyads|trafficjunky|adcash|admaven|monetag|notix|onesignal|<script[^>]+(ads?|pop)[^>]*>/i;
+    var _dw=document.write, _dwl=document.writeln;
+    document.write=function(s){ try{ if(AD_WRITE.test(String(s))) return; }catch(e){} return _dw.apply(document, arguments); };
+    document.writeln=function(s){ try{ if(AD_WRITE.test(String(s))) return; }catch(e){} return _dwl.apply(document, arguments); };
+  }catch(e){}
   // ── Timer-sniffing (restored from the old "Brave-level" build) ────────────
   // Ad/pop scriptlets — including the fake-notification overlay — schedule
   // themselves via setTimeout/setInterval. Refuse any timer whose function
@@ -347,6 +378,11 @@ fun AdblockBrowserScreen(
     var customView by remember { mutableStateOf<android.view.View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    // Live "ads blocked" tally shown in the toolbar. shouldInterceptRequest runs
+    // on WebView worker threads, so the count is an AtomicInteger and only the
+    // display value is pushed to Compose on the main thread.
+    val blockedCounter = remember { java.util.concurrent.atomic.AtomicInteger(0) }
+    var blockedCount by remember { mutableIntStateOf(0) }
 
     // Reset orientation when leaving the tab
     DisposableEffect(Unit) {
@@ -424,8 +460,18 @@ fun AdblockBrowserScreen(
             } catch (_: Exception) {}
         }
 
+        // When the current document started loading — used to tell a genuine
+        // on-load mirror redirect from a later ad hijack (see below).
+        var pageStartedAt = 0L
+        // Bump the visible "ads blocked" tally (called from WebView worker threads)
+        fun countBlocked() {
+            val n = blockedCounter.incrementAndGet()
+            mainHandler.post { blockedCount = n }
+        }
+
         wv.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                pageStartedAt = System.currentTimeMillis()
                 mainHandler.post {
                     isLoading = true
                     canGoBack = view.canGoBack()
@@ -453,21 +499,27 @@ fun AdblockBrowserScreen(
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean {
-                if (isAdRequest(request.url.toString())) return true
+                if (isAdRequest(request.url.toString())) { countBlocked(); return true }
                 if (request.isForMainFrame) {
                     val scheme = request.url.scheme?.lowercase()
                     // intent://, market://, tg:// … = "open another app" ad links.
-                    if (scheme != null && scheme != "http" && scheme != "https") return true
-                    // Block ONLY user-tap-triggered jumps to another site — that's
-                    // the popunder/redirect ad. Gesture-less redirects (a site
-                    // moving itself to a new mirror domain on load) are allowed
-                    // through so the tab doesn't dead-end.
-                    if (request.hasGesture()) {
-                        val host = request.url.host?.lowercase().orEmpty()
-                        if (host.isNotEmpty() && siteBase.isNotEmpty() &&
-                            !host.endsWith(siteBase) &&
-                            INFRA_ALLOW.none { host.endsWith(it) }
-                        ) return true
+                    if (scheme != null && scheme != "http" && scheme != "https") {
+                        countBlocked(); return true
+                    }
+                    val host = request.url.host?.lowercase().orEmpty()
+                    val offSite = host.isNotEmpty() && siteBase.isNotEmpty() &&
+                        !host.endsWith(siteBase) && INFRA_ALLOW.none { host.endsWith(it) }
+                    if (offSite) {
+                        // A tap-triggered jump off-site is the classic popunder ad.
+                        if (request.hasGesture()) { countBlocked(); return true }
+                        // Gesture-LESS off-site navigation: a genuine mirror redirect
+                        // happens right as the page loads, so allow it only inside a
+                        // short grace window. After that, a script silently replacing
+                        // the whole page is an ad hijack — this was the last big hole
+                        // (an ad could do location.href = adUrl with no tap at all).
+                        if (System.currentTimeMillis() - pageStartedAt > REDIRECT_GRACE_MS) {
+                            countBlocked(); return true
+                        }
                     }
                 }
                 return false
@@ -480,7 +532,7 @@ fun AdblockBrowserScreen(
                 // so a slipped-through ad URL can't turn the whole tab white.
                 if (request.isForMainFrame) return null
                 val url = request.url.toString()
-                if (isAdRequest(url)) return emptyResponse()
+                if (isAdRequest(url)) { countBlocked(); return emptyResponse() }
                 return null
             }
             // Never blanket-accept bad certificates: proceed() here silently
@@ -608,6 +660,25 @@ fun AdblockBrowserScreen(
                 },
                 title = { Text(pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
+                    // Live proof the shield is working on this site
+                    if (blockedCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Shield, contentDescription = "Ads blocked",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                if (blockedCount > 999) "999+" else "$blockedCount",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     IconButton(onClick = { webViewRef?.reload() }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = "Reload")
                     }
