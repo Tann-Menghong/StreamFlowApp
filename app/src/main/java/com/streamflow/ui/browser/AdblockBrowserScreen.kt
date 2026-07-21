@@ -273,7 +273,7 @@ private val AD_BLOCK_JS = """
   // premium account is activated" popup whose Accept/Cancel lead off-site.
   // Kill any FLOATING element that carries scam text or an off-site link — the
   // video player is explicitly protected so playback is never touched.
-  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction on the next page|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app|new message.{0,40}(account|proceed|instruction)/i;
+  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction|next page to proceed|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app|new message.{0,40}(account|proceed|instruction)|your (account|subscription).{0,24}(activated|upgraded|is ready)/i;
   // Ad hosts we recognise in an iframe src even when the iframe is cross-origin
   // (its DOM can't be read, but the iframe ELEMENT can still be removed).
   var AD_HOST = /doubleclick|googlesyndication|adservice|adsystem|adnxs|exoclick|propellerads|propu\.sh|popads|popcash|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|galaksion|revenuehits|onclick(algo|max|ads|predictiv)|mgid|outbrain|taboola|trafficjunky|onesignal|wonderpush|pushengage|pushnami|clickadilla|a-ads|coinzilla|bidgear|adprovider/i;
@@ -295,13 +295,23 @@ private val AD_BLOCK_JS = """
     if(!n||n.nodeType!==1) return;
     // 1) An ad iframe (by src) — remove it whether or not we can read inside it.
     try{ if(n.tagName==='IFRAME'){ var isrc=n.src||n.getAttribute('src')||''; if(isrc && AD_HOST.test(isrc)){ adKill(n); return; } } }catch(e){}
+    if(adIsPlayer(n)) return;                       // never remove the player
+    // 2) HIGH-CONFIDENCE SCAM TEXT — checked BEFORE any positioning heuristic.
+    //    This used to sit AFTER the fixed/absolute+z-index gate below, so a fake
+    //    "Your premium account is activated / follow the instruction on the next
+    //    page" card that was static, relative, sticky, or absolute with z-index
+    //    'auto' (parseInt -> 0) returned early and its text was NEVER tested.
+    //    That is exactly the ad that kept getting through. Wording like this is a
+    //    certain ad however it is positioned; the length gate means we can never
+    //    take out a page-sized container that merely contains the phrase.
+    //    textContent (not innerText) — it needs no layout pass, so this stays
+    //    cheap enough to run over every element on a timer.
+    var txt=''; try{ txt=(n.textContent||''); }catch(e){}
+    if(txt && txt.length<600 && n.tagName!=='BODY' && n.tagName!=='HTML' &&
+       AD_TXT.test(txt)){ adKill(n); return; }
     var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
     var pos=s.position, z=parseInt(s.zIndex,10)||0;
     if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
-    if(adIsPlayer(n)) return;                       // never remove the player
-    // 2) Scam-text overlay (the fake "premium account activated" dialog).
-    var txt=''; try{ txt=(n.innerText||n.textContent||''); }catch(e){}
-    if(AD_TXT.test(txt)){ adKill(n); return; }
     // 3) Floating box that links off-site (Accept -> ad site).
     if((pos==='fixed'||z>=100) && adHasOffsite(n)){ adKill(n); return; }
     // 4) A floating box that WRAPS an ad iframe.
@@ -319,7 +329,9 @@ private val AD_BLOCK_JS = """
   }
   function adSweep(){
     try{
-      var sel='div,ins,aside,section,a,dialog,center,table,iframe';
+      // Widened: the fake-notification card can be any container tag, and the
+      // scam-text check above is now the primary detector.
+      var sel='div,ins,aside,section,a,dialog,center,table,iframe,article,span,p,form,header,footer,nav,li';
       var els=document.body?document.body.querySelectorAll(sel):[];
       for(var i=0;i<els.length;i++) adScan(els[i]);
       // Also every direct child of body/html regardless of tag (custom elements,
