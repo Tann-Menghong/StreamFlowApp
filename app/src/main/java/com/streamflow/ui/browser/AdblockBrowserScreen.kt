@@ -145,6 +145,10 @@ internal fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", "".byt
 
 private val AD_BLOCK_JS = """
 (function(){
+  // This script is injected into EVERY frame (main page + the cross-origin
+  // player iframe). Some defences must be gentler inside a sub-frame so they
+  // can't break the video player itself — see AD_FN below.
+  var IS_TOP = (function(){ try{ return window.top === window; }catch(e){ return false; } })();
   var noop = function(){};
   var noopObj = new Proxy({}, { get: function(){ return noop; } });
   ['adsbygoogle','googletag','ga','_gaq','dataLayer','pbjs','apntag',
@@ -184,7 +188,15 @@ private val AD_BLOCK_JS = """
   // a WebView — it's a native ExoPlayer screen now, so it's safe to bring back.
   try{
     var _si=window.setInterval, _st=window.setTimeout;
-    var AD_FN=/popunder|popup|popmagic|popns|window\.open|adsby|exoloader|onclick(algo|max|ads)|nativead|showad|_0x[0-9a-f]{4}|atob\(|premium account|new message|congratulation|claim your|you.?ve won|activate.{0,14}account/i;
+    // FRAME-AWARE: this script now runs inside the player IFRAME too, and video
+    // players are minified/obfuscated — `_0x1a2b` and `atob(` appear all over
+    // legitimate player code. Applying those two tokens inside a sub-frame would
+    // kill the player's own buffer/append timers (the v4.4.1 PDTV regression).
+    // So: aggressive token set in the top frame only, unambiguous pop/ad tokens
+    // everywhere (they never appear in real player code).
+    var AD_FN = IS_TOP
+      ? /popunder|popup|popmagic|popns|window\.open|adsby|exoloader|onclick(algo|max|ads)|nativead|showad|_0x[0-9a-f]{4}|atob\(|premium account|new message|congratulation|claim your|you.?ve won|activate.{0,14}account/i
+      : /popunder|popmagic|popns|window\.open|adsby|exoloader|onclick(algo|max|ads)|nativead|showad|premium account|new message|congratulation|claim your|you.?ve won|activate.{0,14}account/i;
     window.setInterval=function(fn){ try{ if(AD_FN.test(String(fn))) return 0; }catch(e){} return _si.apply(window, arguments); };
     window.setTimeout =function(fn){ try{ if(AD_FN.test(String(fn))) return 0; }catch(e){} return _st.apply(window, arguments); };
   }catch(e){}
@@ -437,6 +449,23 @@ fun AdblockBrowserScreen(
                 try { safeBrowsingEnabled = true } catch (_: Throwable) {}
             }
         }
+        // ── THE key injection ────────────────────────────────────────────────
+        // evaluateJavascript (below, in onPageStarted/Finished) only ever runs in
+        // the MAIN frame. These sites embed the video in a third-party IFRAME and
+        // that is where the ad scripts live — so the pop-up blackhole, timer
+        // sniffing, click guard and overlay killer never applied where the ads
+        // actually fire. addDocumentStartJavaScript injects into EVERY frame
+        // (allowedOriginRules "*" covers cross-origin iframes) and runs BEFORE any
+        // page script, so window.open/setTimeout are already neutered by the time
+        // an ad loader grabs its references.
+        try {
+            if (androidx.webkit.WebViewFeature.isFeatureSupported(
+                    androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
+                    wv, AD_BLOCK_JS, setOf("*"))
+            }
+        } catch (_: Throwable) {}
+
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(wv, true)
