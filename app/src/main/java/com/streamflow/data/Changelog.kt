@@ -3,12 +3,12 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.2.1"
+    const val VERSION_NAME = "6.2.2"
 
     val notes = listOf(
-        "Killed the fake 'Your premium account is activated' pop-up 🎯 — the check for scam wording was being skipped unless the pop-up floated a certain way, so this one slipped past every time",
-        "Scam wording is now detected no matter how the pop-up is positioned on the page",
-        "The sweep also covers more page elements, so these fake 'New message' cards get removed on sight",
-        "Plus the previous fix: ad blocking now runs inside the video player's frame too"
+        "Hunting down the fake 'New message / premium account' pop-up 🎯 — the scanner now checks EVERY element on the page, several times a second",
+        "It now also looks inside hidden shadow areas and sub-frames, which is where pop-ups like this hide from blockers",
+        "Any change to the page triggers an instant re-scan, so the card is removed the moment it appears",
+        "Kept fast — the heavy checks only run on elements that could actually be a pop-up"
     )
 }

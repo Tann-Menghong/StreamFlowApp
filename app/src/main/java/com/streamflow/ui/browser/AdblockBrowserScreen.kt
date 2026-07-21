@@ -309,6 +309,13 @@ private val AD_BLOCK_JS = """
     var txt=''; try{ txt=(n.textContent||''); }catch(e){}
     if(txt && txt.length<600 && n.tagName!=='BODY' && n.tagName!=='HTML' &&
        AD_TXT.test(txt)){ adKill(n); return; }
+    // The cheap text test above runs on EVERY element; the positional tests below
+    // call getComputedStyle, which forces layout — restrict those to tags that
+    // could plausibly BE an overlay container so sweeping stays smooth.
+    var tn=n.tagName;
+    if(tn!=='DIV'&&tn!=='INS'&&tn!=='ASIDE'&&tn!=='SECTION'&&tn!=='A'&&tn!=='DIALOG'&&
+       tn!=='CENTER'&&tn!=='TABLE'&&tn!=='IFRAME'&&tn!=='ARTICLE'&&tn!=='FORM'&&
+       tn!=='HEADER'&&tn!=='FOOTER'&&tn!=='NAV') return;
     var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
     var pos=s.position, z=parseInt(s.zIndex,10)||0;
     if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
@@ -327,24 +334,46 @@ private val AD_BLOCK_JS = """
       }
     }catch(e){}
   }
+  // Walk a root (document or shadowRoot), scanning every element and RECURSING
+  // into open shadow roots. querySelectorAll does NOT pierce shadow DOM, so an
+  // overlay attached to a shadow root was completely invisible to the old sweep
+  // — a standard way these cards evade blockers.
+  function adWalk(root, depth){
+    if(!root || depth>6) return;
+    var els;
+    try{ els = root.querySelectorAll('*'); }catch(e){ return; }
+    for(var i=0;i<els.length;i++){
+      var el = els[i];
+      adScan(el);
+      try{ if(el.shadowRoot) adWalk(el.shadowRoot, depth+1); }catch(e){}
+    }
+  }
   function adSweep(){
     try{
-      // Widened: the fake-notification card can be any container tag, and the
-      // scam-text check above is now the primary detector.
-      var sel='div,ins,aside,section,a,dialog,center,table,iframe,article,span,p,form,header,footer,nav,li';
-      var els=document.body?document.body.querySelectorAll(sel):[];
-      for(var i=0;i<els.length;i++) adScan(els[i]);
-      // Also every direct child of body/html regardless of tag (custom elements,
-      // <dialog>, ad frames appended straight to the root).
-      var roots=[document.body,document.documentElement];
-      for(var r=0;r<roots.length;r++){ if(!roots[r]) continue; var ch=roots[r].children;
-        for(var j=0;j<ch.length;j++) adScan(ch[j]); }
+      adWalk(document, 0);
+      // Same-origin iframes: if this WebView can't inject into sub-frames we can
+      // still reach any same-origin frame's document from here.
+      var frames; try{ frames=document.querySelectorAll('iframe'); }catch(e){ frames=[]; }
+      for(var f=0;f<frames.length;f++){
+        try{
+          var d = frames[f].contentDocument;
+          if(d) adWalk(d, 1);
+        }catch(e){}                                  // cross-origin: not readable
+      }
     }catch(e){}
   }
+  // Schedule with the SAVED originals: our own setTimeout/setInterval wrappers
+  // filter by function source, and a future token added to AD_FN could silently
+  // stop every sweep from ever running. The originals can't be sabotaged.
+  var _sched=function(fn,t){ try{ return _st.call(window,fn,t); }catch(e){ return setTimeout(fn,t); } };
+  var _repeat=function(fn,t){ try{ return _si.call(window,fn,t); }catch(e){ return setInterval(fn,t); } };
   // These ads inject on a delay and re-inject, so sweep immediately, a few more
   // times, then keep watch on a short interval.
-  [0,200,500,1000,1800,2800,4200,6000,9000].forEach(function(t){ setTimeout(adSweep,t); });
-  setInterval(adSweep, 2000);
+  [0,120,300,600,1000,1800,2800,4200,6000,9000].forEach(function(t){ _sched(adSweep,t); });
+  _repeat(adSweep, 1200);
+  // Debounced full sweep on ANY DOM change: scanning only the added node missed
+  // a card injected deep inside an added subtree.
+  var _pending=0;
   new MutationObserver(function(muts){
     muts.forEach(function(m){
       m.addedNodes.forEach(function(n){
@@ -360,6 +389,7 @@ private val AD_BLOCK_JS = """
         adScan(n);                                  // catch injected overlays too
       });
     });
+    if(!_pending){ _pending=1; _sched(function(){ _pending=0; adSweep(); },60); }
   }).observe(document.documentElement,{childList:true,subtree:true});
 })();
 """.trimIndent()
