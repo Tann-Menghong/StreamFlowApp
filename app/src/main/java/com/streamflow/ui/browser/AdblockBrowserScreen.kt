@@ -265,6 +265,10 @@ private val AD_BLOCK_JS = """
     '[class*="ad-overlay"],[class*="adoverlay"],[class*="modal-ad"],[id*="ad-modal"]',
     '.gdpr-overlay,.cookie-consent-overlay,.consent-banner',
     '[class*="interstitial"],[class*="splash-ad"],[class*="banner-ad"]',
+    // Named floating-promo widgets (incl. Chinese-template names). Kept specific
+    // so they can't match ordinary layout classes like "float-left".
+    '[class*="hongbao"],[class*="fudai"],[class*="float-ad"],[class*="ad-float"]',
+    '[class*="gift-float"],[class*="float-gift"],[class*="floatgift"],[id*="hongbao"]',
     'ins.adsbygoogle'
   ].join(',');
   var s = document.createElement('style');
@@ -310,6 +314,24 @@ private val AD_BLOCK_JS = """
   function adHasImage(el){
     try{ return !!(el.querySelector && el.querySelector('img,svg,picture')); }catch(e){ return false; }
   }
+  // A RASTER graphic — a real <img src>, <picture>, or a CSS background-image on
+  // the element or a near descendant. This is the ad's actual artwork. It is
+  // deliberately distinct from a plain inline <svg> (which is how the site's own
+  // icon buttons — scroll-to-top, settings — are drawn), so a promo banner can
+  // be told apart from a benign vector-icon control.
+  function adHasRaster(el){
+    try{
+      if(el.querySelector && el.querySelector('img[src],picture,image[href]')) return true;
+      var bg=''; try{ bg=getComputedStyle(el).backgroundImage||''; }catch(e){}
+      if(/url\(/i.test(bg)) return true;
+      var k=el.querySelectorAll?el.querySelectorAll('*'):[];
+      for(var i=0;i<k.length && i<40;i++){
+        var b2=''; try{ b2=getComputedStyle(k[i]).backgroundImage; }catch(e){}
+        if(b2 && /url\(/i.test(b2)) return true;
+      }
+    }catch(e){}
+    return false;
+  }
   function adHasOffsite(el){
     try{
       var as = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
@@ -350,41 +372,51 @@ private val AD_BLOCK_JS = """
        tn!=='CENTER'&&tn!=='TABLE'&&tn!=='IFRAME'&&tn!=='ARTICLE'&&tn!=='FORM'&&
        tn!=='HEADER'&&tn!=='FOOTER'&&tn!=='NAV') return;
     var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
+    if(s.display==='none' || s.visibility==='hidden') return;
     var pos=s.position, z=parseInt(s.zIndex,10)||0;
-    if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
-    // 2b) Floating widget named like a promo ("gift", "hongbao", "fuli"…).
-    try{
-      var idcls=((n.id||'')+' '+(typeof n.className==='string'?n.className:'')).toLowerCase();
-      if(idcls && AD_WIDGET.test(idcls)){ adKill(n); return; }
-    }catch(e){}
-    // 2c) The floating "free gift" badge ad: a SMALL fixed widget carrying an
-    //     image plus a close button and/or a red unread-count badge. The site's
-    //     own floating buttons (scroll-to-top, settings) have neither, and a
-    //     full-width bar (the site's real nav/header) is excluded by the size cap.
-    try{
-      if(pos==='fixed'){
-        var rw=n.getBoundingClientRect();
-        var vw0=window.innerWidth||document.documentElement.clientWidth||1;
-        var vh0=window.innerHeight||document.documentElement.clientHeight||1;
-        if(rw.width>0 && rw.height>0 && rw.width<=vw0*0.5 && rw.height<=vh0*0.35){
-          if(adHasImage(n) && (adHasClose(n) || adHasBadge(n))){ adKill(n); return; }
-        }
-      }
-    }catch(e){}
-    // 3) Floating box that links off-site (Accept -> ad site).
-    if((pos==='fixed'||z>=100) && adHasOffsite(n)){ adKill(n); return; }
-    // 4) A floating box that WRAPS an ad iframe.
-    try{ var ifr=n.querySelector&&n.querySelector('iframe'); if(ifr){ var s2=ifr.src||''; if(s2 && AD_HOST.test(s2)){ adKill(n); return; } } }catch(e){}
-    // 5) A screen-covering fixed overlay that carries any ad signal (off-site
-    //    link or an iframe). Gated on a signal so the player is never removed.
-    try{
-      if(pos==='fixed'){
-        var r=n.getBoundingClientRect();
-        var vw=window.innerWidth||document.documentElement.clientWidth;
-        var vh=window.innerHeight||document.documentElement.clientHeight;
-        if(r.width>=vw*0.9 && r.height>=vh*0.6 && (adHasOffsite(n) || (n.querySelector&&n.querySelector('iframe')))){ adKill(n); return; }
-      }
-    }catch(e){}
+    // Only something LIFTED OUT of normal flow can be a pop-up overlay: fixed,
+    // sticky, or absolute raised above the page (z>=50). Everything else is
+    // ordinary in-flow content and is left completely alone.
+    if(pos!=='fixed' && pos!=='sticky' && !(pos==='absolute' && z>=50)) return;
+    var r; try{ r=n.getBoundingClientRect(); }catch(e){ return; }
+    if(r.width<=0 || r.height<=0) return;
+    var vw=window.innerWidth||document.documentElement.clientWidth||1;
+    var vh=window.innerHeight||document.documentElement.clientHeight||1;
+    // A) A screen-covering fixed overlay: remove ONLY when it carries an ad
+    //    signal (off-site link or ad iframe); otherwise it's the video-player
+    //    wrapper or the site's own modal and must survive.
+    if(pos==='fixed' && r.width>=vw*0.9 && r.height>=vh*0.6){
+      if(adHasOffsite(n) || (n.querySelector&&n.querySelector('iframe[src]'))){ adKill(n); return; }
+      return;
+    }
+    // B) A bar spanning (almost) the full width is the site's real header /
+    //    bottom nav — never a floating ad. Its children were scanned already.
+    if(r.width>=vw*0.85) return;
+    // ── C) WEIGHTED SCORING for a small floating widget ───────────────────────
+    // No single trait is proof — a legit scroll-to-top button is ALSO a small
+    // fixed icon hugging a corner. So we add up independent ad signals and only
+    // remove when they clearly outweigh a benign control. This uBlock-style
+    // heuristic is far more robust than the old single rigid rule that missed
+    // any widget using a CSS background-image or a pseudo-element badge.
+    var idcls=((n.id||'')+' '+(typeof n.className==='string'?n.className:'')).toLowerCase();
+    var score=0;
+    if(AD_WIDGET.test(idcls)) score+=2;     // named gift/prize/coupon/hongbao/float-ad
+    if(adHasClose(n))         score+=2;     // carries its own × close control
+    if(adHasBadge(n))         score+=2;     // fake red unread-count badge
+    if(adHasOffsite(n))       score+=3;     // a link that leaves the site = ad
+    if(adHasImage(n))         score+=1;     // has a graphic of any kind
+    // Corner/edge-anchored — the floating-ad hallmark (a benign icon scores here
+    // too, which is why this alone is never enough to remove).
+    var nearR=(vw-r.right)<=24, nearL=r.left<=24, nearB=(vh-r.bottom)<=48, nearT=r.top<=24;
+    var corner=(nearR||nearL)&&(nearB||nearT);
+    if(corner) score+=1;
+    // A RASTER banner (real photo/img) bigger than a normal icon button, sitting
+    // in a corner, is promo artwork — the site's own controls are small vector
+    // icons, so this cleanly separates the gift/prize graphic from scroll-to-top.
+    if(corner && adHasRaster(n) && (r.width>64 || r.height>64)) score+=2;
+    // Wraps a KNOWN ad iframe — decisive on its own.
+    try{ var ifr=n.querySelector&&n.querySelector('iframe'); if(ifr){ var s2=ifr.src||ifr.getAttribute('src')||''; if(s2 && AD_HOST.test(s2)) score+=4; } }catch(e){}
+    if(score>=3){ adKill(n); return; }
   }
   // Walk a root (document or shadowRoot), scanning every element and RECURSING
   // into open shadow roots. querySelectorAll does NOT pierce shadow DOM, so an
