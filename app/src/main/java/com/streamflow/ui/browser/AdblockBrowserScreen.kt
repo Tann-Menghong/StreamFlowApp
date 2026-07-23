@@ -11,7 +11,10 @@ import android.view.WindowManager
 import android.webkit.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -277,6 +280,36 @@ private val AD_BLOCK_JS = """
   // Ad hosts we recognise in an iframe src even when the iframe is cross-origin
   // (its DOM can't be read, but the iframe ELEMENT can still be removed).
   var AD_HOST = /doubleclick|googlesyndication|adservice|adsystem|adnxs|exoclick|propellerads|propu\.sh|popads|popcash|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|galaksion|revenuehits|onclick(algo|max|ads|predictiv)|mgid|outbrain|taboola|trafficjunky|onesignal|wonderpush|pushengage|pushnami|clickadilla|a-ads|coinzilla|bidgear|adprovider/i;
+  // Promo-widget naming used by these templates (incl. Chinese sites: hongbao =
+  // red packet, fuli = welfare/perks, fudai = lucky bag).
+  var AD_WIDGET=/gift|hongbao|red.?bag|red.?pack|fudai|fuli|welfare|lucky.?(draw|box|bag)|coupon|prize|float.?(ad|gift|btn)|ad.?float|activity.?(box|icon|float)|xuanfu|suspend.?(ad|box)/i;
+  // A tiny "x / close" control — legit floating buttons (scroll-to-top) have none.
+  function adHasClose(el){
+    try{
+      var k=el.querySelectorAll('*');
+      for(var i=0;i<k.length && i<80;i++){
+        var t=(k[i].textContent||'').trim();
+        if(t==='×'||t==='✕'||t==='✖'||t==='❌'||t==='x'||t==='X'){ return true; }
+        var a=((k[i].className&&typeof k[i].className==='string'?k[i].className:'')+' '+(k[i].getAttribute&&k[i].getAttribute('aria-label')||'')).toLowerCase();
+        if(a.indexOf('close')>-1) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  // A small numeric "unread" badge (the red 1) — mimics a notification count.
+  function adHasBadge(el){
+    try{
+      var k=el.querySelectorAll('*');
+      for(var i=0;i<k.length && i<80;i++){
+        var t=(k[i].textContent||'').trim();
+        if(/^\d{1,2}$/.test(t) && k[i].children.length===0) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function adHasImage(el){
+    try{ return !!(el.querySelector && el.querySelector('img,svg,picture')); }catch(e){ return false; }
+  }
   function adHasOffsite(el){
     try{
       var as = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
@@ -319,6 +352,25 @@ private val AD_BLOCK_JS = """
     var s; try{ s=getComputedStyle(n); }catch(e){ return; } if(!s) return;
     var pos=s.position, z=parseInt(s.zIndex,10)||0;
     if(pos!=='fixed' && !(pos==='absolute' && z>=50)) return;
+    // 2b) Floating widget named like a promo ("gift", "hongbao", "fuli"…).
+    try{
+      var idcls=((n.id||'')+' '+(typeof n.className==='string'?n.className:'')).toLowerCase();
+      if(idcls && AD_WIDGET.test(idcls)){ adKill(n); return; }
+    }catch(e){}
+    // 2c) The floating "free gift" badge ad: a SMALL fixed widget carrying an
+    //     image plus a close button and/or a red unread-count badge. The site's
+    //     own floating buttons (scroll-to-top, settings) have neither, and a
+    //     full-width bar (the site's real nav/header) is excluded by the size cap.
+    try{
+      if(pos==='fixed'){
+        var rw=n.getBoundingClientRect();
+        var vw0=window.innerWidth||document.documentElement.clientWidth||1;
+        var vh0=window.innerHeight||document.documentElement.clientHeight||1;
+        if(rw.width>0 && rw.height>0 && rw.width<=vw0*0.5 && rw.height<=vh0*0.35){
+          if(adHasImage(n) && (adHasClose(n) || adHasBadge(n))){ adKill(n); return; }
+        }
+      }
+    }catch(e){}
     // 3) Floating box that links off-site (Accept -> ad site).
     if((pos==='fixed'||z>=100) && adHasOffsite(n)){ adKill(n); return; }
     // 4) A floating box that WRAPS an ad iframe.
@@ -362,6 +414,33 @@ private val AD_BLOCK_JS = """
       }
     }catch(e){}
   }
+  // Manual override: tapping the shield in the toolbar calls this. Removes every
+  // SMALL floating widget on the page (plus anything the rules already flag), so
+  // if a brand-new ad shape ever slips past the heuristics the user can always
+  // clear it themselves. Size-capped so the site's real header/nav (full width)
+  // and the video player survive; a reload restores anything over-zealous.
+  try{
+    window.__sfZap = function(){
+      var out=0;
+      try{
+        var all=document.querySelectorAll('*');
+        var vw1=window.innerWidth||document.documentElement.clientWidth||1;
+        var vh1=window.innerHeight||document.documentElement.clientHeight||1;
+        for(var i=0;i<all.length;i++){
+          var el=all[i];
+          try{
+            if(adIsPlayer(el)) continue;
+            var st=getComputedStyle(el); if(!st) continue;
+            if(st.position!=='fixed' && st.position!=='sticky') continue;
+            var r=el.getBoundingClientRect();
+            if(r.width<=0||r.height<=0) continue;
+            if(r.width<=vw1*0.6 && r.height<=vh1*0.4){ adKill(el); out++; }
+          }catch(e){}
+        }
+      }catch(e){}
+      return out;
+    };
+  }catch(e){}
   // Schedule with the SAVED originals: our own setTimeout/setInterval wrappers
   // filter by function source, and a future token added to AD_FN could silently
   // stop every sweep from ever running. The originals can't be sabotaged.
@@ -731,12 +810,28 @@ fun AdblockBrowserScreen(
                 },
                 title = { Text(pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
-                    // Live proof the shield is working on this site
+                    // Live proof the shield is working — TAP IT to force-remove any
+                    // floating pop-up the automatic rules missed.
                     if (blockedCount > 0) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            modifier = Modifier.padding(end = 4.dp)
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    webViewRef?.evaluateJavascript(
+                                        "(window.__sfZap?window.__sfZap():0)"
+                                    ) { r ->
+                                        val n = r?.trim()?.toIntOrNull() ?: 0
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (n > 0) "Removed $n pop-up${if (n == 1) "" else "s"}"
+                                            else "No pop-ups found",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
                         ) {
                             Icon(
                                 Icons.Rounded.Shield, contentDescription = "Ads blocked",
