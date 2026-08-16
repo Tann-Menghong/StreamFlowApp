@@ -12,11 +12,33 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 152
-        versionName "6.4.2"
+        versionCode 153
+        versionName "6.4.3"
         vectorDrawables {
             useSupportLibrary true
         }
+
+        // Ship only the CPU architectures real phones use.
+        //
+        // MediaPipe's LLM engine contributes a ~53 MB native library, and with no
+        // filter the APK carried FOUR copies of it — one per ABI — even though a
+        // given phone can only ever load one:
+        //
+        //   x86          17.2 MB   emulator only, 32-bit, obsolete
+        //   x86_64       15.0 MB   emulator only
+        //   arm64-v8a    12.8 MB   every modern phone
+        //   armeabi-v7a   8.3 MB   older 32-bit ARM phones
+        //
+        // Dropping the two x86 variants removes ~32 MB of dead weight from every
+        // download without affecting a single real device. This matters more than
+        // usual here because the app self-updates by downloading its own APK from
+        // GitHub, so the saving is paid back on every single update.
+        //
+        // To test on an emulator, temporarily add 'x86_64' to this list.
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+
         buildConfigField "String", "GITHUB_RELEASES_URL", '"https://github.com/Tann-Menghong/StreamFlowApp/releases"'
     }
 
