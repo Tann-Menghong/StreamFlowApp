@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Close
@@ -36,6 +35,7 @@ import com.streamflow.data.friendlyError
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.formatDuration
 import kotlinx.coroutines.launch
+import com.streamflow.ui.theme.appShape
 import org.schabi.newpipe.extractor.Page
 
 // ── Local playlist detail ────────────────────────────────────────────────────
@@ -120,12 +120,12 @@ fun PlaylistDetailScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Box(Modifier.width(110.dp).height(62.dp).clip(RoundedCornerShape(8.dp))) {
+                            Box(Modifier.width(110.dp).height(62.dp).clip(appShape(8.dp))) {
                                 AsyncImage(item.thumbnailUrl, null,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                 if (item.duration > 0) {
                                     Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)
-                                        .background(Color.Black.copy(0.8f), RoundedCornerShape(4.dp))
+                                        .background(Color.Black.copy(0.8f), appShape(4.dp))
                                         .padding(horizontal = 4.dp, vertical = 1.dp)) {
                                         Text(formatDuration(item.duration), color = Color.White, fontSize = 9.sp)
                                     }
@@ -327,12 +327,12 @@ fun RemotePlaylistScreen(
                             Text("${index + 1}", fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.width(20.dp))
-                            Box(Modifier.width(110.dp).height(62.dp).clip(RoundedCornerShape(8.dp))) {
+                            Box(Modifier.width(110.dp).height(62.dp).clip(appShape(8.dp))) {
                                 AsyncImage(video.thumbnailUrl, null,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                 if (video.duration > 0) {
                                     Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)
-                                        .background(Color.Black.copy(0.8f), RoundedCornerShape(4.dp))
+                                        .background(Color.Black.copy(0.8f), appShape(4.dp))
                                         .padding(horizontal = 4.dp, vertical = 1.dp)) {
                                         Text(formatDuration(video.duration), color = Color.White, fontSize = 9.sp)
                                     }

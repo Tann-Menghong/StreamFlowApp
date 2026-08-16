@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
@@ -19,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamflow.data.local.AppPreferences
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import kotlinx.coroutines.launch
 
 // First-launch setup: country -> interests -> theme, then straight to the feed
@@ -49,7 +49,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 Modifier.size(40.dp).background(
                     Brush.linearGradient(listOf(
                         MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)),
-                    CircleShape),
+                    appCircle()),
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(26.dp)) }
             Spacer(Modifier.width(10.dp))
@@ -70,7 +70,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                             "VN" to "Vietnam", "KR" to "South Korea", "JP" to "Japan", "IN" to "India").forEach { (code, name) ->
                             Surface(
                                 onClick = { country = code },
-                                shape = RoundedCornerShape(14.dp),
+                                shape = appShape(14.dp),
                                 color = if (country == code) MaterialTheme.colorScheme.primary.copy(0.16f)
                                         else MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -99,7 +99,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                                         selected = on,
                                         onClick = { if (on) interests.remove(cat) else interests.add(cat) },
                                         label = { Text(cat, fontSize = 12.sp) },
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = appShape(16.dp),
                                         border = null,
                                         colors = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -119,7 +119,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                         listOf("DARK" to "Dark (recommended)", "AMOLED" to "AMOLED black", "LIGHT" to "Light").forEach { (code, name) ->
                             Surface(
                                 onClick = { theme = code },
-                                shape = RoundedCornerShape(14.dp),
+                                shape = appShape(14.dp),
                                 color = if (theme == code) MaterialTheme.colorScheme.primary.copy(0.16f)
                                         else MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -145,7 +145,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 Box(Modifier.padding(end = 6.dp).size(if (pager.currentPage == i) 10.dp else 7.dp)
                     .background(
                         if (pager.currentPage == i) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outline.copy(0.4f), CircleShape))
+                        else MaterialTheme.colorScheme.outline.copy(0.4f), appCircle()))
             }
             Spacer(Modifier.weight(1f))
             Button(
@@ -163,7 +163,7 @@ fun OnboardingScreen(prefs: AppPreferences, onDone: () -> Unit) {
                         }
                     }
                 },
-                shape = RoundedCornerShape(22.dp)
+                shape = appShape(22.dp)
             ) {
                 Text(if (pager.currentPage < 2) "Next" else "Start watching",
                     fontWeight = FontWeight.SemiBold)

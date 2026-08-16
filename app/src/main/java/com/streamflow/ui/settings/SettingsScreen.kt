@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -33,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import com.streamflow.data.ai.AiEngine
 
 private val countryOptions = listOf(
@@ -160,7 +160,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
             // card instead of a loud full-bleed gradient banner.
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = appShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp),
                 border = androidx.compose.foundation.BorderStroke(
@@ -173,7 +173,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 ) {
                     Box(
                         Modifier.size(48.dp).background(
-                            MaterialTheme.colorScheme.primary.copy(0.12f), RoundedCornerShape(14.dp)),
+                            MaterialTheme.colorScheme.primary.copy(0.12f), appShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Rounded.PlayArrow, null,
@@ -258,7 +258,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 )
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = appShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(0.dp),
                     border = androidx.compose.foundation.BorderStroke(
@@ -290,7 +290,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape    = RoundedCornerShape(14.dp),
+                    shape    = appShape(14.dp),
                     colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -308,7 +308,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                         if (update.downloading) {
                             LinearProgressIndicator(
                                 progress = { update.progress / 100f },
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                modifier = Modifier.fillMaxWidth().clip(appShape(4.dp)),
                                 color      = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.15f)
                             )
@@ -318,7 +318,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                             Button(
                                 onClick  = { vm.downloadUpdate() },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape    = RoundedCornerShape(10.dp),
+                                shape    = appShape(10.dp),
                                 colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) { Text("Download & Install") }
                         }
@@ -347,7 +347,7 @@ private fun SettingsDashboardRow(
         horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         Box(
-            Modifier.size(34.dp).background(tile.color.copy(0.14f), RoundedCornerShape(11.dp)),
+            Modifier.size(34.dp).background(tile.color.copy(0.14f), appShape(11.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(tile.icon, null, tint = tile.color, modifier = Modifier.size(19.dp))
@@ -1266,7 +1266,7 @@ private fun SettingsCard(
     }
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape     = RoundedCornerShape(20.dp),
+        shape     = appShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
         border    = androidx.compose.foundation.BorderStroke(
@@ -1320,7 +1320,7 @@ private fun SettingsIconBadge(icon: ImageVector, title: String) {
         // staying calm and expensive-looking.
         val color = badgePalette[Math.abs(title.hashCode()) % badgePalette.size]
         Box(
-            Modifier.size(34.dp).background(color.copy(0.14f), RoundedCornerShape(11.dp)),
+            Modifier.size(34.dp).background(color.copy(0.14f), appShape(11.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
@@ -1466,7 +1466,7 @@ private fun PickerDialog(
         },
         confirmButton  = {},
         dismissButton  = { TextButton(onDismiss) { Text("Cancel") } },
-        shape          = RoundedCornerShape(16.dp)
+        shape          = appShape(16.dp)
     )
 }
 
@@ -1557,7 +1557,7 @@ private fun VersionPickerDialog(
                                     LinearProgressIndicator(
                                         progress = { state.progress / 100f },
                                         modifier = Modifier.fillMaxWidth()
-                                            .clip(RoundedCornerShape(4.dp))
+                                            .clip(appShape(4.dp))
                                     )
                                 }
                             }
@@ -1579,7 +1579,7 @@ private fun VersionPickerDialog(
         },
         confirmButton = {},
         dismissButton = { TextButton(onDismiss) { Text("Close") } },
-        shape = RoundedCornerShape(16.dp)
+        shape = appShape(16.dp)
     )
 }
 
@@ -1626,7 +1626,7 @@ private fun DowngradeDialog(
             }
         },
         dismissButton = { TextButton(onDismiss) { Text("Later") } },
-        shape = RoundedCornerShape(16.dp)
+        shape = appShape(16.dp)
     )
 }
 
@@ -1638,7 +1638,7 @@ private fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit,
         text   = { Text(message, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = { TextButton(onConfirm) { Text("Clear", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-        shape  = RoundedCornerShape(16.dp)
+        shape  = appShape(16.dp)
     )
 }
 
@@ -1667,7 +1667,7 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(appShape(10.dp))
                             .background(
                                 if (selected == "DYNAMIC") MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.surfaceVariant.copy(0.5f)
@@ -1678,7 +1678,7 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
-                            Modifier.size(32.dp).clip(CircleShape)
+                            Modifier.size(32.dp).clip(appCircle())
                                 .background(
                                     androidx.compose.ui.graphics.Brush.sweepGradient(
                                         listOf(Color(0xFF6750A4), Color(0xFF006875), Color(0xFF3F6844), Color(0xFF6750A4))
@@ -1722,9 +1722,9 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(customColor)
+                        Modifier.size(32.dp).clip(appCircle()).background(customColor)
                             .then(if (selected.startsWith("CUSTOM:"))
-                                Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                                Modifier.border(2.dp, Color.White, appCircle()) else Modifier)
                             .clickable {
                                 onSelect("CUSTOM:%06X".format(
                                     android.graphics.Color.HSVToColor(
@@ -1796,9 +1796,9 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(CircleShape)
+                                    .clip(appCircle())
                                     .background(color)
-                                    .then(if (key == selected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
+                                    .then(if (key == selected) Modifier.border(3.dp, Color.White, appCircle()) else Modifier)
                                     .clickable { onSelect(key) }
                             ) {
                                 if (key == selected) Icon(Icons.Rounded.Check, null,
@@ -1815,6 +1815,6 @@ private fun AccentPickerDialog(selected: String, onSelect: (String) -> Unit, onD
         },
         confirmButton  = {},
         dismissButton  = { TextButton(onDismiss) { Text("Cancel") } },
-        shape          = RoundedCornerShape(16.dp)
+        shape          = appShape(16.dp)
     )
 }

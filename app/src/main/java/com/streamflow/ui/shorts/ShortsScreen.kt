@@ -7,7 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.OpenInFull
@@ -47,6 +46,7 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.streamflow.data.OkHttpDownloader
 import com.streamflow.data.model.VideoItem
+import com.streamflow.ui.theme.appCircle
 import com.streamflow.ui.components.formatViews
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -328,11 +328,11 @@ private fun ShortsOverlay(
                         model = video.uploaderAvatarUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(30.dp).clip(CircleShape)
+                        modifier = Modifier.size(30.dp).clip(appCircle())
                     )
                 } else {
                     Box(
-                        Modifier.size(30.dp).clip(CircleShape)
+                        Modifier.size(30.dp).clip(appCircle())
                             .background(Color.White.copy(0.25f)),
                         contentAlignment = Alignment.Center
                     ) {

@@ -22,8 +22,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -76,6 +74,8 @@ import com.streamflow.ui.components.ShimmerList
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatDuration
 import com.streamflow.ui.components.formatViews
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -223,7 +223,7 @@ fun HomeScreen(
                     } },
                     containerColor    = MaterialTheme.colorScheme.primary,
                     contentColor      = MaterialTheme.colorScheme.onPrimary,
-                    shape             = RoundedCornerShape(16.dp),
+                    shape             = appShape(16.dp),
                     modifier          = Modifier.size(48.dp)
                 ) {
                     Icon(Icons.Rounded.KeyboardArrowUp, "Scroll to top", modifier = Modifier.size(22.dp))
@@ -239,7 +239,7 @@ fun HomeScreen(
                             // App logo: play glyph in a rounded accent badge
                             Box(
                                 Modifier.size(30.dp).background(
-                                    MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp)),
+                                    MaterialTheme.colorScheme.primary, appShape(9.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Rounded.PlayArrow, null,
@@ -265,7 +265,7 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                                     modifier = Modifier
                                         .background(MaterialTheme.colorScheme.surfaceVariant,
-                                            RoundedCornerShape(10.dp))
+                                            appShape(10.dp))
                                         .padding(horizontal = 7.dp, vertical = 3.dp)
                                 ) {
                                     Icon(Icons.Rounded.VisibilityOff, null,
@@ -340,7 +340,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .padding(top = 2.dp, bottom = 10.dp),
-                    shape          = RoundedCornerShape(26.dp),
+                    shape          = appShape(26.dp),
                     color          = MaterialTheme.colorScheme.surfaceVariant.copy(0.55f),
                     tonalElevation = 0.dp
                 ) {
@@ -538,7 +538,7 @@ fun HomeScreen(
                                     selected = searchType == key,
                                     onClick  = { vm.setSearchType(key) },
                                     label    = { Text(label, fontSize = 12.sp) },
-                                    shape    = RoundedCornerShape(16.dp),
+                                    shape    = appShape(16.dp),
                                     colors   = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                                         selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
@@ -558,7 +558,7 @@ fun HomeScreen(
                                         selected = sortMode == key,
                                         onClick  = { vm.setSortMode(key) },
                                         label    = { Text(label, fontSize = 12.sp) },
-                                        shape    = RoundedCornerShape(16.dp),
+                                        shape    = appShape(16.dp),
                                         colors   = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                                             selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
@@ -860,7 +860,7 @@ private fun CategoryChipsRow(
                         fontSize   = 13.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                 },
-                shape  = RoundedCornerShape(20.dp),
+                shape  = appShape(20.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
@@ -879,7 +879,7 @@ private fun CategoryChipsRow(
                     Icon(Icons.Rounded.Edit, null, modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
-                shape  = RoundedCornerShape(20.dp),
+                shape  = appShape(20.dp),
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     labelColor     = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1013,7 +1013,7 @@ private fun CustomizeHomeSheet(
                                         indication = null
                                     ) { onRemoveCustom(cat) })
                         }) else null,
-                        shape    = RoundedCornerShape(16.dp),
+                        shape    = appShape(16.dp),
                         colors   = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
@@ -1039,7 +1039,7 @@ private fun CustomizeHomeSheet(
             ) {
                 Surface(
                     modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = appShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Row(
@@ -1104,7 +1104,7 @@ private fun SheetChoiceChip(
         leadingIcon = if (icon != null) ({
             Icon(icon, null, modifier = Modifier.size(16.dp))
         }) else null,
-        shape  = RoundedCornerShape(12.dp),
+        shape  = appShape(12.dp),
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.primary,
             selectedLabelColor     = MaterialTheme.colorScheme.onPrimary,
@@ -1201,7 +1201,7 @@ private fun SectionHeader(
             Modifier
                 .width(4.dp)
                 .height(if (subtitle != null) 30.dp else 18.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(appShape(2.dp))
                 .background(MaterialTheme.colorScheme.primary)
         )
         Column(Modifier.weight(1f)) {
@@ -1261,7 +1261,7 @@ private fun FeaturedHeroCard(
     Box(
         modifier = modifier
             .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape((corner + 6).dp))
+            .clip(appShape((corner + 6).dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1289,7 +1289,7 @@ private fun FeaturedHeroCard(
             Modifier
                 .align(Alignment.TopStart)
                 .padding(10.dp)
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary, appShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -1303,7 +1303,7 @@ private fun FeaturedHeroCard(
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(10.dp)
-                    .background(Color.Black.copy(0.62f), RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(0.62f), appShape(6.dp))
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
                 Text(formatDuration(video.duration), color = Color.White,
@@ -1380,7 +1380,7 @@ private fun SearchTypeResults(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(appShape(12.dp))
                         .clickable { onChannelClick?.invoke(ch.url) }
                         .padding(horizontal = 6.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1391,12 +1391,12 @@ private fun SearchTypeResults(
                             model = ch.avatarUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(56.dp).clip(CircleShape)
+                            modifier = Modifier.size(56.dp).clip(appCircle())
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         )
                     } else {
                         Box(
-                            Modifier.size(56.dp).clip(CircleShape)
+                            Modifier.size(56.dp).clip(appCircle())
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1432,7 +1432,7 @@ private fun SearchTypeResults(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(appShape(12.dp))
                         .clickable { onPlaylistClick?.invoke(pl.url) }
                         .padding(horizontal = 6.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1443,7 +1443,7 @@ private fun SearchTypeResults(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(width = 110.dp, height = 62.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(appShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                     )
                     Column(Modifier.weight(1f)) {

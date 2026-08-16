@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -53,6 +52,7 @@ import com.streamflow.ui.shorts.ShortsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import android.content.ComponentName
+import com.streamflow.ui.theme.appShape
 import kotlinx.coroutines.flow.first
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -508,7 +508,7 @@ private fun AnimatedNavBar(
                     MaterialTheme.colorScheme.primary.copy(0.55f),
                     MaterialTheme.colorScheme.tertiary.copy(0.35f))))
         else null,
-        shape = if (modernStyle) RoundedCornerShape(26.dp)
+        shape = if (modernStyle) appShape(26.dp)
                 else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier
             .navigationBarsPadding()
@@ -565,7 +565,7 @@ private fun AnimatedNavBar(
                     Box(
                         modifier = Modifier
                             .size(width = 52.dp, height = 32.dp)
-                            .clip(RoundedCornerShape(if (terminalStyle) 0.dp else 12.dp))
+                            .clip(appShape(if (terminalStyle) 0.dp else 12.dp))
                             .background(
                                 when {
                                     selected && terminalStyle -> MaterialTheme.colorScheme.primary

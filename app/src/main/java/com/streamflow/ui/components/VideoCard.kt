@@ -9,8 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -35,6 +33,8 @@ import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.theme.LocalHapticsEnabled
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import com.streamflow.ui.theme.LocalThumbCorner
 
 private val avatarPalette = listOf(
@@ -65,12 +65,12 @@ fun ChannelAvatar(
             model              = avatarUrl,
             contentDescription = name,
             contentScale       = ContentScale.Crop,
-            modifier           = Modifier.size(size).clip(CircleShape)
+            modifier           = Modifier.size(size).clip(appCircle())
                 .background(avatarColorFor(name)).then(clickMod)
         )
     } else {
         Box(
-            modifier = Modifier.size(size).clip(CircleShape)
+            modifier = Modifier.size(size).clip(appCircle())
                 .background(avatarColorFor(name)).then(clickMod),
             contentAlignment = Alignment.Center
         ) {
@@ -109,7 +109,7 @@ private fun DurationBadge(
             .padding(if (terminal) 4.dp else outerPadding)
             .background(
                 if (terminal) MaterialTheme.colorScheme.primary else Color.Black.copy(0.82f),
-                if (terminal) RoundedCornerShape(0.dp) else RoundedCornerShape(5.dp)
+                appShape(5.dp)   // appShape already squares off in TERMINAL
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
@@ -179,11 +179,11 @@ fun VideoCard(
                                     MaterialTheme.colorScheme.primary.copy(0.55f),
                                     MaterialTheme.colorScheme.tertiary.copy(0.35f),
                                     MaterialTheme.colorScheme.primary.copy(0.15f))),
-                                shape = RoundedCornerShape(cardCorner.dp))
-                            .clip(RoundedCornerShape(cardCorner.dp))
+                                shape = appShape(cardCorner.dp))
+                            .clip(appShape(cardCorner.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.35f))
                         modernStyle -> Modifier
-                            .shadow(6.dp, RoundedCornerShape(cardCorner.dp))
+                            .shadow(6.dp, appShape(cardCorner.dp))
                             .background(MaterialTheme.colorScheme.surface)
                         else -> Modifier
                     }
@@ -209,8 +209,8 @@ fun VideoCard(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .clip(
-                        if (modernStyle) RoundedCornerShape(topStart = cardCorner.dp, topEnd = cardCorner.dp)
-                        else RoundedCornerShape(corner.dp)   // corner is forced to 0 in TERMINAL
+                        if (modernStyle) appShape(cardCorner.dp, cardCorner.dp, 0.dp, 0.dp)
+                        else appShape(corner.dp)   // corner is forced to 0 in TERMINAL
                     )
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             ) {
@@ -300,7 +300,7 @@ fun VideoCard(
                     // video preview header and big spaced action rows
                     if (showMenu) ModalBottomSheet(
                         onDismissRequest = { showMenu = false },
-                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        shape = appShape(24.dp, 24.dp, 0.dp, 0.dp)
                     ) {
                         Row(
                             Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp),
@@ -311,7 +311,7 @@ fun VideoCard(
                                 model = video.thumbnailUrl, contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.size(width = 96.dp, height = 54.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(appShape(10.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
                             )
                             Text(video.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
@@ -411,7 +411,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .scale(scale)
-            .clip(RoundedCornerShape((corner + 4).dp))
+            .clip(appShape((corner + 4).dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             .pointerInput(video.url) {
                 detectTapGestures(
@@ -436,7 +436,7 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             Modifier
                 .size(52.dp)
                 .align(Alignment.Center)
-                .background(Color.White.copy(0.18f), CircleShape),
+                .background(Color.White.copy(0.18f), appCircle()),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp))
@@ -479,7 +479,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(LocalThumbCorner.current.dp))
+                .clip(appShape(LocalThumbCorner.current.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
         ) {
             AsyncImage(
@@ -499,7 +499,7 @@ fun ContinueWatchingCard(entity: HistoryEntity, onClick: () -> Unit) {
             }
             Box(
                 Modifier.align(Alignment.BottomStart).padding(start = 5.dp, bottom = 7.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(0.88f), RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(0.88f), appShape(4.dp))
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Text("▶ ${formatDuration(entity.position / 1000)}",
@@ -556,7 +556,7 @@ fun CompactVideoCard(
     ) {
         Box(
             Modifier.width(168.dp).aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape((LocalThumbCorner.current + 2).dp))
+                .clip(appShape((LocalThumbCorner.current + 2).dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
         ) {
             AsyncImage(
@@ -630,7 +630,7 @@ fun CompactVideoCard(
             // Telegram-style action sheet (same as VideoCard)
             if (showMenu) ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                shape = appShape(24.dp, 24.dp, 0.dp, 0.dp)
             ) {
                 Row(
                     Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp),
@@ -641,7 +641,7 @@ fun CompactVideoCard(
                         model = video.thumbnailUrl, contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(width = 96.dp, height = 54.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(appShape(10.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
                     )
                     Text(video.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,

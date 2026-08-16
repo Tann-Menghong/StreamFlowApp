@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
 import coil.compose.AsyncImage
+import com.streamflow.ui.theme.appShape
 import kotlinx.coroutines.delay
 
 @Composable
@@ -68,7 +68,7 @@ fun MiniPlayerBar(
                     MaterialTheme.colorScheme.tertiary.copy(0.35f))))
             else -> null
         },
-        shape = if (modernStyle) RoundedCornerShape(16.dp)
+        shape = if (modernStyle) appShape(16.dp)
                 else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier
             .then(
@@ -135,7 +135,7 @@ fun MiniPlayerBar(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(width = 80.dp, height = 45.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(appShape(8.dp))
                     .background(MaterialTheme.colorScheme.outline.copy(0.2f))
             )
 

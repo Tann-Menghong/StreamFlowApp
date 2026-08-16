@@ -10,8 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -42,6 +40,8 @@ import com.streamflow.data.model.VideoItem
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatDuration
 import kotlinx.coroutines.flow.first
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,13 +152,13 @@ fun LibraryScreen(
                     // Premium-minimal segmented tabs: unselected are quiet text,
                     // the selected one gets a soft neutral pill + a hairline edge.
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = appShape(20.dp),
                         color = if (selected) MaterialTheme.colorScheme.onSurface.copy(0.07f)
                                 else androidx.compose.ui.graphics.Color.Transparent,
                         border = if (selected) androidx.compose.foundation.BorderStroke(
                                     1.dp, MaterialTheme.colorScheme.outline.copy(0.7f)) else null,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(appShape(20.dp))
                             .clickable { selectedTab = i }
                     ) {
                         Row(
@@ -335,7 +335,7 @@ private fun PlaylistList(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
-                            Modifier.width(100.dp).height(56.dp).clip(RoundedCornerShape(8.dp))
+                            Modifier.width(100.dp).height(56.dp).clip(appShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
@@ -437,12 +437,12 @@ private fun DownloadList(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(Modifier.width(100.dp).height(56.dp).clip(RoundedCornerShape(8.dp))) {
+                Box(Modifier.width(100.dp).height(56.dp).clip(appShape(8.dp))) {
                     AsyncImage(d.thumbnailUrl, null,
                         contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     if (d.isAudio) {
                         Box(Modifier.align(Alignment.BottomEnd).padding(4.dp)
-                            .background(androidx.compose.ui.graphics.Color.Black.copy(0.7f), RoundedCornerShape(4.dp))
+                            .background(androidx.compose.ui.graphics.Color.Black.copy(0.7f), appShape(4.dp))
                             .padding(3.dp)) {
                             Icon(Icons.Rounded.MusicNote, null,
                                 tint = androidx.compose.ui.graphics.Color.White,
@@ -606,7 +606,7 @@ private fun VideoListWithSearch(
         ) {
             Surface(
                 modifier = Modifier.weight(1f).height(38.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = appShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 tonalElevation = 0.dp
             ) {
@@ -789,7 +789,7 @@ private fun SubscriptionList(
                         selected = groupFilter == g,
                         onClick  = { groupFilter = g },
                         label    = { Text(g, fontSize = 12.sp) },
-                        shape    = RoundedCornerShape(16.dp)
+                        shape    = appShape(16.dp)
                     )
                 }
             }
@@ -810,7 +810,7 @@ private fun SubscriptionList(
                         if (unseen > 0) {
                             Spacer(Modifier.width(8.dp))
                             // NEW badge: uploads found since the feed was last opened
-                            Surface(shape = RoundedCornerShape(10.dp),
+                            Surface(shape = appShape(10.dp),
                                 color = MaterialTheme.colorScheme.onPrimary) {
                                 Text(if (unseen > 99) "99+" else "$unseen",
                                     fontSize = 10.sp, fontWeight = FontWeight.Bold,
@@ -825,7 +825,7 @@ private fun SubscriptionList(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(appShape(12.dp))
                         .clickable(enabled = onChannelClick != null) { onChannelClick?.invoke(sub.channelUrl) }
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -834,12 +834,12 @@ private fun SubscriptionList(
                     if (sub.avatarUrl.isNotEmpty()) {
                         coil.compose.AsyncImage(
                             model = sub.avatarUrl, contentDescription = null,
-                            modifier = Modifier.size(46.dp).clip(CircleShape)
+                            modifier = Modifier.size(46.dp).clip(appCircle())
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         )
                     } else {
                         Box(
-                            Modifier.size(46.dp).clip(CircleShape)
+                            Modifier.size(46.dp).clip(appCircle())
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1054,13 +1054,13 @@ private fun BookmarkList(
                         model = b.thumbnailUrl, contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(width = 120.dp, height = 68.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(appShape(10.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
                     )
                     // Timestamp chip over the thumbnail
                     Surface(
                         color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(6.dp),
+                        shape = appShape(6.dp),
                         modifier = Modifier.align(Alignment.BottomStart).padding(5.dp)
                     ) {
                         Text(

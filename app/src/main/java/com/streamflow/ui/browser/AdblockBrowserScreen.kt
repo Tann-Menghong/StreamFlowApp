@@ -13,7 +13,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.streamflow.ui.theme.appShape
 import androidx.core.view.WindowInsetsControllerCompat
 
 // ── Ad-blocking (shared by the Donghua, Drama and MKissa tabs) ───────────────
@@ -887,7 +887,7 @@ fun AdblockBrowserScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(appShape(12.dp))
                                 .clickable {
                                     webViewRef?.evaluateJavascript(
                                         "(window.__sfZap?window.__sfZap():0)"

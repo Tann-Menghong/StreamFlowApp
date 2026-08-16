@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.streamflow.ui.components.ShimmerList
 import com.streamflow.ui.components.VideoCard
+import com.streamflow.ui.theme.appShape
 import kotlinx.coroutines.delay
 
 @Composable
@@ -94,7 +94,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
         ) {
             Surface(
                 modifier = Modifier.weight(1f).height(46.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = appShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 tonalElevation = 0.dp
             ) {

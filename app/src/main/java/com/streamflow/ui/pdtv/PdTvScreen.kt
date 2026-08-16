@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
@@ -54,6 +53,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import com.streamflow.ui.theme.appShape
 import org.json.JSONObject
 
 data class PdChannel(val name: String, val streamUrl: String, val logoUrl: String)
@@ -381,12 +381,12 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
                         val selected = ch.streamUrl == currentUrl
                         Column(
                             Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(appShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
                                 .then(
                                     if (selected) Modifier.border(
                                         2.dp, MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(12.dp)
+                                        appShape(12.dp)
                                     ) else Modifier
                                 )
                                 .clickable { play(ch.streamUrl) }
@@ -405,7 +405,7 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .background(Color(0xFFE53935), RoundedCornerShape(4.dp))
+                                        .background(Color(0xFFE53935), appShape(4.dp))
                                         .padding(horizontal = 4.dp, vertical = 1.dp)
                                 )
                             }

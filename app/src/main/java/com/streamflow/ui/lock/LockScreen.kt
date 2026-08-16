@@ -2,7 +2,6 @@ package com.streamflow.ui.lock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
@@ -13,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.streamflow.ui.theme.appShape
 import androidx.compose.ui.unit.sp
 
 // Shown over everything while the app is locked (Settings > App lock). The real
@@ -31,7 +31,7 @@ fun LockScreen(onUnlock: () -> Unit) {
         ) {
             Box(
                 Modifier.size(72.dp).background(
-                    MaterialTheme.colorScheme.primary.copy(0.12f), RoundedCornerShape(22.dp)),
+                    MaterialTheme.colorScheme.primary.copy(0.12f), appShape(22.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Rounded.Lock, null,
@@ -43,7 +43,7 @@ fun LockScreen(onUnlock: () -> Unit) {
             Text("Unlock with your fingerprint or PIN to continue",
                 fontSize = 13.sp, textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onUnlock, shape = RoundedCornerShape(12.dp)) {
+            Button(onClick = onUnlock, shape = appShape(12.dp)) {
                 Icon(Icons.Rounded.LockOpen, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Unlock")

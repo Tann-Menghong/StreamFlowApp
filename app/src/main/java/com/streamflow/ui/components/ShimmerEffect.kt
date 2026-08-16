@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +13,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -88,19 +88,19 @@ fun ShimmerVideoCard() {
     val brush = shimmerBrush()
     val bg    = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f)
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(bg)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(appShape(12.dp)).background(bg)) {
             Box(Modifier.fillMaxSize().background(brush))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(34.dp).clip(CircleShape).background(bg)) {
+            Box(Modifier.size(34.dp).clip(appCircle()).background(bg)) {
                 Box(Modifier.fillMaxSize().background(brush))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.fillMaxWidth(0.88f).height(13.dp).clip(RoundedCornerShape(5.dp)).background(bg)) {
+                Box(Modifier.fillMaxWidth(0.88f).height(13.dp).clip(appShape(5.dp)).background(bg)) {
                     Box(Modifier.fillMaxSize().background(brush))
                 }
-                Box(Modifier.fillMaxWidth(0.55f).height(11.dp).clip(RoundedCornerShape(5.dp)).background(bg)) {
+                Box(Modifier.fillMaxWidth(0.55f).height(11.dp).clip(appShape(5.dp)).background(bg)) {
                     Box(Modifier.fillMaxSize().background(brush))
                 }
             }

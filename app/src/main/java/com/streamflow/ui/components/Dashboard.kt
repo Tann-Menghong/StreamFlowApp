@@ -2,7 +2,6 @@ package com.streamflow.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -17,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamflow.ui.components.terminal.AsciiBar
 import com.streamflow.ui.components.terminal.TerminalPane
+import com.streamflow.ui.theme.appShape
 import com.streamflow.ui.theme.LocalTerminalMode
 
 /*
@@ -40,7 +40,7 @@ fun DashboardPane(
         return
     }
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = appShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
@@ -109,7 +109,7 @@ fun DashboardTile(
         return
     }
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = appShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
@@ -158,12 +158,12 @@ fun DashboardMeter(
             AsciiBar(progress = safe, cells = 24, color = color, showPercent = false)
         } else {
             Box(
-                Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                Modifier.fillMaxWidth().height(6.dp).clip(appShape(3.dp))
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(0.15f))
             ) {
                 Box(
                     Modifier.fillMaxWidth(safe).fillMaxHeight()
-                        .clip(RoundedCornerShape(3.dp)).background(color)
+                        .clip(appShape(3.dp)).background(color)
                 )
             }
         }
@@ -205,7 +205,7 @@ fun DashboardBarChart(
                         .height((4 + barHeight * v / maxValue).dp)
                         .then(
                             if (terminal) Modifier
-                            else Modifier.clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                            else Modifier.clip(appShape(4.dp, 4.dp, 0.dp, 0.dp))
                         )
                         .background(if (v > 0) active else idle)
                 )
@@ -240,7 +240,7 @@ fun DashboardRankRow(
             Modifier
                 .fillMaxWidth(safe)
                 .height(24.dp)
-                .then(if (terminal) Modifier else Modifier.clip(RoundedCornerShape(6.dp)))
+                .then(if (terminal) Modifier else Modifier.clip(appShape(6.dp)))
                 .background(MaterialTheme.colorScheme.primary.copy(if (terminal) 0.22f else 0.14f))
         )
         Row(

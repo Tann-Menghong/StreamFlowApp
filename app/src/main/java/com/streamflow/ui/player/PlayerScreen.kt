@@ -28,7 +28,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -87,6 +86,9 @@ import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatViews
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
+import com.streamflow.ui.theme.appShapePercent
 import kotlinx.coroutines.launch
 
 // Drag distance (px) past which releasing the swipe-down-to-minimize gesture
@@ -692,8 +694,8 @@ fun PlayerScreen(
                     .fillMaxHeight()
                     .fillMaxWidth(0.3f)
                     .clip(
-                        if (back) RoundedCornerShape(topEndPercent = 100, bottomEndPercent = 100)
-                        else RoundedCornerShape(topStartPercent = 100, bottomStartPercent = 100)
+                        if (back) appShapePercent(0, 100, 100, 0)
+                        else appShapePercent(100, 0, 0, 100)
                     )
                     .background(Color.White.copy(0.14f)),
                 contentAlignment = Alignment.Center
@@ -955,7 +957,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(start = 8.dp)
-                            .background(Color.Black.copy(0.55f), RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(0.55f), appShape(8.dp))
                             .padding(8.dp)
                     ) {
                         Icon(Icons.Rounded.Brightness6, null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -994,7 +996,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = 8.dp)
-                            .background(Color.Black.copy(0.55f), RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(0.55f), appShape(8.dp))
                             .padding(8.dp)
                     ) {
                         Icon(Icons.Rounded.VolumeUp, null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1057,7 +1059,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     "Sleep: %02d:%02d".format(java.util.Locale.US, mm, ss),
                                     color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier
-                                        .background(Color.Black.copy(0.5f), RoundedCornerShape(6.dp))
+                                        .background(Color.Black.copy(0.5f), appShape(6.dp))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -1162,7 +1164,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 val pos = mediaController?.currentPosition ?: 0L
                 Box(
                     Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 130.dp)
-                        .background(Color.Black.copy(0.7f), RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(0.7f), appShape(8.dp))
                         .padding(12.dp)
                 ) {
                     Column {
@@ -1198,7 +1200,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
                             fsTapTimestamp = System.currentTimeMillis()
                         },
-                        modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), CircleShape)
+                        modifier = Modifier.size(64.dp).background(Color.Black.copy(0.45f), appCircle())
                     ) {
                         Icon(
                             if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -1223,11 +1225,11 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 ) {
                     scrubDetails?.storyboard?.let { sb ->
                         StoryboardPreview(sb, scrubTargetMs,
-                            Modifier.size(176.dp, 99.dp).clip(RoundedCornerShape(10.dp)))
+                            Modifier.size(176.dp, 99.dp).clip(appShape(10.dp)))
                         Spacer(Modifier.height(8.dp))
                     }
                     Column(
-                        Modifier.background(Color.Black.copy(0.7f), RoundedCornerShape(10.dp))
+                        Modifier.background(Color.Black.copy(0.7f), appShape(10.dp))
                             .padding(horizontal = 20.dp, vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -1245,7 +1247,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // ── Skip sponsor banner ──────────────────────────────────────
             if (showSkipBanner) {
                 Box(Modifier.align(Alignment.TopCenter).padding(top = 48.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.primary, appShape(20.dp))
                     .padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Text("Skipping $skipBannerLabel",
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -1256,7 +1258,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // ── 2x speed boost indicator ─────────────────────────────────
             if (speedBoost) {
                 Row(Modifier.align(Alignment.TopCenter).padding(top = 12.dp)
-                    .background(Color.Black.copy(0.65f), RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(0.65f), appShape(20.dp))
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1271,7 +1273,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     color = Color.White, fontSize = 11.sp,
                     modifier = Modifier.align(Alignment.BottomStart)
                         .padding(start = 8.dp, bottom = 120.dp)
-                        .background(Color.Black.copy(0.5f), RoundedCornerShape(5.dp))
+                        .background(Color.Black.copy(0.5f), appShape(5.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp))
             }
 
@@ -1279,7 +1281,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             if (autoPlayCountdown > 0) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 110.dp)
-                        .background(Color.Black.copy(0.8f), RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(0.8f), appShape(12.dp))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1364,7 +1366,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             if (fsIsLive) {
                                 Row(verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), CircleShape))
+                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), appCircle()))
                                     Text("LIVE", color = Color.White, fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold)
                                 }
@@ -1412,6 +1414,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             .nestedScroll(minimizeScrollConnection)
     ) {
         item {
+            // graphicsLayer's block is a draw-scope lambda, not a composable, so
+            // the theme has to be read out here and captured rather than calling
+            // appShape() inside it.
+            val squareCorners = com.streamflow.ui.theme.LocalTerminalMode.current
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
                     .graphicsLayer {
@@ -1424,7 +1430,10 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         scaleX = 1f - progress * 0.35f
                         scaleY = 1f - progress * 0.35f
                         alpha = 1f - progress * 0.35f
-                        shape = RoundedCornerShape((progress * 14f).dp)
+                        // TERMINAL keeps the shrink animation but never rounds:
+                        // the mini player it turns into is square there too.
+                        shape = if (squareCorners) androidx.compose.ui.graphics.RectangleShape
+                                else androidx.compose.foundation.shape.RoundedCornerShape((progress * 14f).dp)
                         clip = true
                     }
             ) {
@@ -1513,7 +1522,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 mediaController?.let { mc -> if (mc.isPlaying) mc.pause() else mc.play() }
                                                 fsTapTimestamp = System.currentTimeMillis()
                                             },
-                                            modifier = Modifier.size(64.dp).background(Color.Black.copy(0.35f), CircleShape)
+                                            modifier = Modifier.size(64.dp).background(Color.Black.copy(0.35f), appCircle())
                                         ) {
                                             Icon(
                                                 if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -1537,7 +1546,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             if (s.details.isLive) {
                                                 Row(verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), CircleShape))
+                                                    Box(Modifier.size(8.dp).background(Color(0xFFE53935), appCircle()))
                                                     Text("LIVE", color = Color.White, fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold)
                                                 }
@@ -1598,7 +1607,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 ) {
                                     s.details.storyboard?.let { sb ->
                                         StoryboardPreview(sb, seekTargetPortrait,
-                                            Modifier.size(144.dp, 81.dp).clip(RoundedCornerShape(8.dp)))
+                                            Modifier.size(144.dp, 81.dp).clip(appShape(8.dp)))
                                         Spacer(Modifier.height(6.dp))
                                     }
                                     val chTitle = s.details.chapters
@@ -1609,7 +1618,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         color = Color.White, fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold, maxLines = 1,
                                         modifier = Modifier
-                                            .background(Color.Black.copy(0.65f), RoundedCornerShape(8.dp))
+                                            .background(Color.Black.copy(0.65f), appShape(8.dp))
                                             .padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
                                 }
@@ -1618,7 +1627,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         // Skip sponsor banner (portrait)
                         if (showSkipBanner) {
                             Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.primary, appShape(16.dp))
                                 .padding(horizontal = 12.dp, vertical = 4.dp)) {
                                 Text("Skipping $skipBannerLabel",
                                     color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp)
@@ -1627,7 +1636,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         // 2x speed boost indicator (portrait)
                         if (speedBoost) {
                             Row(Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
-                                .background(Color.Black.copy(0.65f), RoundedCornerShape(16.dp))
+                                .background(Color.Black.copy(0.65f), appShape(16.dp))
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1649,7 +1658,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                 if (autoPlayCountdown > 0) {
                     Box(
                         Modifier.align(Alignment.BottomEnd).padding(8.dp)
-                            .background(Color.Black.copy(0.8f), RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(0.8f), appShape(10.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically,
@@ -1692,7 +1701,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         Spacer(Modifier.height(10.dp))
                         // Distinct rounded "channel bar" grouping avatar + name + Subscribe
                         Surface(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = appShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -2033,7 +2042,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             var expanded by remember { mutableStateOf(false) }
                             // YouTube-style rounded description card
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = appShape(12.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -2164,7 +2173,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                     // offers what the data can actually back up.
                                     Surface(
                                         onClick = { commentsSortByLikes = !commentsSortByLikes },
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = appShape(12.dp),
                                         color = MaterialTheme.colorScheme.surfaceVariant.copy(0.6f)
                                     ) {
                                         Text(
@@ -2201,7 +2210,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Box(
-                                Modifier.size(32.dp).clip(CircleShape)
+                                Modifier.size(32.dp).clip(appCircle())
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2275,7 +2284,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Box(
-                                                Modifier.size(22.dp).clip(CircleShape)
+                                                Modifier.size(22.dp).clip(appCircle())
                                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -2420,7 +2429,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
                     if (aiOutput.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = appShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -2554,7 +2563,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 model = video.thumbnailUrl, contentDescription = null,
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                                 modifier = Modifier.size(width = 80.dp, height = 45.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(appShape(6.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             )
                             Column(Modifier.weight(1f)) {
@@ -2734,7 +2743,7 @@ private fun ActionChip(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = appShape(20.dp),
         color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
     ) {

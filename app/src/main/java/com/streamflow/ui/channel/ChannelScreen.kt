@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Person
@@ -29,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.streamflow.ui.components.VideoCard
+import com.streamflow.ui.theme.appShape
+import com.streamflow.ui.theme.appCircle
 import com.streamflow.ui.components.formatViews
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,13 +132,13 @@ fun ChannelScreen(
                                 model = data.avatarUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(72.dp).clip(CircleShape)
+                                modifier = Modifier.size(72.dp).clip(appCircle())
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .border(2.dp, MaterialTheme.colorScheme.primary.copy(0.5f), CircleShape)
+                                    .border(2.dp, MaterialTheme.colorScheme.primary.copy(0.5f), appCircle())
                             )
                         } else {
                             Box(
-                                Modifier.size(72.dp).clip(CircleShape)
+                                Modifier.size(72.dp).clip(appCircle())
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -257,13 +257,13 @@ fun ChannelScreen(
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.size(120.dp, 68.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(appShape(8.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant)
                                     )
                                     if (pl.streamCount >= 0) {
                                         Surface(
                                             color = Color.Black.copy(alpha = 0.75f),
-                                            shape = RoundedCornerShape(topStart = 6.dp),
+                                            shape = appShape(6.dp, 0.dp, 0.dp, 0.dp),
                                             modifier = Modifier.align(Alignment.BottomEnd)
                                         ) {
                                             Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -309,7 +309,7 @@ fun ChannelScreen(
                                     }
                                 },
                                 singleLine = true,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = appShape(14.dp),
                                 textStyle = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.fillMaxWidth()
                                     .padding(horizontal = 14.dp, vertical = 6.dp)
