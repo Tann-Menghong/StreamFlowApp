@@ -84,6 +84,44 @@ fun ChannelAvatar(
     }
 }
 
+/**
+ * The timecode chip over a thumbnail.
+ *
+ * Extracted because three card variants (feed, hero, compact) each carried their
+ * own copy with slightly different radii and opacities — so styling the feed one
+ * for TERMINAL left the other two as black pills, which is exactly the kind of
+ * one-off drift a design system exists to remove. One definition now.
+ *
+ * TERMINAL renders it as inverted video (solid phosphor block, background-colour
+ * text) instead of a translucent rounded pill: same information, read as a
+ * status field on a readout.
+ */
+@Composable
+private fun DurationBadge(
+    label: String,
+    modifier: Modifier = Modifier,
+    outerPadding: androidx.compose.ui.unit.Dp = 8.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
+) {
+    val terminal = com.streamflow.ui.theme.LocalTerminalMode.current
+    Box(
+        modifier
+            .padding(if (terminal) 4.dp else outerPadding)
+            .background(
+                if (terminal) MaterialTheme.colorScheme.primary else Color.Black.copy(0.82f),
+                if (terminal) RoundedCornerShape(0.dp) else RoundedCornerShape(5.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            label,
+            color = if (terminal) MaterialTheme.colorScheme.background else Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoCard(
@@ -183,31 +221,10 @@ fun VideoCard(
                     modifier           = Modifier.fillMaxSize()
                 )
                 // Duration badge or remaining label
-                // TERMINAL renders the timecode as inverted video (solid phosphor
-                // block, black text) rather than a translucent rounded pill —
-                // same information, and it reads as a status field on a readout.
                 val badgeLabel = remainingLabel ?: if (video.duration > 0)
                     formatDuration(video.duration) else null
                 if (badgeLabel != null) {
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(if (terminalStyle) 4.dp else 8.dp)
-                            .background(
-                                if (terminalStyle) MaterialTheme.colorScheme.primary
-                                else Color.Black.copy(0.82f),
-                                if (terminalStyle) RoundedCornerShape(0.dp) else RoundedCornerShape(5.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            badgeLabel,
-                            color = if (terminalStyle) MaterialTheme.colorScheme.background
-                                    else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    DurationBadge(badgeLabel, Modifier.align(Alignment.BottomEnd))
                 }
                 // Watch progress bar
                 if (progressFraction in 0.01f..0.99f) {
@@ -425,14 +442,11 @@ fun HeroVideoCard(video: VideoItem, onClick: () -> Unit) {
             Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp))
         }
         if (video.duration > 0) {
-            Box(
-                Modifier.align(Alignment.BottomEnd).padding(10.dp)
-                    .background(Color.Black.copy(0.75f), RoundedCornerShape(5.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(formatDuration(video.duration), color = Color.White,
-                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            }
+            DurationBadge(
+                formatDuration(video.duration),
+                Modifier.align(Alignment.BottomEnd),
+                outerPadding = 10.dp
+            )
         }
         Column(
             Modifier.align(Alignment.BottomStart).padding(12.dp).padding(end = 70.dp)
@@ -552,14 +566,12 @@ fun CompactVideoCard(
                 modifier           = Modifier.fillMaxSize()
             )
             if (video.duration > 0) {
-                Box(
-                    Modifier.align(Alignment.BottomEnd).padding(5.dp)
-                        .background(Color.Black.copy(0.82f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                ) {
-                    Text(formatDuration(video.duration), color = Color.White,
-                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                }
+                DurationBadge(
+                    formatDuration(video.duration),
+                    Modifier.align(Alignment.BottomEnd),
+                    outerPadding = 5.dp,
+                    fontSize = 10.sp
+                )
             }
             // Watch progress bar
             if (progressFraction in 0.01f..0.99f) {

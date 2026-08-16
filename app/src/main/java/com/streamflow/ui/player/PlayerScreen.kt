@@ -732,10 +732,21 @@ fun PlayerScreen(
             }
         }
 
+        // Every zone below is keyed on `mc` as well as skipMs.
+        //
+        // pointerInput only restarts when a key changes, so a block keyed on Unit
+        // (or on skipMs alone) keeps the MediaController instance it captured on
+        // first composition. When the media session reconnects — returning from
+        // PiP, or after the service is rebound — `mediaController` becomes a NEW
+        // instance while these handlers still hold the dead one, so fullscreen
+        // scrubbing and double-tap seek silently stop moving the video.
+        //
+        // This is the same defect already fixed in MiniPlayerBar and VideoCard;
+        // these four zones were missed.
         Row(Modifier.fillMaxWidth().fillMaxHeight()) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
-                    .pointerInput(skipMs) {
+                    .pointerInput(mc, skipMs) {
                         detectTapGestures(
                             onPress = holdBoost,
                             onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },
@@ -747,7 +758,7 @@ fun PlayerScreen(
                     }
             )
             Box(Modifier.weight(0.4f).fillMaxHeight()
-                .pointerInput(Unit) {
+                .pointerInput(mc) {
                     detectHorizontalDragGestures(
                         onDragStart = {
                             scrubStartMs  = mc.currentPosition
@@ -762,14 +773,14 @@ fun PlayerScreen(
                         onDragCancel = { isScrubbing = false }
                     )
                 }
-                .pointerInput(Unit) {
+                .pointerInput(mc) {
                     detectTapGestures(
                         onPress = holdBoost,
                         onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() })
                 })
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
-                    .pointerInput(skipMs) {
+                    .pointerInput(mc, skipMs) {
                         detectTapGestures(
                             onPress = holdBoost,
                             onTap = { showFsControls = !showFsControls; fsTapTimestamp = System.currentTimeMillis() },

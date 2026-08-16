@@ -451,12 +451,21 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         }
                     ) { showDesignDialog = true }
                     SettingsDivider()
+                    // The Terminal style deliberately fixes the palette, the type
+                    // face and the corner radius — a light-mode, pink-accent,
+                    // rounded terminal is not a terminal. These rows stay tappable
+                    // so the choice is remembered for the other styles, but they
+                    // must SAY they're overridden; leaving them looking live was a
+                    // control that silently did nothing.
+                    val fixedByTerminal = designStyle == "TERMINAL"
                     SettingsItem(Icons.Rounded.Palette, "Theme",
-                        when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
+                        if (fixedByTerminal) "Fixed by Terminal style"
+                        else when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
                     ) { showThemeDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.ColorLens, "Accent color",
-                        if (accentColor == "DYNAMIC") "Dynamic (Material You)"
+                        if (fixedByTerminal) "Fixed by Terminal style"
+                        else if (accentColor == "DYNAMIC") "Dynamic (Material You)"
                         else accentColor.lowercase().replaceFirstChar { it.uppercase() }
                     ) { showAccentDialog = true }
                     SettingsDivider()
@@ -469,11 +478,13 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { showFontDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.TextFields, "Font style",
-                        when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
+                        if (fixedByTerminal) "Monospace — fixed by Terminal style"
+                        else when (fontFamily) { "SERIF" -> "Serif"; "MONO" -> "Monospace"; else -> "Default" }
                     ) { showFontFamilyDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.RoundedCorner, "Thumbnail corners",
-                        when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
+                        if (fixedByTerminal) "Square — fixed by Terminal style"
+                        else when (cornerStyle) { "SQUARE" -> "Square"; "ROUND" -> "Extra round"; else -> "Rounded" }
                     ) { showCornerDialog = true }
                     SettingsDivider()
                     SettingsSwitchItem(Icons.Rounded.Animation, "Reduce motion",
