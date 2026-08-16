@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -81,6 +82,19 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
         fun createRoute(url: String) = "ytplaylist?url=${URLEncoder.encode(url, "UTF-8")}"
     }
     object Shorts : Screen("shortsfeed", "Shorts", Icons.Rounded.SlowMotionVideo)
+
+    /**
+     * A user-added website tab. Unlike the built-ins this is a data class, not an
+     * object: label, icon and target URL all come from the database row, so each
+     * configured tab is its own Screen instance.
+     */
+    data class Custom(val id: Long, val title: String, val iconVector: ImageVector) :
+        Screen("customtab/$id", title, iconVector) {
+        companion object {
+            const val ROUTE_PATTERN = "customtab/{tabId}"
+            fun createRoute(id: Long) = "customtab/$id"
+        }
+    }
 }
 
 private val allBottomRoutes = listOf(
@@ -88,13 +102,18 @@ private val allBottomRoutes = listOf(
     Screen.PdTv.route, Screen.Mkiss.route, Screen.Library.route, Screen.Settings.route
 )
 
+// Custom tabs are part of the bottom-bar set too, but their routes are dynamic,
+// so they're matched by prefix rather than by membership in the fixed list.
+private fun isBottomRoute(route: String?): Boolean =
+    route != null && (allBottomRoutes.contains(route) || route.startsWith("customtab/"))
+
 @Composable
 fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: Int = 0) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val currentDest = entry?.destination
     var isDonghuaFullscreen by remember { mutableStateOf(false) }
-    val showBottom = allBottomRoutes.any { it == currentDest?.route } && !isDonghuaFullscreen
+    val showBottom = isBottomRoute(currentDest?.route) && !isDonghuaFullscreen
 
     val miniState by MiniPlayerState.data.collectAsState()
     val isOnPlayerScreen = currentDest?.route?.startsWith("player") == true
@@ -126,7 +145,13 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
             android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val bottomItems = remember(showDonghua, showDrama, showPdTv, showMkiss, showSearchTab) {
+    // User-added website tabs, live from the database so adding one in Settings
+    // shows up in the bar immediately without an app restart.
+    val customTabs by remember {
+        com.streamflow.data.local.AppDatabase.get(context).customTabDao().getAll()
+    }.collectAsState(initial = emptyList())
+
+    val bottomItems = remember(showDonghua, showDrama, showPdTv, showMkiss, showSearchTab, customTabs) {
         buildList {
             add(Screen.Home)
             if (showSearchTab) add(Screen.Search)
@@ -134,6 +159,11 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
             if (showDrama) add(Screen.Drama)
             if (showPdTv) add(Screen.PdTv)
             if (showMkiss) add(Screen.Mkiss)
+            // Custom tabs sit with the other site tabs, before Library/Settings,
+            // which stay anchored at the end where users expect them.
+            customTabs.forEach { t ->
+                add(Screen.Custom(t.id, t.title, com.streamflow.data.CustomTabs.iconFor(t.iconKey)))
+            }
             add(Screen.Library)
             add(Screen.Settings)
         }
@@ -260,6 +290,9 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                     AnimatedNavBar(
                         items    = bottomItems,
                         current  = currentDest,
+                        currentCustomTabId =
+                            if (currentDest?.route == Screen.Custom.ROUTE_PATTERN)
+                                entry?.arguments?.getLong("tabId") else null,
                         lang     = uiLang,
                         labelStyle   = navLabels,
                         reduceMotion = reduceMotion,
@@ -340,6 +373,32 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                     defaultTitle = "KissKH",
                     onFullscreenChange = { isDonghuaFullscreen = it }
                 )
+            }
+            // ── User-added website tabs ───────────────────────────────────────
+            // Same ad-blocking browser as the built-in site tabs, so a custom tab
+            // gets the pop-up blocking, fullscreen handling and shield for free.
+            composable(
+                Screen.Custom.ROUTE_PATTERN,
+                arguments = listOf(navArgument("tabId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val tabId = backStackEntry.arguments?.getLong("tabId") ?: 0L
+                val tab = customTabs.firstOrNull { it.id == tabId }
+                if (tab == null) {
+                    // The tab was deleted while it was open. Fall back to Home
+                    // rather than rendering an empty browser pointed at nothing.
+                    LaunchedEffect(tabId) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
+                        }
+                    }
+                } else {
+                    com.streamflow.ui.browser.AdblockBrowserScreen(
+                        homeUrl = tab.url,
+                        prefsName = com.streamflow.data.CustomTabs.prefsNameFor(tab.id),
+                        defaultTitle = tab.title,
+                        onFullscreenChange = { isDonghuaFullscreen = it }
+                    )
+                }
             }
             composable(Screen.PdTv.route) {
                 // Native live-TV player (the site's own web player doesn't
@@ -484,6 +543,15 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
 private fun AnimatedNavBar(
     items: List<Screen>,
     current: androidx.navigation.NavDestination?,
+    /**
+     * Which custom tab is open, if any.
+     *
+     * Needed because a custom tab's Screen.route is the CONCRETE path
+     * ("customtab/7") while the back-stack destination carries the PATTERN
+     * ("customtab/{tabId}"). Comparing those two strings never matches, so
+     * without the id the tab would never highlight as selected.
+     */
+    currentCustomTabId: Long? = null,
     lang: String = "EN",
     labelStyle: String = "SELECTED", // ALWAYS / SELECTED / NEVER
     reduceMotion: Boolean = false,
@@ -529,16 +597,30 @@ private fun AnimatedNavBar(
                 }
             )
     ) {
+        // With the built-ins plus up to five custom tabs the bar can hold more
+        // items than a phone width can share out. Past six, stop dividing the
+        // width (which squeezes icons into each other and makes labels unreadable)
+        // and scroll fixed-width items instead.
+        val crowded = items.size > 6
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (crowded) Modifier.horizontalScroll(rememberScrollState())
+                    else Modifier
+                )
                 .height(if (terminalStyle) 52.dp else 60.dp)
                 .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = if (crowded) Arrangement.Start else Arrangement.SpaceEvenly,
             verticalAlignment     = Alignment.CenterVertically
         ) {
             items.forEach { screen ->
-                val selected = current?.hierarchy?.any { it.route == screen.route } == true
+                val selected = if (screen is Screen.Custom) {
+                    current?.route == Screen.Custom.ROUTE_PATTERN &&
+                        currentCustomTabId == screen.id
+                } else {
+                    current?.hierarchy?.any { it.route == screen.route } == true
+                }
                 val iconScale by animateFloatAsState(
                     targetValue    = if (selected && !reduceMotion) 1.12f else 1f,
                     animationSpec  = if (reduceMotion) snap()
@@ -546,8 +628,7 @@ private fun AnimatedNavBar(
                     label          = "nav_scale_${screen.label}"
                 )
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
+                    modifier = (if (crowded) Modifier.width(76.dp) else Modifier.weight(1f))
                         .fillMaxHeight()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },

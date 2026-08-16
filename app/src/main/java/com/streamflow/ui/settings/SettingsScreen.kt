@@ -443,6 +443,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     ) { uri -> if (uri != null) vm.exportOpml(uri) }
     val update               by vm.update.collectAsState()
     val versions             by vm.versions.collectAsState()
+    val customTabs           by vm.customTabs.collectAsState()
     val context              = LocalContext.current
 
     var showThemeDialog    by remember { mutableStateOf(false) }
@@ -471,6 +472,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     var showLibTabDialog     by remember { mutableStateOf(false) }
     var showDeleteAiDialog   by remember { mutableStateOf(false) }
     var showVersionsDialog   by remember { mutableStateOf(false) }
+    var showAddTabDialog     by remember { mutableStateOf(false) }
+    var editingTab by remember {
+        mutableStateOf<com.streamflow.data.local.entity.CustomTabEntity?>(null)
+    }
 
     Scaffold(
         topBar = {
@@ -656,6 +661,33 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             when (navLabels) { "ALWAYS" -> "Always show"; "NEVER" -> "Icons only"; else -> "Selected tab only" }
                         ) { showNavLabelDialog = true }
                     }
+
+                    // ── Custom website tabs ───────────────────────────────────
+                    SettingsGroupLabel("Your own tabs")
+                    SettingsCard {
+                        customTabs.forEach { tab ->
+                            SettingsItem(
+                                com.streamflow.data.CustomTabs.iconFor(tab.iconKey),
+                                tab.title,
+                                tab.url.removePrefix("https://").removePrefix("http://")
+                            ) { editingTab = tab }
+                            SettingsDivider()
+                        }
+                        if (customTabs.size < com.streamflow.data.CustomTabs.MAX_TABS) {
+                            SettingsItem(Icons.Rounded.AddCircle, "Add website tab",
+                                "Open any site in the ad-blocking browser"
+                            ) { editingTab = null; showAddTabDialog = true }
+                        } else {
+                            SettingsItem(Icons.Rounded.Info, "Tab limit reached",
+                                com.streamflow.data.CustomTabs.tooManyMessage)
+                        }
+                    }
+                    SettingsFooter(
+                        if (customTabs.isEmpty())
+                            "Add any website as its own tab. It opens in the same browser as the built-in site tabs, so pop-up blocking and fullscreen work the same way."
+                        else
+                            "Tap a tab to edit or remove it. Each keeps its own logins and cookies."
+                    )
                     SettingsGroupLabel("Start & defaults")
                     SettingsCard {
                         SettingsItem(Icons.Rounded.Start, "Start screen",
@@ -940,6 +972,31 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     }
 
     // ── Dialogs (shared across all categories) ─────────────────────────
+    // Custom tab editor — add and edit share one dialog.
+    if (showAddTabDialog || editingTab != null) {
+        val existing = editingTab
+        CustomTabDialog(
+            existing = existing,
+            onDismiss = { showAddTabDialog = false; editingTab = null },
+            onSave = { title, url, icon, onError ->
+                if (existing == null) {
+                    vm.addCustomTab(title, url, icon) { err ->
+                        if (err == null) { showAddTabDialog = false; editingTab = null }
+                        else onError(err)
+                    }
+                } else {
+                    vm.updateCustomTab(existing, title, url, icon) { err ->
+                        if (err == null) { showAddTabDialog = false; editingTab = null }
+                        else onError(err)
+                    }
+                }
+            },
+            onDelete = existing?.let {
+                { vm.deleteCustomTab(it); showAddTabDialog = false; editingTab = null }
+            }
+        )
+    }
+
     // pendingDowngrade == null: once the older build is downloaded the downgrade
     // dialog takes over, otherwise both AlertDialogs stack on top of each other.
     if (showVersionsDialog && versions.pendingDowngrade == null) {
@@ -1626,6 +1683,106 @@ private fun DowngradeDialog(
             }
         },
         dismissButton = { TextButton(onDismiss) { Text("Later") } },
+        shape = appShape(16.dp)
+    )
+}
+
+/**
+ * Add / edit a custom website tab.
+ *
+ * The URL field is deliberately forgiving — validation happens on save via
+ * CustomTabs.normalizeUrl, so typing "kisskh.co" works and the error only
+ * appears when it genuinely cannot be a website. Showing a red field while
+ * someone is still halfway through typing is hostile.
+ */
+@Composable
+private fun CustomTabDialog(
+    existing: com.streamflow.data.local.entity.CustomTabEntity?,
+    onDismiss: () -> Unit,
+    onSave: (title: String, url: String, iconKey: String, onError: (String) -> Unit) -> Unit,
+    onDelete: (() -> Unit)?,
+) {
+    var title by remember { mutableStateOf(existing?.title ?: "") }
+    var url by remember { mutableStateOf(existing?.url ?: "") }
+    var iconKey by remember { mutableStateOf(existing?.iconKey ?: "LANGUAGE") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existing == null) "Add website tab" else "Edit tab",
+            fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it; error = null },
+                    label = { Text("Website address") },
+                    placeholder = { Text("kisskh.co") },
+                    singleLine = true,
+                    isError = error != null,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it.take(16) },
+                    label = { Text("Tab name") },
+                    // Left blank on purpose: the name is derived from the address
+                    // so the common case needs no typing at all.
+                    placeholder = { Text("Optional — we'll use the site name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("Icon", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    com.streamflow.data.CustomTabs.iconChoices.forEach { (key, vec) ->
+                        val selected = key == iconKey
+                        Box(
+                            Modifier
+                                .size(38.dp)
+                                .clip(appShape(10.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .clickable { iconKey = key },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(vec, key,
+                                tint = if (selected) MaterialTheme.colorScheme.onPrimary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+                if (error != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(error!!, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error)
+                }
+                if (onDelete != null) {
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = onDelete) {
+                        Text("Remove this tab", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(title, url, iconKey) { error = it } }) {
+                Text(if (existing == null) "Add" else "Save")
+            }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
         shape = appShape(16.dp)
     )
 }

@@ -23,12 +23,13 @@ import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 
 @Database(
-    entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class, DownloadEntity::class, PlaylistEntity::class, PlaylistItemEntity::class, com.streamflow.data.local.entity.BookmarkEntity::class],
-    version = 9,
+    entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class, DownloadEntity::class, PlaylistEntity::class, PlaylistItemEntity::class, com.streamflow.data.local.entity.BookmarkEntity::class, com.streamflow.data.local.entity.CustomTabEntity::class],
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): com.streamflow.data.local.dao.BookmarkDao
+    abstract fun customTabDao(): com.streamflow.data.local.dao.CustomTabDao
     abstract fun favoriteDao(): FavoriteDao
     abstract fun historyDao(): HistoryDao
     abstract fun watchLaterDao(): WatchLaterDao
@@ -123,6 +124,22 @@ abstract class AppDatabase : RoomDatabase() {
 
         // downloads: PRIMARY KEY(url) -> (url, isAudio) so the video and audio
         // downloads of the same video can coexist instead of replacing each other
+        // Adds user-defined website tabs. Purely additive — no existing table is
+        // touched, so favorites/history/playlists/subscriptions are untouched.
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `custom_tabs` (" +
+                    "`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                    "`title` TEXT NOT NULL, " +
+                    "`url` TEXT NOT NULL, " +
+                    "`iconKey` TEXT NOT NULL, " +
+                    "`position` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL)"
+                )
+            }
+        }
+
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -144,7 +161,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "streamflow.db")
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     // Destructive fallback ONLY from the ancient v1 schema (no
                     // migration exists for it). The blanket fallback was a data
                     // landmine: any future version bump missing a migration would

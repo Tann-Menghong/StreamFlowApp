@@ -176,46 +176,23 @@ class PlaybackService : MediaSessionService() {
         val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
             .setEnableDecoderFallback(true)
 
-        // ── Bandwidth estimation ──────────────────────────────────────────────
-        // ExoPlayer's default starting estimate is a conservative country-wide
-        // average, so the FIRST chunk of every video is picked for a slower link
-        // than the user usually has — that is why a video can open soft and take
-        // a few seconds to sharpen. Seeding a higher initial estimate lets the
-        // opening chunk be chosen correctly; the meter then measures the real
-        // link within a second or two and takes over regardless, so a seed that
-        // is too optimistic self-corrects rather than causing sustained stalls.
-        val bandwidthMeter = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(this)
-            .setInitialBitrateEstimate(if (highPerf) 6_000_000L else 2_500_000L)
-            .setResetOnNetworkTypeChange(true)   // Wi-Fi -> mobile must re-measure
-            .build()
-
-        // ── Adaptive track selection ──────────────────────────────────────────
-        // Previously unset, so every adaptive stream ran on stock defaults.
-        // These parameters bias toward NOT stalling: drop quality quickly when
-        // the link degrades, climb back slowly so quality doesn't oscillate, and
-        // never pick a track the device cannot actually display.
-        val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(
-            this,
-            androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(
-                /* minDurationForQualityIncreaseMs = */ 10_000,
-                /* maxDurationForQualityDecreaseMs = */ 4_000,
-                /* minDurationToRetainAfterDiscardMs = */ 12_000,
-                /* bandwidthFraction = */ 0.75f   // leave headroom for jitter
-            )
-        ).apply {
-            parameters = buildUponParameters()
-                // Never let a constraint leave the user staring at nothing: if no
-                // track fits, play the closest one rather than failing the render.
-                .setExceedVideoConstraintsIfNecessary(true)
-                .setExceedRendererCapabilitiesIfNecessary(true)
-                .build()
-        }
-
+        // ── Track selection: deliberately left at ExoPlayer's defaults ────────
+        //
+        // v6.3.0 installed a custom DefaultTrackSelector here and it BROKE VIDEO
+        // PLAYBACK — audio played, the picture stayed black. The cause was
+        // setExceedRendererCapabilitiesIfNecessary(true): despite the reassuring
+        // name, it does not mean "fall back to something safe", it means "select
+        // a track even when the decoder cannot handle it". Paired with a raised
+        // initial bandwidth estimate that pushed selection toward higher-bitrate
+        // tracks, the player kept choosing streams this device could not decode.
+        //
+        // The stock selector already picks the best track the renderer actually
+        // supports, and DefaultRenderersFactory.setEnableDecoderFallback(true)
+        // above covers a decoder that fails at runtime. Do not re-add a custom
+        // selector without testing playback on a real device first.
         val player = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
-            .setBandwidthMeter(bandwidthMeter)
-            .setTrackSelector(trackSelector)
             .setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true)
             .setHandleAudioBecomingNoisy(true)
             .build()

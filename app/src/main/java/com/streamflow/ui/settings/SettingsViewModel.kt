@@ -240,6 +240,84 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         _versions.value = _versions.value.copy(pendingDowngrade = null)
     }
 
+    // ── Custom website tabs ───────────────────────────────────────────────────
+    val customTabs = db.customTabDao().getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Adds a tab. Returns an error string, or null on success.
+     *
+     * Validation lives here rather than in the dialog so every caller gets the
+     * same rules: the URL is normalised (bare "kisskh.co" becomes a real https
+     * URL), duplicates are rejected, and the cap is enforced before the insert.
+     */
+    fun addCustomTab(title: String, rawUrl: String, iconKey: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val url = com.streamflow.data.CustomTabs.normalizeUrl(rawUrl)
+            if (url == null) {
+                onResult("That doesn't look like a website address. Try something like kisskh.co")
+                return@launch
+            }
+            val existing = customTabs.value
+            if (existing.size >= com.streamflow.data.CustomTabs.MAX_TABS) {
+                onResult(com.streamflow.data.CustomTabs.tooManyMessage)
+                return@launch
+            }
+            if (existing.any { it.url.equals(url, ignoreCase = true) }) {
+                onResult("You already have a tab for that site.")
+                return@launch
+            }
+            val name = title.trim().ifEmpty { com.streamflow.data.CustomTabs.titleFromUrl(url) }
+            db.customTabDao().insert(
+                com.streamflow.data.local.entity.CustomTabEntity(
+                    title = name.take(16),
+                    url = url,
+                    iconKey = iconKey,
+                    position = db.customTabDao().nextPosition()
+                )
+            )
+            onResult(null)
+        }
+    }
+
+    fun updateCustomTab(
+        tab: com.streamflow.data.local.entity.CustomTabEntity,
+        title: String,
+        rawUrl: String,
+        iconKey: String,
+        onResult: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val url = com.streamflow.data.CustomTabs.normalizeUrl(rawUrl)
+            if (url == null) {
+                onResult("That doesn't look like a website address. Try something like kisskh.co")
+                return@launch
+            }
+            if (customTabs.value.any { it.id != tab.id && it.url.equals(url, ignoreCase = true) }) {
+                onResult("You already have a tab for that site.")
+                return@launch
+            }
+            val name = title.trim().ifEmpty { com.streamflow.data.CustomTabs.titleFromUrl(url) }
+            db.customTabDao().update(tab.copy(title = name.take(16), url = url, iconKey = iconKey))
+            onResult(null)
+        }
+    }
+
+    fun deleteCustomTab(tab: com.streamflow.data.local.entity.CustomTabEntity) {
+        viewModelScope.launch {
+            db.customTabDao().delete(tab)
+            // Drop the tab's isolated WebView state too — cookies and logins for a
+            // site the user just removed should not linger on disk.
+            runCatching {
+                getApplication<Application>()
+                    .getSharedPreferences(
+                        com.streamflow.data.CustomTabs.prefsNameFor(tab.id),
+                        android.content.Context.MODE_PRIVATE
+                    ).edit().clear().apply()
+            }
+        }
+    }
+
     fun setTheme(v: String)          = viewModelScope.launch { prefs.setTheme(v) }
     fun setQuality(v: String)        = viewModelScope.launch { prefs.setQuality(v) }
     fun setAutoPlay(v: Boolean)      = viewModelScope.launch { prefs.setAutoPlay(v) }

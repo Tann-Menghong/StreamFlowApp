@@ -3,14 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.3.0"
+    const val VERSION_NAME = "6.3.1"
 
     val notes = listOf(
-        "Loading now shows a real percentage ⏳ — an animated ring that tells you how far along it is instead of a spinner that says nothing",
-        "If a video stalls mid-playback you now see the actual buffered percentage climbing, so you know it's working",
-        "Videos should open sharper: the player no longer guesses a slow connection for the first few seconds before catching up",
-        "Smoother playback on changing signal — quality now drops fast when your connection dips and climbs back gently, instead of stalling",
-        "More simultaneous connections and longer-lived ones, so video, audio and thumbnails stop competing for the same sockets",
-        "Pressing play on your first video no longer hitches while the media cache opens — that work moved off the main thread at startup"
+        "FIXED: video not showing 🔴 — 6.3.0 broke the picture on some devices (sound played, screen stayed black). Sorry about that; please update",
+        "The cause was a playback setting added in 6.3.0 that let the app pick video formats your device can't actually decode. It's been removed",
+        "NEW: add your own website tabs 🌐 — Settings › Home › Your own tabs. Type any address and it becomes a tab",
+        "Your tabs use the same ad-blocking browser as Donghua and Drama, so pop-up blocking and fullscreen work the same way",
+        "Each tab keeps its own logins and cookies, and picks its own icon and name",
+        "The bottom bar now scrolls sideways when you have lots of tabs, instead of squashing them together"
     )
 }
