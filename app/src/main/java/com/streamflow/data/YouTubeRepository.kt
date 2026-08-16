@@ -654,8 +654,14 @@ class YouTubeRepository {
         viewCount = viewCount,
         duration = duration,
         uploadedAgo = try { textualUploadDate ?: "" } catch (_: Exception) { "" },
+        // java.time is native only from API 26; below that it comes from core
+        // library desugaring (enabled in build.gradle — DateWrapper has no
+        // non-java.time accessor, so desugaring is the only way this works on
+        // Android 5-7). catch Throwable, not Exception: if desugaring is ever
+        // dropped this surfaces as NoSuchMethodError, an Error that the old
+        // catch(Exception) let through and turned into a crash on every list item.
         uploadedEpoch = try {
             uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli() ?: 0L
-        } catch (_: Exception) { 0L }
+        } catch (_: Throwable) { 0L }
     )
 }

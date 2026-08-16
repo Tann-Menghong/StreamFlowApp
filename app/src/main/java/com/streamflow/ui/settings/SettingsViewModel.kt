@@ -193,6 +193,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun installVersion(rel: ReleaseInfo) {
         if (_versions.value.busyVersion != null) return   // one download at a time
+        // The About banner's own updater writes to the same StreamFlow-update.apk;
+        // letting both run would interleave two downloads into one file and hand
+        // the installer a corrupt APK.
+        if (_update.value.downloading) return
         viewModelScope.launch {
             _versions.value = _versions.value.copy(
                 busyVersion = rel.version, progress = 0, error = null, savedTo = null

@@ -575,15 +575,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         return if (prefIdx == -1 || capIdx == -1 || prefIdx <= capIdx) pref else cap
     }
 
+    // activeNetwork/getNetworkCapabilities are API 23. Below that they raise
+    // NoSuchMethodError, an Error that `catch (Exception)` lets through — so the
+    // data-saver check crashed instead of degrading. Catch Throwable and use the
+    // deprecated activeNetworkInfo on older releases.
     private fun isOnCellular(): Boolean = try {
         val cm = getApplication<Application>()
             .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
             as android.net.ConnectivityManager
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-        caps != null &&
-            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
-            !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
-    } catch (_: Exception) { false }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            caps != null &&
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+        } else {
+            @Suppress("DEPRECATION")
+            (cm.activeNetworkInfo?.type == android.net.ConnectivityManager.TYPE_MOBILE)
+        }
+    } catch (_: Throwable) { false }
 
     private fun isDirectStream(url: String): Boolean {
         val lower = url.lowercase()

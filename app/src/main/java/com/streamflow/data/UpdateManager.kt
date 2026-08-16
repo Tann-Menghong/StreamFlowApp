@@ -148,7 +148,12 @@ class UpdateManager(private val context: Context) {
             resp.close()
             throw java.io.IOException("Download failed (HTTP ${resp.code})")
         }
-        val body = resp.body ?: throw java.io.IOException("Empty download response")
+        // resp.close() on the null-body path too: returning early here would leak
+        // the connection back into the pool unusable.
+        val body = resp.body ?: run {
+            resp.close()
+            throw java.io.IOException("Empty download response")
+        }
         val total = body.contentLength()
 
         val cr = context.contentResolver
@@ -175,11 +180,24 @@ class UpdateManager(private val context: Context) {
             sink = cr.openOutputStream(pendingUri)
                 ?: throw java.io.IOException("Couldn't write to Downloads")
         } else {
+            // Pre-Android-10 there is no MediaStore route, and writing to the public
+            // Downloads folder needs WRITE_EXTERNAL_STORAGE — an install-time grant
+            // on API 21-22 but a runtime one from API 23, which this screen has no
+            // way to request. Say so plainly rather than surfacing a bare
+            // "Permission denied"; the app's own folder is no use here because the
+            // uninstall that a downgrade requires would delete the APK with it.
             @Suppress("DEPRECATION")
             val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!dir.exists()) dir.mkdirs()
             legacyFile = File(dir, fileName)
-            sink = FileOutputStream(legacyFile)
+            sink = try {
+                FileOutputStream(legacyFile)
+            } catch (e: Exception) {
+                throw java.io.IOException(
+                    "Can't save to Downloads on this Android version. Download " +
+                    "StreamFlow $fileName from the GitHub releases page in your browser instead."
+                )
+            }
         }
 
         try {
@@ -232,7 +250,10 @@ class UpdateManager(private val context: Context) {
             resp.close()
             throw java.io.IOException("Download failed (HTTP ${resp.code})")
         }
-        val body = resp.body ?: throw java.io.IOException("Empty download response")
+        val body = resp.body ?: run {
+            resp.close()   // same connection leak as the null-body path above
+            throw java.io.IOException("Empty download response")
+        }
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
         val file = File(dir, "StreamFlow-update.apk")
         val total = body.contentLength()

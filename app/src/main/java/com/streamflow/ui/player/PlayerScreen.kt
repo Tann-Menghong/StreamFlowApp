@@ -616,7 +616,12 @@ fun PlayerScreen(
     var showVolumeIndicator by remember { mutableStateOf(false) }
     var volumeLevel by remember { mutableFloatStateOf(0f) }
 
-    val audioManager = remember { context.getSystemService(AudioManager::class.java) }
+    // getSystemService(Class) is API 23; the String-keyed overload works on every
+    // level. The typed one threw NoSuchMethodError on Android 5.x — an Error, so
+    // nothing caught it and simply opening the player killed the app there.
+    val audioManager = remember {
+        context.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
+    }
     val maxVolume = remember { audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15 }
 
     // ── Pinch-to-zoom (fullscreen) ───────────────────────────────────────────

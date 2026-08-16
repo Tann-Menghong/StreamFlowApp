@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 139
-        versionName "6.2.5"
+        versionCode 140
+        versionName "6.2.6"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -41,6 +41,13 @@ android {
     }
 
     compileOptions {
+        // NewPipeExtractor's public API is built on java.time (DateWrapper takes and
+        // returns OffsetDateTime/Instant — it has no Calendar path at all), and
+        // java.time only exists natively from API 26. Without desugaring, every
+        // extractor call that touches a date throws NoSuchMethodError on Android
+        // 5-7 — an Error, so the repository's catch(Exception) blocks let it through
+        // and the app died. Desugaring backports java.time all the way to minSdk 21.
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -55,6 +62,14 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.10'
     }
+    lint {
+        // The module opts into media3's UnstableApi for the whole compilation via
+        // freeCompilerArgs below, but lint doesn't read that flag and reported ~89
+        // false errors — enough noise to make `lintRelease` useless as a gate and
+        // hide the real API-level bugs underneath. Disabled so lint stays honest.
+        disable 'UnsafeOptInUsageError'
+    }
+
     packaging {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -64,6 +79,9 @@ android {
 }
 
 dependencies {
+    // Backports java.time (and other JDK 8+ APIs) to API 21 — see compileOptions.
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+
     def composeBom = platform('androidx.compose:compose-bom:2024.02.00')
     implementation composeBom
 

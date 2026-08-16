@@ -208,11 +208,10 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    } else
-                    LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
-                ) {
+                    } else LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
                     itemsIndexed(shown, key = { _, v -> v.url }) { index, video ->
                         var visible by remember { mutableStateOf(video.url in animatedUrls) }
                         LaunchedEffect(Unit) {

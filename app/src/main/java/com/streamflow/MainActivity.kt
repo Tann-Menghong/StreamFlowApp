@@ -58,8 +58,15 @@ class MainActivity : ComponentActivity() {
     private var unlockInFlight = false
     private lateinit var unlockLauncher: ActivityResultLauncher<Intent>
 
-    private fun deviceSecure(): Boolean =
-        (getSystemService(KEYGUARD_SERVICE) as? KeyguardManager)?.isDeviceSecure == true
+    // isDeviceSecure is API 23. Below that fall back to isKeyguardSecure, which
+    // answers the same question (a PIN/pattern/password is set) on those releases.
+    private fun deviceSecure(): Boolean {
+        val km = getSystemService(KEYGUARD_SERVICE) as? KeyguardManager ?: return false
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+            km.isDeviceSecure
+        else
+            @Suppress("DEPRECATION") km.isKeyguardSecure
+    }
 
     private fun requestUnlock() {
         if (unlockInFlight) return
@@ -255,6 +262,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // The 2-arg overload only exists from API 26, so the framework never calls
+    // this below Oreo — annotated so that contract is explicit rather than implied.
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.O)
     override fun onPictureInPictureModeChanged(
         isInPictureInPictureMode: Boolean,
         newConfig: Configuration

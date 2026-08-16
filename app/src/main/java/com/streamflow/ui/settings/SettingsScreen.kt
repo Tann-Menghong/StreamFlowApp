@@ -518,11 +518,26 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsItem(Icons.Rounded.Tune, "Sound & vibration",
                             "Per-channel options in Android settings"
                         ) {
-                            try {
-                                val i = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                context.startActivity(i)
-                            } catch (_: Exception) {}
+                            // The per-app notification screen only exists from API 26.
+                            // Below that the intent resolves to nothing and the tap did
+                            // nothing at all — fall back to the app details page, which
+                            // has the notification toggle on those releases.
+                            val opened = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    )
+                                }.isSuccess
+                            } else false
+                            if (!opened) runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                )
+                            }
                         }
                     }
                     SettingsFooter("New-video alerts follow the schedule above and stay silent during quiet hours.")
@@ -838,7 +853,9 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     }
 
     // ── Dialogs (shared across all categories) ─────────────────────────
-    if (showVersionsDialog) {
+    // pendingDowngrade == null: once the older build is downloaded the downgrade
+    // dialog takes over, otherwise both AlertDialogs stack on top of each other.
+    if (showVersionsDialog && versions.pendingDowngrade == null) {
         VersionPickerDialog(
             state          = versions,
             currentVersion = vm.appVersion,
