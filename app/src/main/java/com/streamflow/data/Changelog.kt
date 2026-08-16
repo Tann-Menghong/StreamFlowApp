@@ -3,14 +3,13 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.3.1"
+    const val VERSION_NAME = "6.3.2"
 
     val notes = listOf(
-        "FIXED: video not showing 🔴 — 6.3.0 broke the picture on some devices (sound played, screen stayed black). Sorry about that; please update",
-        "The cause was a playback setting added in 6.3.0 that let the app pick video formats your device can't actually decode. It's been removed",
-        "NEW: add your own website tabs 🌐 — Settings › Home › Your own tabs. Type any address and it becomes a tab",
-        "Your tabs use the same ad-blocking browser as Donghua and Drama, so pop-up blocking and fullscreen work the same way",
-        "Each tab keeps its own logins and cookies, and picks its own icon and name",
-        "The bottom bar now scrolls sideways when you have lots of tabs, instead of squashing them together"
+        "Second attempt at fixing the black video 🔴 — please tell me if this one works",
+        "Removed the CRT scanline overlay that the Terminal style drew across the whole app, including on top of the video",
+        "Video is drawn on its own display layer, so anything painted over it hides the picture instead of blending — that matches 'sound plays, screen black'",
+        "The Terminal style keeps everything else: monospace text, square corners, ASCII panes and the green palette",
+        "Everything else from 6.3.1 stays, including your own website tabs"
     )
 }
