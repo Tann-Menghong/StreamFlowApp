@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 148
-        versionName "6.3.4"
+        versionCode 149
+        versionName "6.3.5"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -147,4 +147,10 @@ dependencies {
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+    // Plain JVM unit tests (./gradlew testReleaseUnitTest). Kept to logic that
+    // has no Android dependency so the suite runs in seconds with no device and
+    // no Robolectric — that constraint is why CustomTabs parses URLs with string
+    // operations instead of android.net.Uri.
+    testImplementation 'junit:junit:4.13.2'
 }

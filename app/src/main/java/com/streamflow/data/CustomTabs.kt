@@ -21,6 +21,29 @@ object CustomTabs {
         "You can add up to $MAX_TABS custom tabs — the bottom bar runs out of room beyond that."
 
     /**
+     * Extracts the host from a URL using plain string operations.
+     *
+     * Deliberately NOT android.net.Uri: that class is a stub in JVM unit tests
+     * (every method returns null), which made this logic impossible to test
+     * without Robolectric. Hand-parsing is also more predictable than
+     * java.net.URI, which rejects hosts containing underscores that browsers
+     * accept quite happily.
+     *
+     * Not handled: bracketed IPv6 literals. Nobody types one as a video-site tab.
+     */
+    private fun hostOf(url: String): String? {
+        var s = url
+        val schemeEnd = s.indexOf("://")
+        if (schemeEnd >= 0) s = s.substring(schemeEnd + 3)
+        s = s.takeWhile { it != '/' && it != '?' && it != '#' }
+        val at = s.lastIndexOf('@')
+        if (at >= 0) s = s.substring(at + 1)          // strip user:pass@
+        val colon = s.lastIndexOf(':')
+        if (colon >= 0) s = s.substring(0, colon)      // strip :port
+        return s.lowercase().ifEmpty { null }
+    }
+
+    /**
      * Turns typed input into a loadable URL, or null if it cannot be one.
      *
      * - trims whitespace and stray newlines from pasting
@@ -30,36 +53,43 @@ object CustomTabs {
      *   redirect or a blank page later
      * - rejects non-web schemes: a tab is a web view, and javascript:/file:
      *   URLs in one would be a way to point the app at local storage
+     *
+     * Covered by CustomTabsTest.
      */
     fun normalizeUrl(raw: String): String? {
-        val trimmed = raw.trim().replace("\n", "").replace(" ", "")
+        val trimmed = raw.trim().replace("\n", "").replace("\r", "").replace(" ", "")
         if (trimmed.isEmpty()) return null
 
         val withScheme = when {
             trimmed.startsWith("http://", true) || trimmed.startsWith("https://", true) -> trimmed
-            // Anything with an explicit non-web scheme is rejected outright.
-            Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:").containsMatchIn(trimmed) -> return null
+            // A non-web scheme WITH an authority (foo://bar) is refused.
+            //
+            // This deliberately requires "://" rather than just a colon. The
+            // earlier version matched any leading word followed by ':', which
+            // silently rejected "example.com:8080" and "localhost:3000" — a
+            // host:port is not a scheme.
+            Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(trimmed) -> return null
+            // Schemes that take no authority but would still be dangerous or
+            // useless in a web tab, so they can never reach the WebView.
+            Regex("^(javascript|data|file|content|intent|about|blob|mailto|tel|sms):",
+                  RegexOption.IGNORE_CASE).containsMatchIn(trimmed) -> return null
             else -> "https://$trimmed"
         }
 
-        val host = try {
-            android.net.Uri.parse(withScheme).host?.lowercase()
-        } catch (_: Exception) { null } ?: return null
-
+        val host = hostOf(withScheme) ?: return null
+        if (host.startsWith(".") || host.endsWith(".") || host.contains("..")) return null
         // "localhost" aside, a real site has a dot. This catches the single most
         // common mistake (a bare word) before it becomes a confusing blank tab.
         if (!host.contains(".") && host != "localhost") return null
-        if (host.startsWith(".") || host.endsWith(".")) return null
 
         return withScheme
     }
 
     /** A sensible default tab name from a URL: "kisskh.co" -> "Kisskh". */
     fun titleFromUrl(url: String): String {
-        val host = try {
-            android.net.Uri.parse(url).host?.removePrefix("www.")
-        } catch (_: Exception) { null } ?: return "Site"
+        val host = hostOf(url)?.removePrefix("www.") ?: return "Site"
         val name = host.substringBefore('.')
+        if (name.isEmpty()) return "Site"
         return name.replaceFirstChar { it.uppercase() }.take(14)
     }
 
