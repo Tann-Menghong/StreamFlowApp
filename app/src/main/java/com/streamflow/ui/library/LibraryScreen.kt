@@ -132,7 +132,12 @@ fun LibraryScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            LibraryStatsHeader(favoritesCount = favorites.size, history = history)
+            LibraryDashboard(
+                favoritesCount     = favorites.size,
+                downloadsCount     = downloads.size,
+                subscriptionsCount = subscriptions.size,
+                history            = history
+            )
             val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size, bookmarksList.size)
             // Pill-style segmented tabs (replaces the flat underline TabRow)
             Row(
@@ -518,88 +523,50 @@ private fun HistoryStatsRow(history: List<HistoryEntity>) {
         if (totalMin >= 60) "${totalMin / 60}h ${totalMin % 60}m" else "${totalMin}m"
     }
 
-    // Watch activity for the last 7 days (today rightmost) + top channels —
-    // the local history is the only data source, nothing leaves the phone
-    val dayMs = 24L * 60 * 60 * 1000
-    val dayCounts = remember(history.size, dayStart) {
-        (6 downTo 0).map { d ->
-            val start = dayStart - d * dayMs
-            history.count { it.watchedAt >= start && it.watchedAt < start + dayMs }
-        }
-    }
+    // Top channels — the local history is the only data source, nothing leaves
+    // the phone. Five rather than three now that they render as a ranked list
+    // instead of being squeezed into one horizontally-scrolling line.
     val topChannels = remember(history.size) {
         history.groupBy { it.uploaderName }
             .filterKeys { it.isNotBlank() }
             .map { (name, vids) -> name to vids.size }
             .sortedByDescending { it.second }
-            .take(3)
+            .take(5)
     }
 
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+    // The seven-day chart lives in the Library dashboard above the tabs now, so
+    // this pane deliberately shows only what the dashboard does NOT: today's
+    // count, all-time watch time, and the channel leaderboard. Repeating the
+    // chart a few hundred pixels below itself was pure duplication.
+    com.streamflow.ui.components.DashboardPane(
+        title = "History",
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatCell("$today", "Today")
-                StatCell("$week", "This week")
-                StatCell(watchLabel, "Watch time")
-            }
-            val maxCount = dayCounts.max().coerceAtLeast(1)
-            Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                dayCounts.forEach { c ->
-                    Box(
-                        Modifier
-                            .width(16.dp)
-                            .height((4 + 24 * c / maxCount).dp)
-                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                            .background(
-                                if (c > 0) MaterialTheme.colorScheme.primary.copy(0.85f)
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.15f))
-                    )
-                }
-            }
-            Text("Last 7 days", fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp))
-            if (topChannels.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("Top channels:", fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    topChannels.forEach { (name, count) ->
-                        Text("$name ($count)", fontSize = 11.sp, maxLines = 1,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            com.streamflow.ui.components.DashboardTile("$today", "Today", null, Modifier.weight(1f))
+            com.streamflow.ui.components.DashboardTile("$week", "This week", null, Modifier.weight(1f))
+            com.streamflow.ui.components.DashboardTile(watchLabel, "Watch time", "all time", Modifier.weight(1f))
         }
-    }
-}
-
-@Composable
-private fun StatCell(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 17.sp,
-            color = MaterialTheme.colorScheme.primary)
-        Text(label, fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (topChannels.isNotEmpty()) {
+            val top = topChannels.first().second.coerceAtLeast(1)
+            Spacer(Modifier.height(10.dp))
+            Text("TOP CHANNELS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.2.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.75f),
+                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+            topChannels.forEachIndexed { i, (name, count) ->
+                com.streamflow.ui.components.DashboardRankRow(
+                    rank = i + 1,
+                    name = name,
+                    value = "$count",
+                    fraction = count.toFloat() / top
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+        }
     }
 }
 
@@ -970,43 +937,94 @@ private fun FavoriteEntity.toVideoItem() = VideoItem(url = url, title = title, t
 private fun HistoryEntity.toVideoItem()  = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 private fun WatchLaterEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 
-// Dashboard header: colorful stat tiles summarizing the user's week
+/**
+ * The Library dashboard: an at-a-glance readout above the tabs.
+ *
+ * Four metrics plus a seven-day activity chart, collapsible so it never pushes
+ * the tab strip off screen on a short phone. Collapsed state is remembered, and
+ * defaults to EXPANDED only when there is history worth looking at — a dashboard
+ * of zeroes on first launch is just an obstacle between the user and their tabs.
+ *
+ * All of it is built from the shared dashboard primitives, so it matches the
+ * Settings dashboard exactly and picks up the TERMINAL treatment for free.
+ */
 @Composable
-private fun LibraryStatsHeader(favoritesCount: Int, history: List<HistoryEntity>) {
+private fun LibraryDashboard(
+    favoritesCount: Int,
+    downloadsCount: Int,
+    subscriptionsCount: Int,
+    history: List<HistoryEntity>,
+) {
     val weekCutoff = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
     val weekly = history.filter { it.watchedAt >= weekCutoff }
     val minutes = weekly.sumOf { it.position } / 1000 / 60
     val timeLabel = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        StatTile("Watch time", timeLabel, "this week", Modifier.weight(1f))
-        StatTile("Watched", "${weekly.size}", "this week", Modifier.weight(1f))
-        StatTile("Favorites", "$favoritesCount", "saved", Modifier.weight(1f))
-    }
-}
 
-@Composable
-private fun StatTile(title: String, value: String, sub: String, modifier: Modifier) {
-    // Premium-minimal: flat surface + hairline border, a big confident number.
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
-        modifier = modifier
-    ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
-            Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(0.85f), maxLines = 1)
-            Text(sub, fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    var expanded by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(history.isNotEmpty())
+    }
+
+    val dayStart = remember(history.size) {
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val dayMs = 24L * 60 * 60 * 1000
+    val dayCounts = remember(history.size, dayStart) {
+        (6 downTo 0).map { d ->
+            val start = dayStart - d * dayMs
+            history.count { it.watchedAt >= start && it.watchedAt < start + dayMs }
         }
+    }
+    val dayLabels = remember(dayStart) {
+        val fmt = java.text.SimpleDateFormat("EEEEE", java.util.Locale.getDefault())
+        (6 downTo 0).map { d -> fmt.format(java.util.Date(dayStart - d * dayMs)) }
+    }
+
+    com.streamflow.ui.components.DashboardPane(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            com.streamflow.ui.components.DashboardTile(
+                timeLabel, "Watch time", "7 days", Modifier.weight(1f))
+            com.streamflow.ui.components.DashboardTile(
+                "${weekly.size}", "Watched", "7 days", Modifier.weight(1f))
+            com.streamflow.ui.components.DashboardTile(
+                "$favoritesCount", "Favorites", "saved", Modifier.weight(1f))
+            com.streamflow.ui.components.DashboardTile(
+                "$downloadsCount", "Offline", "downloads", Modifier.weight(1f))
+        }
+        AnimatedVisibility(expanded) {
+            Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 4.dp)) {
+                com.streamflow.ui.components.DashboardBarChart(dayCounts, dayLabels)
+                if (subscriptionsCount > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "$subscriptionsCount channel${if (subscriptionsCount == 1) "" else "s"} subscribed",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            }
+        }
+        // A quiet full-width affordance rather than an icon button: the whole
+        // strip is a bigger, easier target than a 24dp chevron.
+        Text(
+            if (expanded) "Hide activity" else "Show activity",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp)
+        )
     }
 }
 

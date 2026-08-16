@@ -107,6 +107,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
     val aiState      by vm.aiState.collectAsState()
     val favCount     by vm.favoritesCount.collectAsState()
     val histCount    by vm.historyCount.collectAsState()
+    val blockedCount by vm.blockedCount.collectAsState()
     val language     by vm.language.collectAsState()
     val update       by vm.update.collectAsState()
 
@@ -186,6 +187,59 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+
+            // ── System status: the live numbers a dashboard should answer at a
+            // glance — what's saved, what's been blocked, whether the build is
+            // current — instead of making the user open three category pages to
+            // find out. Built from the shared dashboard primitives so it matches
+            // the Library dashboard exactly.
+            Spacer(Modifier.height(10.dp))
+            com.streamflow.ui.components.DashboardPane(
+                title = "System status",
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    com.streamflow.ui.components.DashboardTile(
+                        "$favCount", "Favorites", "saved", Modifier.weight(1f))
+                    com.streamflow.ui.components.DashboardTile(
+                        "$histCount", "History", "videos", Modifier.weight(1f))
+                    com.streamflow.ui.components.DashboardTile(
+                        "$blockedCount", "Blocked", "channels", Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(4.dp))
+                // Update state as a status line rather than a buried row: this is
+                // the one thing on this screen that can be out of date.
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val (statusText, statusColor) = when {
+                        update.checking -> "CHECKING" to MaterialTheme.colorScheme.onSurfaceVariant
+                        update.info != null -> "UPDATE" to MaterialTheme.colorScheme.secondary
+                        update.error == "check_failed" -> "OFFLINE" to MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> "OK" to MaterialTheme.colorScheme.primary
+                    }
+                    Text("[$statusText]", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        color = statusColor)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        when {
+                            update.checking -> "Checking for updates…"
+                            update.info != null -> "v${update.info?.latestVersion} available"
+                            update.error == "check_failed" -> "Couldn't reach GitHub"
+                            else -> "Running the latest version"
+                        },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f), maxLines = 1
+                    )
+                    Text("v${vm.appVersion}", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
                 }
             }
 
