@@ -909,15 +909,6 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     label = s.stage.label,
                     modifier = Modifier.align(Alignment.Center)
                 )
-                is PlayerUiState.Ready -> if (isRebuffering) {
-                    // Real buffered percentage during a stall.
-                    com.streamflow.ui.components.VideoLoadingIndicator(
-                        progress = bufferedPercent / 100f,
-                        label = "Buffering",
-                        modifier = Modifier.align(Alignment.Center),
-                        size = 64.dp
-                    )
-                }
                 is PlayerUiState.Error -> Column(
                     Modifier.align(Alignment.Center).padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -936,6 +927,20 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
                 }
                 else -> {}
+            }
+
+            // Rebuffer indicator lives OUTSIDE the when, not as another
+            // `is Ready ->` branch. A second branch for a type already handled
+            // is dead code at best — and where the PlayerView itself sits inside
+            // the Ready branch (the portrait player) it shadowed the video and
+            // left a black screen. Never add a duplicate branch to these blocks.
+            if (state is PlayerUiState.Ready && isRebuffering) {
+                com.streamflow.ui.components.VideoLoadingIndicator(
+                    progress = bufferedPercent / 100f,
+                    label = "Buffering",
+                    modifier = Modifier.align(Alignment.Center),
+                    size = 64.dp
+                )
             }
 
             if (!isLocked && state is PlayerUiState.Ready) {
@@ -1461,14 +1466,6 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         label = s.stage.label,
                         modifier = Modifier.align(Alignment.Center)
                     )
-                    is PlayerUiState.Ready -> if (isRebuffering) {
-                        com.streamflow.ui.components.VideoLoadingIndicator(
-                            progress = bufferedPercent / 100f,
-                            label = "Buffering",
-                            modifier = Modifier.align(Alignment.Center),
-                            size = 60.dp
-                        )
-                    }
                     is PlayerUiState.Error -> Column(
                         Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -1514,6 +1511,17 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                 }
                             }
+                        }
+                        // Inside the Ready branch, AFTER the PlayerView — not as a
+                        // second `is Ready ->` branch, which would shadow the
+                        // PlayerView above and black out the video.
+                        if (isRebuffering && !audioOnly) {
+                            com.streamflow.ui.components.VideoLoadingIndicator(
+                                progress = bufferedPercent / 100f,
+                                label = "Buffering",
+                                modifier = Modifier.align(Alignment.Center),
+                                size = 60.dp
+                            )
                         }
                         if (!audioOnly) {
                             DoubleTapZones()
