@@ -722,7 +722,6 @@ fun PlayerScreen(
     @Composable
     fun DoubleTapZones() {
         val mc = mediaController ?: return
-        val skipSec = skipMs / 1000L
         val haptic = LocalHapticFeedback.current
         val scope = rememberCoroutineScope()
 

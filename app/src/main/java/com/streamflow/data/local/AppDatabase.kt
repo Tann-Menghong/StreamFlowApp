@@ -128,9 +128,17 @@ abstract class AppDatabase : RoomDatabase() {
         // touched, so favorites/history/playlists/subscriptions are untouched.
         private val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // Copied VERBATIM from Room's generated AppDatabase_Impl
+                // createAllTables(). Room validates a migration by reading the
+                // real table back with PRAGMA table_info and comparing it to the
+                // entity, and a mismatch throws on open — i.e. it would crash
+                // every existing user the moment they upgraded. SQLite happens to
+                // treat a different constraint order as equivalent, but there is
+                // no reason to depend on that: keep this string identical to the
+                // generated one.
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `custom_tabs` (" +
-                    "`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                     "`title` TEXT NOT NULL, " +
                     "`url` TEXT NOT NULL, " +
                     "`iconKey` TEXT NOT NULL, " +
