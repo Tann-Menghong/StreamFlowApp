@@ -388,6 +388,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/xml")
     ) { uri -> if (uri != null) vm.exportOpml(uri) }
     val update               by vm.update.collectAsState()
+    val versions             by vm.versions.collectAsState()
     val context              = LocalContext.current
 
     var showThemeDialog    by remember { mutableStateOf(false) }
@@ -415,6 +416,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     var showFontFamilyDialog by remember { mutableStateOf(false) }
     var showLibTabDialog     by remember { mutableStateOf(false) }
     var showDeleteAiDialog   by remember { mutableStateOf(false) }
+    var showVersionsDialog   by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -807,6 +809,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         }
                     ) { vm.checkForUpdate() }
                     SettingsDivider()
+                    SettingsItem(Icons.Rounded.History, "Change app version",
+                        "Install any release — newer or older"
+                    ) { showVersionsDialog = true; vm.loadVersions() }
+                    SettingsDivider()
                     SettingsItem(Icons.Rounded.Code, "Source code",
                         "github.com/Tann-Menghong/StreamFlowApp"
                     ) {
@@ -832,6 +838,24 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     }
 
     // ── Dialogs (shared across all categories) ─────────────────────────
+    if (showVersionsDialog) {
+        VersionPickerDialog(
+            state          = versions,
+            currentVersion = vm.appVersion,
+            isDowngrade    = { vm.isDowngrade(it) },
+            onInstall      = { vm.installVersion(it) },
+            onRetry        = { vm.loadVersions() },
+            onDismiss      = { showVersionsDialog = false }
+        )
+    }
+    versions.pendingDowngrade?.let { rel ->
+        DowngradeDialog(
+            version     = rel.version,
+            savedTo     = versions.savedTo ?: "Downloads",
+            onUninstall = { vm.confirmDowngradeUninstall() },
+            onDismiss   = { vm.dismissDowngradePrompt() }
+        )
+    }
     if (showThemeDialog) {
         val opts = listOf("SYSTEM" to "Follow system", "DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
         PickerDialog("Theme", opts.map { it.second }, opts.indexOfFirst { it.first == theme }.coerceAtLeast(0),
@@ -1275,6 +1299,166 @@ private fun PickerDialog(
         confirmButton  = {},
         dismissButton  = { TextButton(onDismiss) { Text("Cancel") } },
         shape          = RoundedCornerShape(16.dp)
+    )
+}
+
+/**
+ * Lists every published release so the user can move to ANY build — forward to a
+ * newer one or back to an older one when a release misbehaves on their device.
+ */
+@Composable
+private fun VersionPickerDialog(
+    state: VersionsState,
+    currentVersion: String,
+    isDowngrade: (String) -> Boolean,
+    onInstall: (com.streamflow.data.ReleaseInfo) -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("Change app version", fontWeight = FontWeight.Bold)
+                Text("You're on v$currentVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        text = {
+            when {
+                state.loading -> Row(
+                    Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Loading versions…", style = MaterialTheme.typography.bodyMedium)
+                }
+
+                state.releases.isEmpty() -> Column(Modifier.padding(vertical = 12.dp)) {
+                    Text(state.error ?: "No versions found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(10.dp))
+                    TextButton(onRetry) { Text("Try again") }
+                }
+
+                else -> Column(
+                    Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())
+                ) {
+                    state.releases.forEach { rel ->
+                        val isCurrent = rel.version == currentVersion
+                        val busy      = state.busyVersion == rel.version
+                        val older     = isDowngrade(rel.version)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isCurrent && state.busyVersion == null) {
+                                    onInstall(rel)
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("v${rel.version}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
+                                    Spacer(Modifier.width(8.dp))
+                                    val tag = when {
+                                        isCurrent -> "Installed"
+                                        older     -> "Older"
+                                        else      -> "Newer"
+                                    }
+                                    val tagColor = when {
+                                        isCurrent -> MaterialTheme.colorScheme.primary
+                                        older     -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        else      -> MaterialTheme.colorScheme.tertiary
+                                    }
+                                    Text(tag, style = MaterialTheme.typography.labelSmall, color = tagColor)
+                                }
+                                val size = if (rel.sizeBytes > 0)
+                                    " · ${rel.sizeBytes / 1024 / 1024} MB" else ""
+                                Text(rel.publishedAt + size,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (busy) {
+                                    Spacer(Modifier.height(6.dp))
+                                    LinearProgressIndicator(
+                                        progress = { state.progress / 100f },
+                                        modifier = Modifier.fillMaxWidth()
+                                            .clip(RoundedCornerShape(4.dp))
+                                    )
+                                }
+                            }
+                            if (!isCurrent && !busy) Icon(
+                                Icons.Rounded.Download, "Install v${rel.version}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text("Going back to an older version needs StreamFlow to be " +
+                         "uninstalled first — Android won't replace an app with an " +
+                         "older one. You'll be guided through it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onDismiss) { Text("Close") } },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+/**
+ * The downgrade hand-off. The APK is already saved in the shared Downloads folder
+ * at this point precisely so it survives the uninstall this dialog asks for.
+ */
+@Composable
+private fun DowngradeDialog(
+    version: String,
+    savedTo: String,
+    onUninstall: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Install v$version", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("v$version is downloaded and saved as:",
+                    style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(savedTo, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text("Android can't replace StreamFlow with an older version, so the " +
+                     "current app has to be uninstalled first.",
+                    style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(10.dp))
+                Text("This erases your settings, history, downloads and watch progress.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(10.dp))
+                Text("After uninstalling, open $savedTo from your Files app to finish " +
+                     "installing v$version.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            TextButton(onUninstall) {
+                Text("Uninstall now", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Later") } },
+        shape = RoundedCornerShape(16.dp)
     )
 }
 

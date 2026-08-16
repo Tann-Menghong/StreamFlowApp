@@ -280,7 +280,7 @@ private val AD_BLOCK_JS = """
   // premium account is activated" popup whose Accept/Cancel lead off-site.
   // Kill any FLOATING element that carries scam text or an off-site link — the
   // video player is explicitly protected so playback is never touched.
-  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction|next page to proceed|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app|new message.{0,40}(account|proceed|instruction)|your (account|subscription).{0,24}(activated|upgraded|is ready)/i;
+  var AD_TXT = /(premium|vip)\s*account.{0,40}activ|follow the instruction|next page to proceed|you.{0,3}ve\s+won|claim your (prize|reward|gift|account)|congratulation.{0,30}(won|winner|selected|prize)|your (device|phone).{0,24}(infected|at risk|virus)|activate.{0,20}premium|download.{0,20}official app|new message.{0,40}(account|proceed|instruction)|your (account|subscription).{0,24}(activated|upgraded|is ready)|click here\s*(x|hide|close|dismiss|later)\b|(hide|close|dismiss)\s*click here|don.{0,3}t worry.{0,60}(hacked|your (fb|facebook|account))|how to (save|recover|secure|protect|restore) your.{0,24}(fb|facebook|account)|your (fb|facebook|whatsapp|instagram|telegram|google)\s*account.{0,30}(hacked|compromised|blocked|suspended)|(sponsored|promoted) (content|link|post)/i;
   // Ad hosts we recognise in an iframe src even when the iframe is cross-origin
   // (its DOM can't be read, but the iframe ELEMENT can still be removed).
   var AD_HOST = /doubleclick|googlesyndication|adservice|adsystem|adnxs|exoclick|propellerads|propu\.sh|popads|popcash|popunder|adsterra|hilltopads|clickadu|juicyads|adcash|admaven|galaksion|revenuehits|onclick(algo|max|ads|predictiv)|mgid|outbrain|taboola|trafficjunky|onesignal|wonderpush|pushengage|pushnami|clickadilla|a-ads|coinzilla|bidgear|adprovider/i;
@@ -294,6 +294,9 @@ private val AD_BLOCK_JS = """
       for(var i=0;i<k.length && i<80;i++){
         var t=(k[i].textContent||'').trim();
         if(t==='×'||t==='✕'||t==='✖'||t==='❌'||t==='x'||t==='X'){ return true; }
+        // A leaf "Hide / Dismiss / Skip / Not now" control is the same thing wearing
+        // a word instead of an ×. Real site chrome does not offer to hide itself.
+        if(k[i].children.length===0 && /^(hide|close|dismiss|skip( ad)?|not now|later|no thanks)$/i.test(t)) return true;
         var a=((k[i].className&&typeof k[i].className==='string'?k[i].className:'')+' '+(k[i].getAttribute&&k[i].getAttribute('aria-label')||'')).toLowerCase();
         if(a.indexOf('close')>-1) return true;
       }
@@ -313,6 +316,22 @@ private val AD_BLOCK_JS = """
   }
   function adHasImage(el){
     try{ return !!(el.querySelector && el.querySelector('img,svg,picture')); }catch(e){ return false; }
+  }
+  // A bare call-to-action label ("Click Here", "Learn More", "Download Now").
+  // Only a LEAF whose whole text is the phrase counts, so an article that merely
+  // contains the words is never flagged. Site chrome labels itself with what it
+  // does ("Home", "Schedule"); an ad labels itself with what it wants from you.
+  var AD_CTA=/^(click here|learn more|read more|see more|find out( more| how)?|download( now| app)?|install( now)?|open( now| app)?|watch now|play now|claim( now| here)?|get( it)? now|try (it )?now|start now|continue|allow|subscribe now|sign ?up now|join now|shop now|order now|register now|view now|tap here|check (it out|now))$/i;
+  function adHasCta(el){
+    try{
+      var k=el.querySelectorAll?el.querySelectorAll('a,button,span,div,p,strong,b'):[];
+      for(var i=0;i<k.length && i<80;i++){
+        if(k[i].children.length) continue;
+        var t=(k[i].textContent||'').trim();
+        if(t.length<26 && AD_CTA.test(t)) return true;
+      }
+    }catch(e){}
+    return false;
   }
   // A RASTER graphic — a real <img src>, <picture>, or a CSS background-image on
   // the element or a near descendant. This is the ad's actual artwork. It is
@@ -389,9 +408,22 @@ private val AD_BLOCK_JS = """
       if(adHasOffsite(n) || (n.querySelector&&n.querySelector('iframe[src]'))){ adKill(n); return; }
       return;
     }
-    // B) A bar spanning (almost) the full width is the site's real header /
-    //    bottom nav — never a floating ad. Its children were scanned already.
-    if(r.width>=vw*0.85) return;
+    // B) The site's real header / bottom nav. It is not just WIDE — it is flush
+    //    to the left edge and reaches the right edge, i.e. an actual full-bleed
+    //    bar pinned to the top or bottom of the screen.
+    //
+    //    THE BUG THIS REPLACES: the old test bailed out on anything >=85% wide.
+    //    The banner-style "message" ad (thumbnail + clickbait headline + Click
+    //    Here / Hide) is an INSET card ~85-90% wide floating over the page, so it
+    //    tripped this guard and was never scored at all — every ad signal it
+    //    carries (off-site link, fake unread badge, photo, CTA) was thrown away
+    //    one line before it could be counted. An inset card is not a nav bar, so
+    //    now only a genuine edge-to-edge bar is exempt and everything else falls
+    //    through to scoring.
+    var fullBleed = r.left<=8 && (vw-r.right)<=8;
+    var pinnedEdge = r.top<=8 || (vh-r.bottom)<=8;
+    if(r.width>=vw*0.85 && fullBleed && pinnedEdge) return;
+    if(r.width>=vw*0.85 && fullBleed && r.height<=vh*0.14 && !adHasOffsite(n)) return;
     // ── C) WEIGHTED SCORING for a small floating widget ───────────────────────
     // No single trait is proof — a legit scroll-to-top button is ALSO a small
     // fixed icon hugging a corner. So we add up independent ad signals and only
@@ -405,6 +437,12 @@ private val AD_BLOCK_JS = """
     if(adHasBadge(n))         score+=2;     // fake red unread-count badge
     if(adHasOffsite(n))       score+=3;     // a link that leaves the site = ad
     if(adHasImage(n))         score+=1;     // has a graphic of any kind
+    if(adHasCta(n))           score+=2;     // "Click Here" / "Download Now" button
+    // The push-notification / content-recommendation card: thumbnail photo on the
+    // left, clickbait headline, a CTA and a Hide button. Each part is weak alone;
+    // together they are unmistakable, and nothing the site itself renders as a
+    // floating layer looks like this.
+    if(adHasRaster(n) && adHasCta(n) && (adHasClose(n)||adHasBadge(n))) score+=3;
     // Corner/edge-anchored — the floating-ad hallmark (a benign icon scores here
     // too, which is why this alone is never enough to remove).
     var nearR=(vw-r.right)<=24, nearL=r.left<=24, nearB=(vh-r.bottom)<=48, nearT=r.top<=24;

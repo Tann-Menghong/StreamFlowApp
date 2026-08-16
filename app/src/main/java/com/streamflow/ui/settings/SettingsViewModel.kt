@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamflow.BuildConfig
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.ReleaseInfo
 import com.streamflow.data.UpdateInfo
 import com.streamflow.data.UpdateManager
 import kotlinx.coroutines.flow.*
@@ -17,6 +18,19 @@ data class UpdateState(
     val progress: Int = 0,
     val done: Boolean = false,
     val error: String? = null
+)
+
+/** Backing state for the "Change app version" picker. */
+data class VersionsState(
+    val loading: Boolean = false,
+    val releases: List<ReleaseInfo> = emptyList(),
+    val error: String? = null,
+    /** Version currently downloading, so only that row shows a progress bar. */
+    val busyVersion: String? = null,
+    val progress: Int = 0,
+    /** An older build finished downloading and is waiting on the uninstall step. */
+    val pendingDowngrade: ReleaseInfo? = null,
+    val savedTo: String? = null
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -151,6 +165,75 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // ── Change app version (install any release, incl. older ones) ─────────────
+    private val _versions = MutableStateFlow(VersionsState())
+    val versions: StateFlow<VersionsState> = _versions
+
+    fun loadVersions() {
+        if (_versions.value.loading) return
+        viewModelScope.launch {
+            _versions.value = _versions.value.copy(loading = true, error = null)
+            try {
+                val list = updater.listReleases()
+                _versions.value = _versions.value.copy(loading = false, releases = list)
+            } catch (e: Exception) {
+                _versions.value = _versions.value.copy(
+                    loading = false,
+                    error = e.message ?: "Couldn't load the version list"
+                )
+            }
+        }
+    }
+
+    /** True when [version] is behind what's installed — i.e. installing it is a downgrade. */
+    fun isDowngrade(version: String) =
+        UpdateManager.compareVersions(version, appVersion) < 0
+
+    fun installVersion(rel: ReleaseInfo) {
+        if (_versions.value.busyVersion != null) return   // one download at a time
+        viewModelScope.launch {
+            _versions.value = _versions.value.copy(
+                busyVersion = rel.version, progress = 0, error = null, savedTo = null
+            )
+            try {
+                if (isDowngrade(rel.version)) {
+                    // Android will not overwrite an app with a lower versionCode, so
+                    // the APK is parked in Downloads (it must survive the uninstall)
+                    // and the user is walked through uninstall -> install.
+                    val where = updater.downloadToDownloads(
+                        rel.downloadUrl, "StreamFlow-v${rel.version}.apk"
+                    ) { p -> _versions.value = _versions.value.copy(progress = p) }
+                    _versions.value = _versions.value.copy(
+                        busyVersion = null, pendingDowngrade = rel, savedTo = where
+                    )
+                } else {
+                    // Same or newer: the package installer handles it in one step.
+                    updater.downloadAndInstall(rel.downloadUrl) { p ->
+                        _versions.value = _versions.value.copy(progress = p)
+                    }
+                    _versions.value = _versions.value.copy(busyVersion = null)
+                }
+            } catch (e: Exception) {
+                _versions.value = _versions.value.copy(
+                    busyVersion = null,
+                    error = e.message ?: "Download failed"
+                )
+                android.widget.Toast.makeText(getApplication(),
+                    "Couldn't download v${rel.version} — check your connection and try again",
+                    android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun confirmDowngradeUninstall() {
+        updater.requestUninstall()
+        _versions.value = _versions.value.copy(pendingDowngrade = null)
+    }
+
+    fun dismissDowngradePrompt() {
+        _versions.value = _versions.value.copy(pendingDowngrade = null)
     }
 
     fun setTheme(v: String)          = viewModelScope.launch { prefs.setTheme(v) }
