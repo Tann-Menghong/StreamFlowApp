@@ -11,7 +11,9 @@ import org.json.JSONObject
 object BackupManager {
 
     suspend fun buildBackupJson(db: AppDatabase): JSONObject = JSONObject().apply {
-        put("app", "StreamFlow"); put("backupVersion", 3)
+        // v4 adds customTabs. Older backups simply lack the key and restore fine —
+        // every reader uses optJSONArray, so a missing section is skipped.
+        put("app", "StreamFlow"); put("backupVersion", 4)
         put("history", JSONArray().also { arr ->
             db.historyDao().getAll().first().forEach { h ->
                 arr.put(JSONObject()
@@ -77,6 +79,19 @@ object BackupManager {
                     .put("uploaderName", b.uploaderName)
                     .put("positionMs", b.positionMs)
                     .put("createdAt", b.createdAt))
+            }
+        })
+        // User-added website tabs. These were the only library data a backup did
+        // not carry, so restoring onto a new phone silently lost them — the same
+        // way bookmarks used to go missing, which is why this file exists.
+        // The row id is deliberately NOT exported: it is a local autoincrement
+        // key, and on import a fresh one is assigned.
+        put("customTabs", JSONArray().also { arr ->
+            db.customTabDao().getAll().first().forEach { t ->
+                arr.put(JSONObject()
+                    .put("title", t.title).put("url", t.url)
+                    .put("iconKey", t.iconKey).put("position", t.position)
+                    .put("createdAt", t.createdAt))
             }
         })
     }

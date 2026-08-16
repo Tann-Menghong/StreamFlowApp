@@ -648,6 +648,35 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         restored++
                     }
                 }
+                // Custom website tabs (backup v4+). Older backups omit the key and
+                // are skipped by optJSONArray, so they still restore cleanly.
+                root.optJSONArray("customTabs")?.let { arr ->
+                    val dao = db.customTabDao()
+                    // Import is additive, like every other section here, so
+                    // duplicates are filtered by URL rather than overwriting the
+                    // user's current tabs — and the cap is honoured so a backup
+                    // from a future build can't push the bottom bar past what it
+                    // can lay out.
+                    val existing = dao.getAll().first().map { it.url.lowercase() }.toMutableSet()
+                    var count = existing.size
+                    for (i in 0 until arr.length()) {
+                        if (count >= com.streamflow.data.CustomTabs.MAX_TABS) break
+                        val o = arr.getJSONObject(i)
+                        val url = com.streamflow.data.CustomTabs.normalizeUrl(o.optString("url"))
+                            ?: continue
+                        if (!existing.add(url.lowercase())) continue
+                        dao.insert(com.streamflow.data.local.entity.CustomTabEntity(
+                            title = o.optString("title").ifBlank {
+                                com.streamflow.data.CustomTabs.titleFromUrl(url)
+                            }.take(16),
+                            url = url,
+                            iconKey = o.optString("iconKey", "LANGUAGE"),
+                            position = o.optInt("position", count),
+                            createdAt = o.optLong("createdAt", System.currentTimeMillis())))
+                        count++
+                        restored++
+                    }
+                }
                 true
             } catch (_: Exception) { false }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
