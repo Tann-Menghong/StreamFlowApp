@@ -623,7 +623,7 @@ fun CompactVideoCard(
         }
         Box {
             IconButton(onClick = { showMenu = true }, modifier = Modifier.size(26.dp)) {
-                Icon(Icons.Rounded.MoreVert, null,
+                Icon(Icons.Rounded.MoreVert, "More options",
                     tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                     modifier = Modifier.size(16.dp))
             }

@@ -124,7 +124,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     )
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Close, "Clear search", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
                     } else {
                         IconButton(onClick = { startVoiceSearch() }, modifier = Modifier.size(24.dp)) {

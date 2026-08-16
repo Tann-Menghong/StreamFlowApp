@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup and device-transfer rules for API 31+.
+
+  Same reasoning as backup_rules.xml: the App Lock promises the library is
+  private, so the database must not travel to cloud backup. Settings still do,
+  which is what makes a new device feel familiar without leaking watch history.
+
+  device-transfer is treated the same as cloud-backup here. A direct
+  phone-to-phone transfer is more trustworthy than a cloud copy, but the user
+  has an explicit in-app Export for that, and defaulting to "private stays
+  private" is the right side to err on.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="streamflow.db" />
+        <exclude domain="database" path="streamflow.db-wal" />
+        <exclude domain="database" path="streamflow.db-shm" />
+        <exclude domain="sharedpref" path="kisskh_prefs.xml" />
+        <exclude domain="sharedpref" path="donghua_prefs.xml" />
+        <exclude domain="sharedpref" path="mkissa_prefs.xml" />
+        <exclude domain="file" path="crash" />
+    </cloud-backup>
+
+    <device-transfer>
+        <exclude domain="database" path="streamflow.db" />
+        <exclude domain="database" path="streamflow.db-wal" />
+        <exclude domain="database" path="streamflow.db-shm" />
+        <exclude domain="sharedpref" path="kisskh_prefs.xml" />
+        <exclude domain="sharedpref" path="donghua_prefs.xml" />
+        <exclude domain="sharedpref" path="mkissa_prefs.xml" />
+        <exclude domain="file" path="crash" />
+    </device-transfer>
+</data-extraction-rules>

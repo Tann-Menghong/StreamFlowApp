@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy backup rules (API 30 and below).
+
+  The app offers an App Lock, which tells the user their library is private.
+  Letting Android copy the Room database into cloud backup would quietly break
+  that promise: watch history, subscriptions and bookmarks would leave the
+  device by a route the user never chose.
+
+  Harmless settings (theme, quality, tab choices) are still backed up, so a
+  device transfer keeps the app configured. Library content is excluded, and
+  the in-app Export backup remains the deliberate way to move it.
+-->
+<full-backup-content>
+    <!-- Watch history, subscriptions, favourites, playlists, bookmarks. -->
+    <exclude domain="database" path="streamflow.db" />
+    <exclude domain="database" path="streamflow.db-wal" />
+    <exclude domain="database" path="streamflow.db-shm" />
+
+    <!-- WebView session state for the site tabs: cookies and logins. -->
+    <exclude domain="sharedpref" path="kisskh_prefs.xml" />
+    <exclude domain="sharedpref" path="donghua_prefs.xml" />
+    <exclude domain="sharedpref" path="mkissa_prefs.xml" />
+
+    <!-- Cached media and thumbnails: large, and rebuilt on demand. -->
+    <exclude domain="file" path="crash" />
+</full-backup-content>

@@ -131,6 +131,7 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
     val navLabels by appPrefs.navLabels.collectAsState(initial = "SELECTED")
     val reduceMotion by appPrefs.reduceMotion.collectAsState(initial = false)
     val confirmExit by appPrefs.confirmExit.collectAsState(initial = false)
+    val isOnline by com.streamflow.data.ConnectivityMonitor.online.collectAsState()
 
     // Double-back to exit (optional, Settings > Appearance)
     var lastBackAt by remember { mutableStateOf(0L) }
@@ -270,6 +271,35 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                 exit  = slideOutVertically { it } + fadeOut()
             ) {
                 Column {
+                    // Offline banner, above everything else in the bottom stack.
+                    // Slides in only when the connection is actually gone, so it
+                    // never occupies space in the normal case. Says what still
+                    // works rather than just reporting a failure — downloads and
+                    // the library are fully usable offline.
+                    AnimatedVisibility(
+                        visible = !isOnline,
+                        enter = slideInVertically { it } + fadeIn(tween(200)),
+                        exit  = slideOutVertically { it } + fadeOut(tween(150))
+                    ) {
+                        Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.CloudOff, null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "You're offline — downloads and your library still work",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
                     // Mini player bar above nav bar
                     AnimatedVisibility(
                         visible = showMini,

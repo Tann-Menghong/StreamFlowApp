@@ -946,7 +946,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         OutlinedButton(onClick = { isFullscreen = false; onBack() }) {
                             Text("Go back", color = Color.White)
                         }
-                        Button(onClick = { vm.loadVideo(videoUrl) }) { Text("Retry") }
+                        Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
                     }
                 }
                 else -> {}
@@ -1087,7 +1087,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             IconButton(onClick = { isFullscreen = false }) {
-                                Icon(Icons.Rounded.FullscreenExit, null, tint = Color.White)
+                                Icon(Icons.Rounded.FullscreenExit, "Exit fullscreen", tint = Color.White)
                             }
                             val fsTitle = (state as? PlayerUiState.Ready)?.details?.title ?: ""
                             if (fsTitle.isNotEmpty()) {
@@ -1519,7 +1519,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     ) {
                         Text(s.message, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp))
                         Spacer(Modifier.height(10.dp))
-                        Button(onClick = { vm.loadVideo(videoUrl) }) { Text("Retry") }
+                        Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
                     }
                     is PlayerUiState.Ready -> {
                         AndroidView(
@@ -1735,7 +1735,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     IconButton(onClick = onBack, modifier = Modifier.padding(4.dp)) {
-                        Icon(Icons.Rounded.ArrowBack, null, tint = Color.White)
+                        Icon(Icons.Rounded.ArrowBack, "Back", tint = Color.White)
                     }
                 }
                 if (autoPlayCountdown > 0) {

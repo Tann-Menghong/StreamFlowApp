@@ -240,6 +240,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         _versions.value = _versions.value.copy(pendingDowngrade = null)
     }
 
+    // ── Crash report ──────────────────────────────────────────────────────────
+    private val _crashReport = MutableStateFlow<String?>(null)
+    val crashReport: StateFlow<String?> = _crashReport
+
+    fun refreshCrashReport() {
+        _crashReport.value = com.streamflow.data.CrashReporter.pending(getApplication())
+    }
+
+    fun dismissCrashReport() {
+        com.streamflow.data.CrashReporter.clear(getApplication())
+        _crashReport.value = null
+    }
+
     // ── Storage usage ─────────────────────────────────────────────────────────
     private val _storage = MutableStateFlow(com.streamflow.data.StorageStats.Snapshot())
     val storage: StateFlow<com.streamflow.data.StorageStats.Snapshot> = _storage

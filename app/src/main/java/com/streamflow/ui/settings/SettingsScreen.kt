@@ -446,6 +446,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val customTabs           by vm.customTabs.collectAsState()
     val storage              by vm.storage.collectAsState()
     val storageScanning      by vm.storageScanning.collectAsState()
+    val crashReport          by vm.crashReport.collectAsState()
     val context              = LocalContext.current
 
     var showThemeDialog    by remember { mutableStateOf(false) }
@@ -475,6 +476,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     var showDeleteAiDialog   by remember { mutableStateOf(false) }
     var showVersionsDialog   by remember { mutableStateOf(false) }
     var showAddTabDialog     by remember { mutableStateOf(false) }
+    var showCrashDialog      by remember { mutableStateOf(false) }
     var editingTab by remember {
         mutableStateOf<com.streamflow.data.local.entity.CustomTabEntity?>(null)
     }
@@ -949,6 +951,17 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                 }
 
                 "About" -> SettingsCard(title = category) {
+                    // Only appears when the previous run actually crashed. Local
+                    // and manual — nothing is uploaded, and the report is shown
+                    // before sending because a stack trace can contain a video
+                    // title or URL.
+                    LaunchedEffect(Unit) { vm.refreshCrashReport() }
+                    crashReport?.let { report ->
+                        SettingsItem(Icons.Rounded.BugReport, "StreamFlow crashed last time",
+                            "Tap to see the details and report it"
+                        ) { showCrashDialog = true }
+                        SettingsDivider()
+                    }
                     // The system banner a shell prints on login: ASCII wordmark,
                     // then the build identifying itself. Terminal-only — in the
                     // other styles the version row alone carries this.
@@ -1024,6 +1037,55 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     }
 
     // ── Dialogs (shared across all categories) ─────────────────────────
+    // Crash report viewer. Shows the trace in full before the user decides to
+    // send it — nothing leaves the device unless they choose to.
+    if (showCrashDialog) {
+        val report = crashReport ?: ""
+        AlertDialog(
+            onDismissRequest = { showCrashDialog = false },
+            title = { Text("Crash details", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
+                    Text(
+                        "This is what the app recorded when it stopped. Sending it opens " +
+                        "a pre-filled GitHub issue — you can review and edit it first.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        report,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val title = Uri.encode("Crash in v${vm.appVersion}")
+                    val body = Uri.encode(
+                        "**What I was doing:**\n\n\n**Crash details:**\n\n```\n" +
+                        com.streamflow.data.CrashReporter.forIssueBody(report) + "\n```"
+                    )
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                            "https://github.com/Tann-Menghong/StreamFlowApp/issues/new?title=$title&body=$body")))
+                    }
+                    vm.dismissCrashReport()
+                    showCrashDialog = false
+                }) { Text("Report it") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.dismissCrashReport(); showCrashDialog = false }) {
+                    Text("Dismiss")
+                }
+            },
+            shape = appShape(16.dp)
+        )
+    }
+
     // Custom tab editor — add and edit share one dialog.
     if (showAddTabDialog || editingTab != null) {
         val existing = editingTab

@@ -114,17 +114,17 @@ fun LibraryScreen(
                 actions = {
                     AnimatedVisibility(selectedTab == 0 && favorites.isNotEmpty()) {
                         IconButton(onClick = { confirmClearTab = 0 }) {
-                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, "Clear all favorites", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 1 && history.isNotEmpty()) {
                         IconButton(onClick = { confirmClearTab = 1 }) {
-                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, "Clear watch history", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     AnimatedVisibility(selectedTab == 2 && watchLater.isNotEmpty()) {
                         IconButton(onClick = { confirmClearTab = 2 }) {
-                            Icon(Icons.Rounded.DeleteSweep, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.DeleteSweep, "Clear Watch Later", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -635,7 +635,7 @@ private fun VideoListWithSearch(
                     )
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(18.dp)) {
-                            Icon(Icons.Rounded.Close, null,
+                            Icon(Icons.Rounded.Close, "Clear search",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(14.dp))
                         }
@@ -712,7 +712,7 @@ private fun VideoListWithSearch(
                         )
                     }
                     IconButton(onClick = { onRemove(video.url) }, modifier = Modifier.padding(top = 4.dp)) {
-                        Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.Close, "Remove from list", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), modifier = Modifier.size(18.dp))
                     }
                 }
             }

@@ -34,7 +34,12 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
         super.onCreate()
         // Probe RAM + hardware codecs first — quality/buffer/cache decisions
         // elsewhere read these capabilities
+        // First thing after super: a crash during any later initialisation should
+        // still be captured. Cheap — it only installs a handler.
+        com.streamflow.data.CrashReporter.install(this, BuildConfig.VERSION_NAME)
+
         com.streamflow.data.DeviceCaps.init(this)
+        com.streamflow.data.ConnectivityMonitor.start(this)
         NewPipe.init(OkHttpDownloader.instance)
 
         // Warm the TLS connections to YouTube's hosts right away so the first

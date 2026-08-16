@@ -34,4 +34,19 @@ object VideoDetailsCache {
     fun put(key: String, details: VideoDetails) {
         map[key] = Entry(details, System.currentTimeMillis())
     }
+
+    /**
+     * Drops every cached entry for a video, across all quality variants.
+     *
+     * Needed because the TTL alone is not a sufficient invalidation strategy:
+     * YouTube's stream URLs are signed and can stop working before 30 minutes
+     * are up. Without this, a stale entry made "Retry" meaningless — the retry
+     * replayed the same dead URL and failed identically every time, for up to
+     * half an hour. Called when the user explicitly retries a failed video.
+     */
+    @Synchronized
+    fun invalidate(url: String) {
+        val prefix = "$url|"
+        map.keys.filter { it.startsWith(prefix) }.forEach { map.remove(it) }
+    }
 }

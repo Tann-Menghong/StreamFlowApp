@@ -331,7 +331,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // a newer one (stale-response race — same pattern as ChannelViewModel)
     private var loadGeneration = 0
 
-    fun loadVideo(videoUrl: String) {
+    /**
+     * @param forceRefresh drops any cached extraction for this video first.
+     *   Set by the Retry button: a cached stream URL can go stale inside its
+     *   TTL, and without this a retry re-served the same dead URL and failed
+     *   identically, which made the button look broken.
+     */
+    fun loadVideo(videoUrl: String, forceRefresh: Boolean = false) {
+        if (forceRefresh) com.streamflow.data.VideoDetailsCache.invalidate(videoUrl)
         _currentUrl.value = videoUrl
         _replies.value = emptyMap()
         _comments.value = emptyList()

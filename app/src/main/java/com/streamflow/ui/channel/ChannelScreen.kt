@@ -304,7 +304,7 @@ fun ChannelScreen(
                                 trailingIcon = {
                                     if (channelQuery.isNotEmpty()) {
                                         IconButton(onClick = { channelQuery = "" }) {
-                                            Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Rounded.Close, "Clear search", modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 },
