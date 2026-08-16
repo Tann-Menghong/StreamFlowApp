@@ -3,14 +3,14 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.2.6"
+    const val VERSION_NAME = "6.2.7"
 
     val notes = listOf(
-        "Stability release — fixed 6 crashes that hit Android 5, 6 and 7 phones 🩹",
-        "Biggest one: browsing, searching or opening the Feed crashed instantly on Android 5-7 because video dates used a feature those versions don't have",
-        "Opening the video player crashed on Android 5.x (volume control), and the app lock and data-saver checks crashed too",
-        "Fixed two network connections that were left open when a download failed",
-        "Sound & vibration in Settings now opens properly on older Android instead of doing nothing",
-        "Version picker polish: no more stacked dialogs, and it can't clash with a running update download"
+        "NEW look: Terminal 🖥️ — a green-on-black command-line theme. Settings › Appearance › Design style › Terminal",
+        "Terminal turns the whole app into a CLI: monospace text, square corners, ASCII panes, blinking cursors and a subtle CRT scanline glow",
+        "Fixed: in fullscreen, swipe-to-scrub and double-tap-to-skip could stop working after returning from picture-in-picture",
+        "Fixed: video length badges now match the rest of the design on every card style",
+        "Terminal fixes the colours and font by design, and the Appearance rows now say so instead of looking like they do nothing",
+        "Your normal look is untouched — Modern, Aurora and Classic all work exactly as before"
     )
 }
