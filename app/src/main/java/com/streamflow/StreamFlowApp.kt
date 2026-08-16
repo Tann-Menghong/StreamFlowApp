@@ -55,6 +55,19 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
             }
         }
 
+        // Build the media disk cache OFF the main thread.
+        //
+        // SimpleCache's constructor scans the cache directory and opens its index
+        // database — real disk I/O that grows with cache size (up to 768 MB here).
+        // It was first touched from PlaybackService.onCreate, and a Service's
+        // onCreate runs on the MAIN thread, so that cost landed as a stall at the
+        // exact moment the user pressed play on their first video. Constructing it
+        // here means the service almost always finds it already built; the
+        // singleton is synchronized, so a race just waits rather than duplicating.
+        appScope.launch(Dispatchers.IO) {
+            try { com.streamflow.data.MediaCache.get(this@StreamFlowApp) } catch (_: Exception) {}
+        }
+
         // Restore + persist the playback queue across app restarts
         PlaybackQueue.bind(prefs, appScope)
 

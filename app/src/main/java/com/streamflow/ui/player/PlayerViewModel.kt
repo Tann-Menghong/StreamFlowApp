@@ -22,8 +22,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+/**
+ * Where the open-a-video pipeline currently is.
+ *
+ * These are REAL pipeline positions, not a timer: each value is set when that
+ * step actually completes. The fractions are stage weights, so the ring moves in
+ * honest steps rather than pretending to know a download percentage that nothing
+ * measures. Once playback starts buffering, the UI switches to the player's
+ * actual buffered percentage.
+ */
+enum class LoadStage(val label: String, val fraction: Float) {
+    RESOLVING("Resolving video", 0.12f),
+    EXTRACTING("Fetching stream", 0.40f),
+    PREPARING("Preparing playback", 0.75f),
+}
+
 sealed class PlayerUiState {
-    object Loading : PlayerUiState()
+    data class Loading(val stage: LoadStage = LoadStage.RESOLVING) : PlayerUiState()
     data class Ready(val details: VideoDetails) : PlayerUiState()
     data class Error(val message: String) : PlayerUiState()
 }
@@ -34,7 +49,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val db = (app as StreamFlowApp).database
     private val prefs = (app as StreamFlowApp).prefs
 
-    private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
+    private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading())
     val uiState: StateFlow<PlayerUiState> = _uiState
 
     private val _currentUrl = MutableStateFlow("")
@@ -321,7 +336,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         loadExtras(videoUrl)
         val gen = ++loadGeneration
         viewModelScope.launch {
-            _uiState.value = PlayerUiState.Loading
+            _uiState.value = PlayerUiState.Loading(LoadStage.RESOLVING)
             if (isDirectStream(videoUrl)) {
                 val details = VideoDetails(
                     url = videoUrl,
@@ -355,7 +370,15 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         qualityPref == "AUTO" && prefs.dataSaver.first() -> "480P"
                         else -> qualityPref
                     }
+                    // Preferences resolved; the slow part (network extraction)
+                    // starts here, so advance the indicator before blocking on it.
+                    if (gen == loadGeneration) {
+                        _uiState.value = PlayerUiState.Loading(LoadStage.EXTRACTING)
+                    }
                     val details = repo.getVideoDetails(videoUrl, quality)
+                    if (gen == loadGeneration) {
+                        _uiState.value = PlayerUiState.Loading(LoadStage.PREPARING)
+                    }
                     if (gen != loadGeneration) return@launch // superseded by a newer video
                     _uiState.value = PlayerUiState.Ready(details)
                     recordHistory(details, videoUrl)
@@ -415,7 +438,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             // 480p") — without this, picking a quality from the in-player menu
             // silently bypassed it, so the setting didn't actually do what it says.
             val cappedHeight = if (prefs.batterySaver.first() && (height == null || height > 480)) 480 else height
-            _uiState.value = PlayerUiState.Loading
+            _uiState.value = PlayerUiState.Loading()
             try {
                 val details = repo.getVideoDetails(videoUrl, "AUTO", maxHeightOverride = cappedHeight)
                 if (gen != loadGeneration) return@launch // a newer video/quality pick replaced this

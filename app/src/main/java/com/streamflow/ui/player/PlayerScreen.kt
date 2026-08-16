@@ -356,6 +356,9 @@ fun PlayerScreen(
     // ── Portrait progress controls ────────────────────────────────────────────
     var playerPosition by remember { mutableLongStateOf(0L) }
     var playerDuration by remember { mutableLongStateOf(0L) }
+    // Rebuffer state, driven by the same 250ms poll below.
+    var isRebuffering by remember { mutableStateOf(false) }
+    var bufferedPercent by remember { mutableIntStateOf(0) }
     var playerIsPlaying by remember { mutableStateOf(false) }
     var isSeekingPortrait by remember { mutableStateOf(false) }
     var seekTargetPortrait by remember { mutableLongStateOf(0L) }
@@ -435,6 +438,11 @@ fun PlayerScreen(
             if (!isSeekingPortrait) playerPosition = mc.currentPosition.coerceAtLeast(0L)
             playerDuration = mc.duration.coerceAtLeast(0L)
             playerIsPlaying = mc.isPlaying
+            // Mid-playback rebuffering — the stall the user actually feels. Report
+            // the player's REAL buffered percentage so a slow network shows
+            // measurable progress instead of an anonymous spinner.
+            isRebuffering = mc.playbackState == Player.STATE_BUFFERING && mc.currentPosition > 0L
+            bufferedPercent = mc.bufferedPercentage.coerceIn(0, 100)
         }
     }
 
@@ -896,10 +904,20 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
 
             // Loading / error state (video starts in fullscreen, so these must show here too)
             when (val s = state) {
-                is PlayerUiState.Loading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center).size(44.dp),
-                    color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp
+                is PlayerUiState.Loading -> com.streamflow.ui.components.VideoLoadingIndicator(
+                    progress = s.stage.fraction,
+                    label = s.stage.label,
+                    modifier = Modifier.align(Alignment.Center)
                 )
+                is PlayerUiState.Ready -> if (isRebuffering) {
+                    // Real buffered percentage during a stall.
+                    com.streamflow.ui.components.VideoLoadingIndicator(
+                        progress = bufferedPercent / 100f,
+                        label = "Buffering",
+                        modifier = Modifier.align(Alignment.Center),
+                        size = 64.dp
+                    )
+                }
                 is PlayerUiState.Error -> Column(
                     Modifier.align(Alignment.Center).padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1438,10 +1456,19 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     }
             ) {
                 when (val s = state) {
-                    is PlayerUiState.Loading -> CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center).size(40.dp),
-                        color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp
+                    is PlayerUiState.Loading -> com.streamflow.ui.components.VideoLoadingIndicator(
+                        progress = s.stage.fraction,
+                        label = s.stage.label,
+                        modifier = Modifier.align(Alignment.Center)
                     )
+                    is PlayerUiState.Ready -> if (isRebuffering) {
+                        com.streamflow.ui.components.VideoLoadingIndicator(
+                            progress = bufferedPercent / 100f,
+                            label = "Buffering",
+                            modifier = Modifier.align(Alignment.Center),
+                            size = 60.dp
+                        )
+                    }
                     is PlayerUiState.Error -> Column(
                         Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally
                     ) {

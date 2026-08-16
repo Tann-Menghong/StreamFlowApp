@@ -24,8 +24,17 @@ class OkHttpDownloader private constructor() : Downloader() {
         // dead network) could keep a call — and the coroutine behind it — pinned
         // indefinitely. callTimeout puts a hard ceiling on the whole request.
         .callTimeout(45, TimeUnit.SECONDS)
-        .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
-        .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
+        // Bigger, longer-lived pool. Media playback holds 1-2 long connections
+        // open for the whole video while extraction, thumbnails, SponsorBlock and
+        // the next-video prefetch all want sockets at the same time; with a pool
+        // of 10 those short requests were evicting each other and paying a fresh
+        // TLS handshake every time. Keep-alive is raised past the 5-minute mark
+        // so connections survive a normal-length video.
+        .connectionPool(ConnectionPool(32, 10, TimeUnit.MINUTES))
+        .dispatcher(Dispatcher().apply {
+            maxRequestsPerHost = 24   // YouTube serves video + audio + storyboards
+            maxRequests = 96
+        })
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
