@@ -52,6 +52,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading())
     val uiState: StateFlow<PlayerUiState> = _uiState
 
+    /**
+     * How long the last stream extraction took, in ms.
+     *
+     * Real measurement of the network round-trip that dominates "time to open a
+     * video". Nothing in the app recorded this before, so every judgement about
+     * playback speed was guesswork — including mine.
+     */
+    private val _extractionMs = MutableStateFlow(0L)
+    val extractionMs: StateFlow<Long> = _extractionMs
+
     private val _currentUrl = MutableStateFlow("")
     val isFavorite: Flow<Boolean> = _currentUrl
         .flatMapLatest { url -> if (url.isEmpty()) flowOf(false) else db.favoriteDao().isFavorite(url) }
@@ -375,7 +385,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     if (gen == loadGeneration) {
                         _uiState.value = PlayerUiState.Loading(LoadStage.EXTRACTING)
                     }
+                    // Measured, not estimated: this is the single biggest
+                    // contributor to how long a video takes to open, and until
+                    // now nothing recorded it. Shown in the stats overlay.
+                    val extractStart = android.os.SystemClock.elapsedRealtime()
                     val details = repo.getVideoDetails(videoUrl, quality)
+                    _extractionMs.value = android.os.SystemClock.elapsedRealtime() - extractStart
                     if (gen == loadGeneration) {
                         _uiState.value = PlayerUiState.Loading(LoadStage.PREPARING)
                     }

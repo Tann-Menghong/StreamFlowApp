@@ -107,6 +107,7 @@ fun PlayerScreen(
     vm: PlayerViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
+    val extractionMs by vm.extractionMs.collectAsState()
     val isFavorite by vm.isFavorite.collectAsState(initial = false)
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val isSubscribed by vm.isSubscribed.collectAsState()
@@ -359,6 +360,15 @@ fun PlayerScreen(
     // Rebuffer state, driven by the same 250ms poll below.
     var isRebuffering by remember { mutableStateOf(false) }
     var bufferedPercent by remember { mutableIntStateOf(0) }
+    // ── Playback quality metrics (shown in the stats overlay) ────────────────
+    // Measured, never estimated. Rebuffer count and stall time are the two
+    // numbers that actually describe "does this video lag", and nothing in the
+    // app recorded either of them before.
+    var rebufferCount by remember(videoUrl) { mutableIntStateOf(0) }
+    var rebufferTotalMs by remember(videoUrl) { mutableLongStateOf(0L) }
+    var timeToPlayMs by remember(videoUrl) { mutableLongStateOf(0L) }
+    val loadStartedAt = remember(videoUrl) { android.os.SystemClock.elapsedRealtime() }
+    var stallStartedAt by remember(videoUrl) { mutableLongStateOf(0L) }
     var playerIsPlaying by remember { mutableStateOf(false) }
     var isSeekingPortrait by remember { mutableStateOf(false) }
     var seekTargetPortrait by remember { mutableLongStateOf(0L) }
@@ -441,7 +451,21 @@ fun PlayerScreen(
             // Mid-playback rebuffering — the stall the user actually feels. Report
             // the player's REAL buffered percentage so a slow network shows
             // measurable progress instead of an anonymous spinner.
-            isRebuffering = mc.playbackState == Player.STATE_BUFFERING && mc.currentPosition > 0L
+            val stalling = mc.playbackState == Player.STATE_BUFFERING && mc.currentPosition > 0L
+            val now = android.os.SystemClock.elapsedRealtime()
+            // Rising edge = a new stall; falling edge closes it and banks the
+            // duration, so the total is real elapsed stall time rather than a
+            // count of poll ticks.
+            if (stalling && !isRebuffering) { rebufferCount++; stallStartedAt = now }
+            if (!stalling && isRebuffering && stallStartedAt > 0L) {
+                rebufferTotalMs += now - stallStartedAt
+                stallStartedAt = 0L
+            }
+            isRebuffering = stalling
+            // First moment the player actually had content ready to show.
+            if (timeToPlayMs == 0L && mc.playbackState == Player.STATE_READY) {
+                timeToPlayMs = now - loadStartedAt
+            }
             bufferedPercent = mc.bufferedPercentage.coerceIn(0, 100)
         }
     }
@@ -1199,6 +1223,31 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         Text("Buffer: $bufferPct%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Text("Position: ${pos / 1000}s / ${dur / 1000}s", color = Color.White, fontSize = 11.sp)
                         Text("Zoom: ${"%.1f".format(java.util.Locale.US, zoom)}x", color = Color.White, fontSize = 11.sp)
+                        // ── Measured playback performance ────────────────────
+                        // Real numbers, not estimates. Extraction time is the
+                        // network round-trip that dominates opening a video;
+                        // stalls are what "lagging" actually means. Both were
+                        // previously unmeasured, which is why tuning playback
+                        // had been guesswork.
+                        Spacer(Modifier.height(4.dp))
+                        Text("Extract: ${extractionMs}ms" +
+                            (if (timeToPlayMs > 0) "  ·  Ready: ${timeToPlayMs}ms" else ""),
+                            color = Color.White.copy(0.85f), fontSize = 11.sp)
+                        Text(
+                            if (rebufferCount == 0) "Stalls: none"
+                            else "Stalls: $rebufferCount  ·  ${rebufferTotalMs / 1000.0}s lost",
+                            color = if (rebufferCount == 0) Color.White.copy(0.85f)
+                                    else MaterialTheme.colorScheme.error,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            // Names the real constraint: outside live streams the
+                            // app plays a fixed-bitrate progressive stream, so
+                            // quality cannot adapt mid-video.
+                            if (stDetails?.currentQuality == 0) "Mode: adaptive (HLS/DASH)"
+                            else "Mode: fixed bitrate (progressive)",
+                            color = Color.White.copy(0.6f), fontSize = 10.sp
+                        )
                     }
                 }
             }
