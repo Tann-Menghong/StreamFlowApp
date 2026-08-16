@@ -68,7 +68,7 @@ class AppPreferences(private val context: Context) {
         val SHOW_CATEGORY_BAR_KEY = booleanPreferencesKey("show_category_bar")
         val PLAYER_GESTURES_KEY = booleanPreferencesKey("player_gestures")
         val AUTO_PIP_KEY        = booleanPreferencesKey("auto_pip") // floating mini video on Home press
-        val DESIGN_STYLE_KEY    = stringPreferencesKey("design_style") // MODERN / CLASSIC
+        val DESIGN_STYLE_KEY    = stringPreferencesKey("design_style") // MODERN / AURORA / CLASSIC / TERMINAL
         val EQ_PRESET_KEY       = stringPreferencesKey("eq_preset")    // "OFF" or a device preset name
         val UNSEEN_FEED_KEY     = stringPreferencesKey("unseen_feed")  // new-upload count for the Feed badge
         val AUTO_DL_WL_KEY      = booleanPreferencesKey("auto_dl_watch_later") // download Watch Later on Wi-Fi

@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -491,11 +492,16 @@ private fun AnimatedNavBar(
     // MODERN: floating pill nav; AURORA: the pill gets a gradient hairline
     // border (glass look); CLASSIC: original full-width bar
     val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
-    val modernStyle = designStyle != "CLASSIC"
+    val terminalStyle = designStyle == "TERMINAL"
+    val modernStyle = designStyle != "CLASSIC" && !terminalStyle
+    // Read outside drawBehind — MaterialTheme is not readable from a draw scope.
+    val terminalNavRule = MaterialTheme.colorScheme.outline
     Surface(
         color        = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 10.dp,
+        // No depth in TERMINAL — the design system forbids shadows, so the bar
+        // is separated by a top border rule instead of by elevation.
+        tonalElevation = if (terminalStyle) 0.dp else 4.dp,
+        shadowElevation = if (terminalStyle) 0.dp else 10.dp,
         border = if (designStyle == "AURORA")
             androidx.compose.foundation.BorderStroke(1.dp,
                 androidx.compose.ui.graphics.Brush.linearGradient(listOf(
@@ -507,14 +513,26 @@ private fun AnimatedNavBar(
         modifier = Modifier
             .navigationBarsPadding()
             .then(
-                if (modernStyle) Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp)
-                else Modifier
+                when {
+                    terminalStyle -> Modifier.drawBehind {
+                        // A single phosphor rule across the top edge — the split
+                        // between two tmux panes, not a floating surface.
+                        drawLine(
+                            color = terminalNavRule,
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                            strokeWidth = 2f
+                        )
+                    }
+                    modernStyle -> Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp)
+                    else -> Modifier
+                }
             )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
+                .height(if (terminalStyle) 52.dp else 60.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment     = Alignment.CenterVertically
@@ -539,22 +557,35 @@ private fun AnimatedNavBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    // TERMINAL: the selected tab is INVERTED VIDEO — a solid
+                    // phosphor block with a black glyph. A 16%-alpha tint is a
+                    // GUI convention and reads as washed-out on this palette;
+                    // inversion is how a terminal shows selection, and it is a
+                    // far stronger focus indicator.
                     Box(
                         modifier = Modifier
                             .size(width = 52.dp, height = 32.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(if (terminalStyle) 0.dp else 12.dp))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                else          androidx.compose.ui.graphics.Color.Transparent
+                                when {
+                                    selected && terminalStyle -> MaterialTheme.colorScheme.primary
+                                    selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    else -> androidx.compose.ui.graphics.Color.Transparent
+                                }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = screen.icon,
                             contentDescription = screen.label,
-                            modifier = Modifier.size(22.dp).scale(iconScale),
-                            tint = if (selected) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            modifier = Modifier.size(if (terminalStyle) 18.dp else 22.dp)
+                                .scale(if (terminalStyle) 1f else iconScale),
+                            tint = when {
+                                selected && terminalStyle -> MaterialTheme.colorScheme.background
+                                selected -> MaterialTheme.colorScheme.primary
+                                terminalStyle -> MaterialTheme.colorScheme.onSurfaceVariant
+                                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            }
                         )
                     }
                     val labelVisible = when (labelStyle) {
@@ -567,11 +598,14 @@ private fun AnimatedNavBar(
                         enter = fadeIn(tween(160)) + expandVertically(tween(160)),
                         exit  = fadeOut(tween(120)) + shrinkVertically(tween(120))
                     ) {
+                        val navLabel = com.streamflow.ui.theme.KmStrings.t(screen.label, lang)
                         Text(
-                            text  = com.streamflow.ui.theme.KmStrings.t(screen.label, lang),
+                            // Shell tabs are lower-case commands, not Title Case.
+                            text  = if (terminalStyle) navLabel.lowercase() else navLabel,
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selected) MaterialTheme.colorScheme.primary
+                                    else if (terminalStyle) MaterialTheme.colorScheme.onSurfaceVariant
                                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                             modifier = Modifier.padding(top = 2.dp)
                         )

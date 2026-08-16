@@ -138,8 +138,24 @@ fun StreamFlowTheme(
     accent: String = "RED",
     fontScale: Float = 1f,
     fontFamilyPref: String = "DEFAULT",
+    /**
+     * When "TERMINAL", the phosphor design system replaces the palette, type and
+     * shapes wholesale. It intentionally ignores theme/accent/font-family: a
+     * light-mode or pink-accent terminal is not a terminal, and the whole point
+     * of the aesthetic is that there is exactly one look.
+     */
+    designStyle: String = "MODERN",
     content: @Composable () -> Unit
 ) {
+    if (designStyle == "TERMINAL") {
+        MaterialTheme(
+            colorScheme = terminalColorScheme(),
+            typography  = terminalTypography(fontScale),
+            shapes      = TerminalShapes,
+            content     = content
+        )
+        return
+    }
     val fontFamily = when (fontFamilyPref) {
         "SERIF" -> FontFamily.Serif
         "MONO"  -> FontFamily.Monospace

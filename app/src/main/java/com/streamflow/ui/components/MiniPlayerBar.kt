@@ -51,23 +51,32 @@ fun MiniPlayerBar(
     // MODERN: floating rounded card; AURORA: adds a gradient hairline border;
     // CLASSIC: original full-width bar
     val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
-    val modernStyle = designStyle != "CLASSIC"
+    val terminalStyle = designStyle == "TERMINAL"
+    val modernStyle = designStyle != "CLASSIC" && !terminalStyle
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 8.dp,
-        shadowElevation = 6.dp,
-        border = if (designStyle == "AURORA")
-            androidx.compose.foundation.BorderStroke(1.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = if (terminalStyle) 0.dp else 8.dp,
+        shadowElevation = if (terminalStyle) 0.dp else 6.dp,
+        border = when {
+            // A solid phosphor frame: the "now playing" pane docked above the
+            // tab bar, exactly like a split in a terminal multiplexer.
+            terminalStyle -> androidx.compose.foundation.BorderStroke(
+                1.dp, MaterialTheme.colorScheme.outline)
+            designStyle == "AURORA" -> androidx.compose.foundation.BorderStroke(1.dp,
                 androidx.compose.ui.graphics.Brush.linearGradient(listOf(
                     MaterialTheme.colorScheme.primary.copy(0.55f),
                     MaterialTheme.colorScheme.tertiary.copy(0.35f))))
-        else null,
+            else -> null
+        },
         shape = if (modernStyle) RoundedCornerShape(16.dp)
                 else androidx.compose.ui.graphics.RectangleShape,
         modifier = Modifier
             .then(
-                if (modernStyle) Modifier.padding(horizontal = 10.dp).padding(bottom = 6.dp)
-                else Modifier
+                when {
+                    terminalStyle -> Modifier.padding(horizontal = 6.dp).padding(bottom = 4.dp)
+                    modernStyle -> Modifier.padding(horizontal = 10.dp).padding(bottom = 6.dp)
+                    else -> Modifier
+                }
             )
             .graphicsLayer {
                 translationX = dragX

@@ -441,11 +441,12 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             Spacer(Modifier.height(8.dp))
 
             when (category) {
-                "Appearance" -> SettingsCard {
+                "Appearance" -> SettingsCard(title = category) {
                     SettingsItem(Icons.Rounded.AutoAwesome, "Design style",
                         when (designStyle) {
                             "CLASSIC" -> "Classic — flat & minimal"
                             "AURORA" -> "Aurora — glass & gradients"
+                            "TERMINAL" -> "Terminal — CLI green-on-black"
                             else -> "Modern — cards & floating bars"
                         }
                     ) { showDesignDialog = true }
@@ -753,7 +754,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     SettingsFooter("The AI runs fully on your device — nothing you ask ever leaves your phone.")
                 }
 
-                "Storage" -> SettingsCard {
+                "Storage" -> SettingsCard(title = category) {
                     SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
                         "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
                     ) { vm.setAutoDlWatchLater(it) }
@@ -775,7 +776,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { showRetentionDialog = true }
                 }
 
-                "Backup" -> SettingsCard {
+                "Backup" -> SettingsCard(title = category) {
                     SettingsSwitchItem(Icons.Rounded.EventRepeat, "Weekly auto-backup",
                         "Saves a backup file to Documents/StreamFlow every week", autoBackup
                     ) { vm.setAutoBackup(it) }
@@ -798,7 +799,28 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     ) { opmlLauncher.launch("streamflow-subscriptions.opml") }
                 }
 
-                "About" -> SettingsCard {
+                "About" -> SettingsCard(title = category) {
+                    // The system banner a shell prints on login: ASCII wordmark,
+                    // then the build identifying itself. Terminal-only — in the
+                    // other styles the version row alone carries this.
+                    if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                            // ASCII art has a fixed character width and WILL
+                            // overflow a narrow phone. Scrolling it horizontally
+                            // keeps the grid intact instead of wrapping the art
+                            // into nonsense.
+                            Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                                com.streamflow.ui.components.terminal.AsciiLogo()
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            com.streamflow.ui.components.terminal.TypewriterText(
+                                text = "streamflow v${vm.appVersion} -- ready",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        SettingsDivider()
+                    }
                     SettingsItem(Icons.Rounded.Info, "App version", "v${vm.appVersion}")
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.Speed, "Device performance",
@@ -1054,7 +1076,8 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
         val designOpts = listOf(
             "MODERN" to "Modern — cards & floating bars",
             "AURORA" to "Aurora — glass & gradients ✨",
-            "CLASSIC" to "Classic — flat & minimal")
+            "CLASSIC" to "Classic — flat & minimal",
+            "TERMINAL" to "Terminal — CLI green-on-black ▮")
         PickerDialog("Design style", designOpts.map { it.second },
             designOpts.indexOfFirst { it.first == designStyle }.coerceAtLeast(0),
             { vm.setDesignStyle(designOpts[it].first); showDesignDialog = false },
@@ -1154,10 +1177,28 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 // ── Reusable components ───────────────────────────────────────────────────────
 
 @Composable
-private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    // Premium-minimal: a flat card defined by a crisp hairline border rather than
-    // a tonal fill. Reads as "quiet & expensive" (Linear/Things) instead of a
-    // stack of grey blocks — and it separates cleanly on any theme.
+private fun SettingsCard(
+    /**
+     * Pane title for the TERMINAL style's `+- TITLE ------+` header. Null where a
+     * SettingsGroupLabel already names the section directly above the card —
+     * printing the name twice would be noise, and the `// SECTION` comment is
+     * the stronger shell metaphor there. Ignored by the other design styles.
+     */
+    title: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    // TERMINAL: a tmux-style pane — square, 1px border, no fill. Everything else
+    // keeps the premium-minimal card: a flat surface defined by a crisp hairline
+    // border rather than a tonal fill, which reads as "quiet & expensive" instead
+    // of a stack of grey blocks.
+    if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+        com.streamflow.ui.components.terminal.TerminalPane(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            title = title,
+            content = content
+        )
+        return
+    }
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape     = RoundedCornerShape(20.dp),
@@ -1170,6 +1211,14 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun SettingsDivider() {
+    // Terminal rows sit directly under one another separated by an ASCII rule
+    // that spans the full pane — an indented hairline would break the grid.
+    if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+        com.streamflow.ui.components.terminal.AsciiRule(
+            Modifier.padding(horizontal = 8.dp)
+        )
+        return
+    }
     HorizontalDivider(
         modifier = Modifier.padding(start = 64.dp),
         color    = MaterialTheme.colorScheme.outline.copy(0.4f)
@@ -1187,6 +1236,19 @@ private val badgePalette = listOf(
 @Composable
 private fun SettingsIconBadge(icon: ImageVector, title: String) {
     val badgeStyle = com.streamflow.ui.theme.LocalDesignStyle.current
+    if (badgeStyle == "TERMINAL") {
+        // No colour-coded chips: the palette is one ink. Icons are the terminal
+        // green at a strict stroke, preceded by the shell prompt character so
+        // each row reads as a command rather than a settings entry.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(">", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(6.dp))
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp))
+        }
+        return
+    }
     if (badgeStyle != "CLASSIC") {
         // Premium-minimal: a soft tinted chip with a colour-matched glyph, not a
         // saturated block with a white icon. Keeps the per-row colour cue while
@@ -1210,10 +1272,15 @@ private fun SettingsIconBadge(icon: ImageVector, title: String) {
 // Small gray explanation under a settings card, Telegram-style
 @Composable
 private fun SettingsFooter(text: String) {
+    // Explanatory text reads as a shell comment in terminal mode.
+    val terminal = com.streamflow.ui.theme.LocalTerminalMode.current
     Text(
-        text, fontSize = 12.sp, lineHeight = 16.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f),
-        modifier = Modifier.padding(horizontal = 24.dp).padding(top = 6.dp)
+        if (terminal) "# $text" else text,
+        fontSize = 12.sp, lineHeight = 16.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (terminal) 1f else 0.8f),
+        modifier = Modifier
+            .padding(horizontal = if (terminal) 16.dp else 24.dp)
+            .padding(top = 6.dp)
     )
 }
 
@@ -1221,6 +1288,18 @@ private fun SettingsFooter(text: String) {
 // accent-coloured so the eye lands on the settings themselves, not the labels.
 @Composable
 private fun SettingsGroupLabel(text: String) {
+    // TERMINAL: section headings are shell comments (`// LAYOUT`) in the accent
+    // amber, so they read as structure in the output rather than as UI chrome.
+    if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+        Text(
+            "// ${text.uppercase()}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.fillMaxWidth()
+                .padding(start = 14.dp, end = 16.dp, top = 18.dp, bottom = 6.dp)
+        )
+        return
+    }
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelSmall.copy(
@@ -1254,9 +1333,16 @@ private fun SettingsItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (onClick != null) Icon(Icons.Rounded.ChevronRight, null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
-            modifier = Modifier.size(18.dp))
+        // A chevron is a GUI affordance; terminal rows end in the shell's own
+        // "there is more" glyph instead.
+        if (onClick != null) {
+            if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+                Text("»", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary)
+            } else Icon(Icons.Rounded.ChevronRight, null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
+                modifier = Modifier.size(18.dp))
+        }
     }
 }
 

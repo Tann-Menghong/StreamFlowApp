@@ -2,7 +2,9 @@ package com.streamflow.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +35,56 @@ fun shimmerBrush(): Brush {
     )
 }
 
+/**
+ * TERMINAL loading state: a shell that is still working.
+ *
+ * A soft gradient sweep is the wrong metaphor for a CLI — nothing on a terminal
+ * fades. Instead the placeholder is literally the output being drawn: a wire
+ * frame with a blinking cursor on the line that is still filling.
+ */
+@Composable
+private fun TerminalSkeletonCard() {
+    val outline = MaterialTheme.colorScheme.outline
+    Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .border(1.dp, outline)
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(
+                    "LOADING",
+                    color = outline,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                com.streamflow.ui.components.terminal.BlinkCursor(color = outline, glyph = "_")
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "> ................................",
+            color = outline,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+        Text(
+            "> ..................",
+            color = outline,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+    }
+}
+
 @Composable
 fun ShimmerVideoCard() {
+    if (com.streamflow.ui.theme.LocalTerminalMode.current) {
+        TerminalSkeletonCard()
+        return
+    }
     val brush = shimmerBrush()
     val bg    = MaterialTheme.colorScheme.surfaceVariant.copy(0.4f)
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {

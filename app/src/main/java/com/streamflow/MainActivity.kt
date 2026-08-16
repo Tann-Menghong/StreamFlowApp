@@ -29,6 +29,7 @@ import com.streamflow.ui.theme.LocalHapticsEnabled
 import com.streamflow.ui.theme.LocalThumbCorner
 import com.streamflow.ui.theme.StreamFlowTheme
 import com.streamflow.ui.theme.cornerDpFor
+import com.streamflow.ui.theme.crtScanlines
 import com.streamflow.ui.theme.toAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -186,26 +187,41 @@ class MainActivity : ComponentActivity() {
                 androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                     .isAppearanceLightStatusBars = !darkTheme
             }
+            val terminal = designStyle == "TERMINAL"
             StreamFlowTheme(theme = themeStr.toAppTheme(), accent = accentStr,
-                fontScale = fontScale, fontFamilyPref = fontFamilyStr) {
+                fontScale = fontScale, fontFamilyPref = fontFamilyStr,
+                designStyle = designStyle) {
                 androidx.compose.runtime.CompositionLocalProvider(
-                    LocalThumbCorner provides cornerDpFor(cornerStyle),
+                    // Radius 0 is absolute in this system, so the user's corner
+                    // preference is overridden rather than merely defaulted —
+                    // a rounded thumbnail would break the character grid.
+                    LocalThumbCorner provides if (terminal) 0 else cornerDpFor(cornerStyle),
                     LocalHapticsEnabled provides hapticsOn,
-                    com.streamflow.ui.theme.LocalDesignStyle provides designStyle
+                    com.streamflow.ui.theme.LocalDesignStyle provides designStyle,
+                    com.streamflow.ui.theme.LocalTerminalMode provides terminal
                 ) {
                     // First launch: quick setup (country, interests, theme) before the feed
                     val onboardingDone by androidx.compose.runtime.produceState<Boolean?>(null) {
                         prefs.onboardingDone.collect { value = it }
                     }
-                    if (appLockEnabled && !appUnlocked) {
-                        // Locked: authenticate before anything else is shown
-                        com.streamflow.ui.lock.LockScreen(onUnlock = { requestUnlock() })
-                        androidx.compose.runtime.LaunchedEffect(Unit) { requestUnlock() }
-                    } else when (onboardingDone) {
-                        null  -> Unit // waiting for DataStore, hidden behind the splash
-                        false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
-                        else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest,
-                                          intentNonce = intentNonce)
+                    // CRT scanlines sit above the ENTIRE tree, including the
+                    // player and dialogs, so the effect never "ends" at a pane
+                    // edge. drawWithContent draws over children without a extra
+                    // layout pass and never intercepts touch.
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier
+                            .let { if (terminal) it.crtScanlines() else it }
+                    ) {
+                        if (appLockEnabled && !appUnlocked) {
+                            // Locked: authenticate before anything else is shown
+                            com.streamflow.ui.lock.LockScreen(onUnlock = { requestUnlock() })
+                            androidx.compose.runtime.LaunchedEffect(Unit) { requestUnlock() }
+                        } else when (onboardingDone) {
+                            null  -> Unit // waiting for DataStore, hidden behind the splash
+                            false -> com.streamflow.ui.onboarding.OnboardingScreen(prefs) {}
+                            else  -> NavGraph(startUrl = pendingUrl, startDest = pendingDest,
+                                              intentNonce = intentNonce)
+                        }
                     }
                 }
             }

@@ -112,9 +112,14 @@ fun VideoCard(
     // MODERN: soft tonal card; AURORA: translucent card with a gradient hairline
     // border (the "glass" look); CLASSIC: original flat layout
     val designStyle = com.streamflow.ui.theme.LocalDesignStyle.current
-    val modernStyle = designStyle != "CLASSIC"
+    val terminalStyle = designStyle == "TERMINAL"
+    val modernStyle = designStyle != "CLASSIC" && !terminalStyle
     val auroraStyle = designStyle == "AURORA"
-    Box(modifier = Modifier.fillMaxWidth().scale(scale).padding(bottom = if (modernStyle) 18.dp else 20.dp)) {
+    // Radius 0 is absolute in TERMINAL; the other styles round the card slightly
+    // more than the thumbnail so the media sits inside the frame.
+    val cardCorner = if (terminalStyle) 0 else corner + 10
+    Box(modifier = Modifier.fillMaxWidth().scale(scale)
+        .padding(bottom = if (terminalStyle) 10.dp else if (modernStyle) 18.dp else 20.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,6 +128,12 @@ fun VideoCard(
                     // surface than the page) with an edge-to-edge thumbnail, so the feed
                     // reads as a stack of distinct cards, not a flat wall of thumbnails.
                     when {
+                        // TERMINAL: a hard-edged pane. No shadow — the design
+                        // system forbids depth; separation comes from the 1px
+                        // phosphor border alone.
+                        terminalStyle -> Modifier
+                            .border(1.dp, MaterialTheme.colorScheme.outline)
+                            .background(MaterialTheme.colorScheme.surface)
                         auroraStyle -> Modifier
                             .border(
                                 width = 1.dp,
@@ -130,11 +141,11 @@ fun VideoCard(
                                     MaterialTheme.colorScheme.primary.copy(0.55f),
                                     MaterialTheme.colorScheme.tertiary.copy(0.35f),
                                     MaterialTheme.colorScheme.primary.copy(0.15f))),
-                                shape = RoundedCornerShape((corner + 10).dp))
-                            .clip(RoundedCornerShape((corner + 10).dp))
+                                shape = RoundedCornerShape(cardCorner.dp))
+                            .clip(RoundedCornerShape(cardCorner.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.35f))
                         modernStyle -> Modifier
-                            .shadow(6.dp, RoundedCornerShape((corner + 10).dp))
+                            .shadow(6.dp, RoundedCornerShape(cardCorner.dp))
                             .background(MaterialTheme.colorScheme.surface)
                         else -> Modifier
                     }
@@ -160,8 +171,8 @@ fun VideoCard(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .clip(
-                        if (modernStyle) RoundedCornerShape(topStart = (corner + 10).dp, topEnd = (corner + 10).dp)
-                        else RoundedCornerShape(corner.dp)
+                        if (modernStyle) RoundedCornerShape(topStart = cardCorner.dp, topEnd = cardCorner.dp)
+                        else RoundedCornerShape(corner.dp)   // corner is forced to 0 in TERMINAL
                     )
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
             ) {
@@ -172,27 +183,30 @@ fun VideoCard(
                     modifier           = Modifier.fillMaxSize()
                 )
                 // Duration badge or remaining label
-                if (remainingLabel != null) {
+                // TERMINAL renders the timecode as inverted video (solid phosphor
+                // block, black text) rather than a translucent rounded pill —
+                // same information, and it reads as a status field on a readout.
+                val badgeLabel = remainingLabel ?: if (video.duration > 0)
+                    formatDuration(video.duration) else null
+                if (badgeLabel != null) {
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(8.dp)
-                            .background(Color.Black.copy(0.82f), RoundedCornerShape(5.dp))
+                            .padding(if (terminalStyle) 4.dp else 8.dp)
+                            .background(
+                                if (terminalStyle) MaterialTheme.colorScheme.primary
+                                else Color.Black.copy(0.82f),
+                                if (terminalStyle) RoundedCornerShape(0.dp) else RoundedCornerShape(5.dp)
+                            )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(remainingLabel, color = Color.White,
-                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                } else if (video.duration > 0) {
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(8.dp)
-                            .background(Color.Black.copy(0.82f), RoundedCornerShape(5.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(formatDuration(video.duration), color = Color.White,
-                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            badgeLabel,
+                            color = if (terminalStyle) MaterialTheme.colorScheme.background
+                                    else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
                 // Watch progress bar
