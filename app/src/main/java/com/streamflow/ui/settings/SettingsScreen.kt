@@ -444,6 +444,8 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val update               by vm.update.collectAsState()
     val versions             by vm.versions.collectAsState()
     val customTabs           by vm.customTabs.collectAsState()
+    val storage              by vm.storage.collectAsState()
+    val storageScanning      by vm.storageScanning.collectAsState()
     val context              = LocalContext.current
 
     var showThemeDialog    by remember { mutableStateOf(false) }
@@ -851,7 +853,56 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     SettingsFooter("The AI runs fully on your device — nothing you ask ever leaves your phone.")
                 }
 
-                "Storage" -> SettingsCard(title = category) {
+                "Storage" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    // Measure on open, not at app start: walking a cache that can
+                    // reach 768 MB is real I/O and the number is only wanted here.
+                    LaunchedEffect(Unit) { vm.refreshStorage() }
+                    SettingsGroupLabel("Space used")
+                    com.streamflow.ui.components.DashboardPane(
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            com.streamflow.ui.components.DashboardTile(
+                                com.streamflow.data.StorageStats.format(storage.totalBytes),
+                                "Total", if (storageScanning) "measuring…" else "app data",
+                                Modifier.weight(1f))
+                            com.streamflow.ui.components.DashboardTile(
+                                com.streamflow.data.StorageStats.format(storage.downloadBytes),
+                                "Downloads", "your files", Modifier.weight(1f))
+                        }
+                        // Proportions of the app's own footprint, so the bars
+                        // answer "what is taking the space" at a glance.
+                        val t = storage.totalBytes.coerceAtLeast(1L).toFloat()
+                        com.streamflow.ui.components.DashboardMeter(
+                            "Video cache", storage.mediaCacheBytes / t,
+                            com.streamflow.data.StorageStats.format(storage.mediaCacheBytes))
+                        com.streamflow.ui.components.DashboardMeter(
+                            "Thumbnails", storage.imageCacheBytes / t,
+                            com.streamflow.data.StorageStats.format(storage.imageCacheBytes))
+                        com.streamflow.ui.components.DashboardMeter(
+                            "Downloads", storage.downloadBytes / t,
+                            com.streamflow.data.StorageStats.format(storage.downloadBytes))
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    SettingsFooter(
+                        "Caches speed up replays and scrolling and rebuild themselves — clearing them is always safe. " +
+                        "Downloads are your own files and are never cleared automatically."
+                    )
+                    SettingsGroupLabel("Free up space")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.Movie, "Clear video cache",
+                            com.streamflow.data.StorageStats.format(storage.mediaCacheBytes) + " — replays re-download"
+                        ) { if (storage.mediaCacheBytes > 0) vm.clearMediaCache() }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.Image, "Clear thumbnails",
+                            com.streamflow.data.StorageStats.format(storage.imageCacheBytes) + " — rebuilds as you browse"
+                        ) { if (storage.imageCacheBytes > 0) vm.clearImageCache() }
+                    }
+                    SettingsGroupLabel("Library data")
+                    SettingsCard {
                     SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
                         "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
                     ) { vm.setAutoDlWatchLater(it) }
@@ -871,6 +922,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
                         when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
                     ) { showRetentionDialog = true }
+                    }
                 }
 
                 "Backup" -> SettingsCard(title = category) {

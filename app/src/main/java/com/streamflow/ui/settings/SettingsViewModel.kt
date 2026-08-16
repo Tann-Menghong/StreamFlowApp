@@ -240,6 +240,47 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         _versions.value = _versions.value.copy(pendingDowngrade = null)
     }
 
+    // ── Storage usage ─────────────────────────────────────────────────────────
+    private val _storage = MutableStateFlow(com.streamflow.data.StorageStats.Snapshot())
+    val storage: StateFlow<com.streamflow.data.StorageStats.Snapshot> = _storage
+
+    private val _storageScanning = MutableStateFlow(false)
+    val storageScanning: StateFlow<Boolean> = _storageScanning
+
+    /**
+     * Measures disk usage. Called when the Storage page opens rather than at app
+     * start — walking a 768 MB cache directory is real I/O and nobody needs the
+     * number until they go looking for it.
+     */
+    fun refreshStorage() {
+        if (_storageScanning.value) return
+        viewModelScope.launch {
+            _storageScanning.value = true
+            _storage.value = com.streamflow.data.StorageStats.snapshot(getApplication())
+            _storageScanning.value = false
+        }
+    }
+
+    fun clearMediaCache() {
+        viewModelScope.launch {
+            val ok = com.streamflow.data.StorageStats.clearMediaCache(getApplication())
+            android.widget.Toast.makeText(getApplication(),
+                if (ok) "Video cache cleared" else "Couldn't clear the video cache",
+                android.widget.Toast.LENGTH_SHORT).show()
+            refreshStorage()
+        }
+    }
+
+    fun clearImageCache() {
+        viewModelScope.launch {
+            val ok = com.streamflow.data.StorageStats.clearImageCache(getApplication())
+            android.widget.Toast.makeText(getApplication(),
+                if (ok) "Thumbnail cache cleared" else "Couldn't clear the thumbnail cache",
+                android.widget.Toast.LENGTH_SHORT).show()
+            refreshStorage()
+        }
+    }
+
     // ── Custom website tabs ───────────────────────────────────────────────────
     val customTabs = db.customTabDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

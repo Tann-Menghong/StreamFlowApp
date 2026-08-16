@@ -3,13 +3,13 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.3.5"
+    const val VERSION_NAME = "6.4.0"
 
     val notes = listOf(
-        "Fixed: adding a website tab with a port in the address (like example.com:8080) was wrongly refused as invalid",
-        "Tab names now read correctly from addresses with a port or a long path",
-        "Added the app's first real automated tests — 15 of them, covering exactly what you type when adding a tab",
-        "Verified the tests actually catch the bug: they fail on the old code and pass on the fixed code",
-        "No changes to video playback in this release"
+        "NEW: see exactly what's using your space 💾 — Settings › Storage now shows real sizes, not just counts",
+        "Bars break it down: video cache, thumbnails and downloads, so you can see what's actually filling the phone",
+        "Clear the video cache or thumbnails in one tap — both rebuild themselves, so it's always safe",
+        "Your downloads are shown but never cleared automatically; those are your files",
+        "More automated tests behind the scenes: 29 now, up from 15"
     )
 }
