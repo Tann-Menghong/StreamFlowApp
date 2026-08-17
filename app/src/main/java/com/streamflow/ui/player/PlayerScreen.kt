@@ -1264,7 +1264,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                         fsTapTimestamp = System.currentTimeMillis()
                     }) {
-                        Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Rounded.Replay10, "Rewind ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(36.dp))
                     }
                     IconButton(
                         onClick = {
@@ -1275,14 +1275,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     ) {
                         Icon(
                             if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            null, tint = Color.White, modifier = Modifier.size(40.dp)
+                            if (playerIsPlaying) "Pause" else "Play",
+                            tint = Color.White, modifier = Modifier.size(40.dp)
                         )
                     }
                     IconButton(onClick = {
                         mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                         fsTapTimestamp = System.currentTimeMillis()
                     }) {
-                        Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Rounded.Forward10, "Forward ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(36.dp))
                     }
                 }
             }
@@ -1410,7 +1411,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                                 fsTapTimestamp = System.currentTimeMillis()
                             }) {
-                                Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.Replay10, "Rewind ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(24.dp))
                             }
                             IconButton(onClick = {
                                 val mc = mediaController ?: return@IconButton
@@ -1419,14 +1420,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }) {
                                 Icon(
                                     if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    null, tint = Color.White, modifier = Modifier.size(28.dp)
+                                    if (playerIsPlaying) "Pause" else "Play",
+                                    tint = Color.White, modifier = Modifier.size(28.dp)
                                 )
                             }
                             IconButton(onClick = {
                                 mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                                 fsTapTimestamp = System.currentTimeMillis()
                             }) {
-                                Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.Forward10, "Forward ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(24.dp))
                             }
                             if (queue.isNotEmpty()) {
                                 IconButton(onClick = { PlaybackQueue.popNext()?.let { onVideoClick(it.url) } }) {
@@ -1598,7 +1600,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                             mediaController?.let { mc -> mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)) }
                                             fsTapTimestamp = System.currentTimeMillis()
                                         }) {
-                                            Icon(Icons.Rounded.Replay10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                            Icon(Icons.Rounded.Replay10, "Rewind ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(34.dp))
                                         }
                                         IconButton(
                                             onClick = {
@@ -1609,14 +1611,15 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         ) {
                                             Icon(
                                                 if (playerIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                                null, tint = Color.White, modifier = Modifier.size(44.dp)
+                                                if (playerIsPlaying) "Pause" else "Play",
+                                                tint = Color.White, modifier = Modifier.size(44.dp)
                                             )
                                         }
                                         IconButton(onClick = {
                                             mediaController?.let { mc -> mc.seekTo(mc.currentPosition + skipMs) }
                                             fsTapTimestamp = System.currentTimeMillis()
                                         }) {
-                                            Icon(Icons.Rounded.Forward10, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                                            Icon(Icons.Rounded.Forward10, "Forward ${skipMs / 1000} seconds", tint = Color.White, modifier = Modifier.size(34.dp))
                                         }
                                     }
 
@@ -1653,7 +1656,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                                 onClick = { isFullscreen = true },
                                                 modifier = Modifier.size(32.dp)
                                             ) {
-                                                Icon(Icons.Rounded.Fullscreen, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Rounded.Fullscreen, "Enter fullscreen", tint = Color.White, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                         if (playerDuration > 0L && !s.details.isLive) {
@@ -2673,7 +2676,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                             }
                             IconButton(onClick = { PlaybackQueue.remove(idx) },
                                 modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Rounded.Close, null,
+                                Icon(Icons.Rounded.Close, "Remove from queue",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp))
                             }

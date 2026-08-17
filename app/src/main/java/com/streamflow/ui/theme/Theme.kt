@@ -11,7 +11,31 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM }
+enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM, MIDNIGHT, CINEMA, GRAPHITE, CONTRAST }
+
+/**
+ * Every theme, in the order they are offered to the user, with their labels.
+ *
+ * Single source of truth on purpose. The picker in Settings, the summary line on
+ * the Settings row and the onboarding chooser each used to carry their own
+ * hand-written copy of this list, so adding a theme meant editing three
+ * unrelated `when` blocks and the app would happily ship having missed one —
+ * showing the new theme in the picker but labelling it "Dark" on the row above.
+ */
+val appThemeOptions: List<Pair<String, String>> = listOf(
+    "SYSTEM"   to "Follow system",
+    "DARK"     to "Dark",
+    "AMOLED"   to "AMOLED Black",
+    "LIGHT"    to "Light",
+    "MIDNIGHT" to "Midnight Blue",
+    "CINEMA"   to "Cinema Purple",
+    "GRAPHITE" to "Minimal Graphite",
+    "CONTRAST" to "High Contrast",
+)
+
+/** Display name for a stored theme code; falls back to Dark for unknown values. */
+fun themeLabelFor(code: String): String =
+    appThemeOptions.firstOrNull { it.first == code }?.second ?: "Dark"
 
 // Bundled brand typeface (Manrope, variable weight). Consistent, geometric,
 // and much more "designed" than the system default on every device.
@@ -24,10 +48,26 @@ val ManropeFamily = FontFamily(
 )
 
 fun String.toAppTheme(): AppTheme = when (this) {
-    "AMOLED" -> AppTheme.AMOLED
-    "LIGHT"  -> AppTheme.LIGHT
-    "SYSTEM" -> AppTheme.SYSTEM
-    else     -> AppTheme.DARK
+    "AMOLED"   -> AppTheme.AMOLED
+    "LIGHT"    -> AppTheme.LIGHT
+    "SYSTEM"   -> AppTheme.SYSTEM
+    "MIDNIGHT" -> AppTheme.MIDNIGHT
+    "CINEMA"   -> AppTheme.CINEMA
+    "GRAPHITE" -> AppTheme.GRAPHITE
+    "CONTRAST" -> AppTheme.CONTRAST
+    else       -> AppTheme.DARK
+}
+
+/**
+ * Whether a theme paints dark surfaces — drives the status-bar icon colour.
+ *
+ * Kept next to the enum rather than inline in MainActivity so a new theme cannot
+ * be added without this being the obvious place to declare which way it goes.
+ */
+fun AppTheme.isDarkSurface(systemInDark: Boolean): Boolean = when (this) {
+    AppTheme.LIGHT  -> false
+    AppTheme.SYSTEM -> systemInDark
+    else            -> true
 }
 
 // Typography scaled by the user's font-size preference, in their chosen face.
@@ -84,53 +124,87 @@ private fun paletteFromColor(c: Color) = AccentPalette(
     lightOnContainer = blend(c, Color.Black, 0.55f)
 )
 
-private fun buildDarkColors(p: AccentPalette) = darkColorScheme(
-    primary            = p.darkPrimary,
-    onPrimary          = Color.White,
-    primaryContainer   = p.darkContainer,
-    onPrimaryContainer = p.darkOnContainer,
-    secondary          = p.darkSecondary,
-    background         = BackgroundDark,
-    surface            = SurfaceDark,
-    surfaceVariant     = SurfaceVariantDark,
-    onBackground       = OnSurfaceDark,
-    onSurface          = OnSurfaceDark,
-    onSurfaceVariant   = SubtextDark,
-    outline            = Color(0xFF2B2C38),
-    outlineVariant     = Color(0xFF1C1D26),
+/**
+ * The neutral half of a theme: everything that is NOT the accent.
+ *
+ * Separating this from [AccentPalette] is what makes "10 accents x 7 themes"
+ * work as 17 declarations instead of 70 hand-written colour schemes — and it
+ * means a new theme cannot accidentally ship with, say, no outlineVariant,
+ * because the type requires every slot.
+ */
+private data class SurfacePalette(
+    val background: Color,
+    val surface: Color,
+    val surfaceVariant: Color,
+    val onSurface: Color,
+    val subtext: Color,
+    val outline: Color,
+    val outlineVariant: Color,
+    val light: Boolean = false
 )
 
-private fun buildAmoledColors(p: AccentPalette) = darkColorScheme(
-    primary            = p.darkPrimary,
-    onPrimary          = Color.White,
-    primaryContainer   = p.darkContainer,
-    onPrimaryContainer = p.darkOnContainer,
-    secondary          = p.darkSecondary,
-    background         = BackgroundAmoled,
-    surface            = SurfaceAmoled,
-    surfaceVariant     = Color(0xFF16161E),
-    onBackground       = Color.White,
-    onSurface          = Color.White,
-    onSurfaceVariant   = Color(0xFF7C7E8E),
-    outline            = Color(0xFF1C1D24),
-    outlineVariant     = Color(0xFF121218),
+private val surfacePalettes: Map<AppTheme, SurfacePalette> = mapOf(
+    AppTheme.DARK to SurfacePalette(
+        BackgroundDark, SurfaceDark, SurfaceVariantDark,
+        OnSurfaceDark, SubtextDark, Color(0xFF2B2C38), Color(0xFF1C1D26)
+    ),
+    AppTheme.AMOLED to SurfacePalette(
+        BackgroundAmoled, SurfaceAmoled, Color(0xFF16161E),
+        Color.White, Color(0xFF7C7E8E), Color(0xFF1C1D24), Color(0xFF121218)
+    ),
+    AppTheme.LIGHT to SurfacePalette(
+        BackgroundLight, SurfaceLight, SurfaceVariantLight,
+        OnSurfaceLight, SubtextLight, Color(0xFFDDDFE8), Color(0xFFEBECF2),
+        light = true
+    ),
+    AppTheme.MIDNIGHT to SurfacePalette(
+        BackgroundMidnight, SurfaceMidnight, SurfaceVariantMidnight,
+        OnSurfaceMidnight, SubtextMidnight, OutlineMidnight, OutlineVariantMidnight
+    ),
+    AppTheme.CINEMA to SurfacePalette(
+        BackgroundCinema, SurfaceCinema, SurfaceVariantCinema,
+        OnSurfaceCinema, SubtextCinema, OutlineCinema, OutlineVariantCinema
+    ),
+    AppTheme.GRAPHITE to SurfacePalette(
+        BackgroundGraphite, SurfaceGraphite, SurfaceVariantGraphite,
+        OnSurfaceGraphite, SubtextGraphite, OutlineGraphite, OutlineVariantGraphite
+    ),
+    AppTheme.CONTRAST to SurfacePalette(
+        BackgroundContrast, SurfaceContrast, SurfaceVariantContrast,
+        OnSurfaceContrast, SubtextContrast, OutlineContrast, OutlineVariantContrast
+    ),
 )
 
-private fun buildLightColors(p: AccentPalette) = lightColorScheme(
-    primary            = p.lightPrimary,
-    onPrimary          = Color.White,
-    primaryContainer   = p.lightContainer,
-    onPrimaryContainer = p.lightOnContainer,
-    secondary          = p.lightPrimary,
-    background         = BackgroundLight,
-    surface            = SurfaceLight,
-    surfaceVariant     = SurfaceVariantLight,
-    onBackground       = OnSurfaceLight,
-    onSurface          = OnSurfaceLight,
-    onSurfaceVariant   = SubtextLight,
-    outline            = Color(0xFFDDDFE8),
-    outlineVariant     = Color(0xFFEBECF2),
-)
+private fun buildColors(s: SurfacePalette, p: AccentPalette): ColorScheme =
+    if (s.light) lightColorScheme(
+        primary            = p.lightPrimary,
+        onPrimary          = Color.White,
+        primaryContainer   = p.lightContainer,
+        onPrimaryContainer = p.lightOnContainer,
+        secondary          = p.lightPrimary,
+        background         = s.background,
+        surface            = s.surface,
+        surfaceVariant     = s.surfaceVariant,
+        onBackground       = s.onSurface,
+        onSurface          = s.onSurface,
+        onSurfaceVariant   = s.subtext,
+        outline            = s.outline,
+        outlineVariant     = s.outlineVariant,
+    ) else darkColorScheme(
+        primary            = p.darkPrimary,
+        onPrimary          = Color.White,
+        primaryContainer   = p.darkContainer,
+        onPrimaryContainer = p.darkOnContainer,
+        secondary          = p.darkSecondary,
+        background         = s.background,
+        surface            = s.surface,
+        surfaceVariant     = s.surfaceVariant,
+        onBackground       = s.onSurface,
+        onSurface          = s.onSurface,
+        onSurfaceVariant   = s.subtext,
+        outline            = s.outline,
+        outlineVariant     = s.outlineVariant,
+    )
 
 @Composable
 fun StreamFlowTheme(
@@ -161,11 +235,7 @@ fun StreamFlowTheme(
         "MONO"  -> FontFamily.Monospace
         else    -> ManropeFamily // bundled brand typeface
     }
-    val isDark   = when (theme) {
-        AppTheme.LIGHT -> false
-        AppTheme.SYSTEM -> isSystemInDarkTheme()
-        else -> true
-    }
+    val isDark = theme.isDarkSurface(isSystemInDarkTheme())
     val context = LocalContext.current
     val palette = when {
         accent.startsWith("CUSTOM:") ->
@@ -177,12 +247,11 @@ fun StreamFlowTheme(
     val colors  = when {
         accent == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        else -> when (theme) {
-            AppTheme.DARK   -> buildDarkColors(palette)
-            AppTheme.AMOLED -> buildAmoledColors(palette)
-            AppTheme.LIGHT  -> buildLightColors(palette)
-            AppTheme.SYSTEM -> if (isDark) buildDarkColors(palette) else buildLightColors(palette)
-        }
+        // SYSTEM has no palette of its own — it resolves to the standard Dark or
+        // Light set. Every other theme names its own surface palette directly.
+        theme == AppTheme.SYSTEM ->
+            buildColors(surfacePalettes[if (isDark) AppTheme.DARK else AppTheme.LIGHT]!!, palette)
+        else -> buildColors(surfacePalettes[theme] ?: surfacePalettes[AppTheme.DARK]!!, palette)
     }
     MaterialTheme(
         colorScheme = colors,

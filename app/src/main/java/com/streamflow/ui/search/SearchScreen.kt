@@ -5,13 +5,16 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
@@ -21,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -40,18 +44,32 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Recent searches, kept on-device. Loaded once; every mutation returns the
+    // new list so the UI never re-reads SharedPreferences on the main thread.
+    var recents by remember { mutableStateOf(com.streamflow.data.SearchHistory.recent(context)) }
+    var fieldFocused by remember { mutableStateOf(false) }
+
+    // Single funnel for every way a search can start (typed, voice, tapped
+    // suggestion) — recording history at each call site is how one of them ends
+    // up forgetting to.
+    fun submit(q: String) {
+        val text = com.streamflow.data.SearchHistory.normalizeQuery(q)
+        if (text.isEmpty()) return
+        query = text
+        recents = com.streamflow.data.SearchHistory.record(context, text)
+        vm.search(text)
+        focusManager.clearFocus()
+    }
 
     // Voice search via the system speech recognizer (follows the device language)
     val voiceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { spoken ->
-                query = spoken
-                vm.search(spoken)
-            }
+            ?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { spoken -> submit(spoken) }
     }
-    val voiceContext = androidx.compose.ui.platform.LocalContext.current
     fun startVoiceSearch() {
         try {
             voiceLauncher.launch(android.content.Intent(
@@ -61,7 +79,7 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                 putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search YouTube")
             })
         } catch (_: Exception) {
-            android.widget.Toast.makeText(voiceContext,
+            android.widget.Toast.makeText(context,
                 "Voice search isn't available on this device",
                 android.widget.Toast.LENGTH_SHORT).show()
         }
@@ -107,16 +125,19 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     BasicTextField(
                         value = query,
                         onValueChange = { query = it },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            // Suggestions appear only while the field has focus,
+                            // so they can't sit on top of results the user is
+                            // already reading
+                            .onFocusChanged { fieldFocused = it.isFocused },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            // Ignore blank submits instead of firing an empty search
-                            if (query.isNotBlank()) vm.search(query)
-                            focusManager.clearFocus()
-                        }),
+                        // submit() ignores blank input, so an empty field can't
+                        // fire a search for nothing
+                        keyboardActions = KeyboardActions(onSearch = { submit(query) }),
                         decorationBox = { inner ->
                             if (query.isEmpty()) Text("Search YouTube…", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             inner()
@@ -136,6 +157,59 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
             }
         }
 
+        // ── Suggestions from on-device search history ─────────────────────────
+        // Derived, not stored: recomputing a <=10 item filter is far cheaper than
+        // another piece of state that can fall out of sync with the field.
+        val suggestions = remember(recents, query, fieldFocused) {
+            if (!fieldFocused) emptyList()
+            else com.streamflow.data.SearchHistory.matching(recents, query)
+        }
+        AnimatedVisibility(
+            visible = suggestions.isNotEmpty(),
+            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(120))
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                suggestions.forEach { term ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(appShape(10.dp))
+                            .clickable { submit(term) }
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.History, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            term,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                recents = com.streamflow.data.SearchHistory.remove(context, term)
+                            },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Remove \"$term\" from recent searches",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         AnimatedContent(
             targetState = state,
             transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
@@ -143,11 +217,69 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
             modifier = Modifier.fillMaxSize()
         ) { s ->
             when (s) {
-                is SearchUiState.Idle -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f), modifier = Modifier.size(56.dp))
-                        Spacer(Modifier.height(12.dp))
-                        Text("Search for videos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                // The idle screen used to be a dead end: an icon, four words, and
+                // nothing to act on. With a history there is something useful to
+                // put there, and one tap replaces retyping a whole title.
+                is SearchUiState.Idle -> if (recents.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f), modifier = Modifier.size(56.dp))
+                            Spacer(Modifier.height(12.dp))
+                            Text("Search for videos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                            Spacer(Modifier.height(4.dp))
+                            Text("Your recent searches will appear here",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f))
+                        }
+                    }
+                } else {
+                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
+                        item {
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Recent searches",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    com.streamflow.data.SearchHistory.clear(context)
+                                    recents = emptyList()
+                                }) { Text("Clear all") }
+                            }
+                        }
+                        items(recents, key = { it }) { term ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(appShape(10.dp))
+                                    .clickable { submit(term) }
+                                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.History, null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp))
+                                Text(term,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = {
+                                        recents = com.streamflow.data.SearchHistory.remove(context, term)
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Close,
+                                        contentDescription = "Remove \"$term\" from recent searches",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
                     }
                 }
                 is SearchUiState.Loading -> ShimmerList()

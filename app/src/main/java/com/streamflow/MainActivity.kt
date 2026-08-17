@@ -29,6 +29,7 @@ import com.streamflow.ui.theme.LocalHapticsEnabled
 import com.streamflow.ui.theme.LocalThumbCorner
 import com.streamflow.ui.theme.StreamFlowTheme
 import com.streamflow.ui.theme.cornerDpFor
+import com.streamflow.ui.theme.isDarkSurface
 import com.streamflow.ui.theme.toAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -177,11 +178,9 @@ class MainActivity : ComponentActivity() {
             // otherwise dark icons vanish over our dark background (looks like
             // the app is "overlaying" the clock/battery/wifi)
             val sysDark = androidx.compose.foundation.isSystemInDarkTheme()
-            val darkTheme = when (themeStr.toAppTheme()) {
-                com.streamflow.ui.theme.AppTheme.LIGHT  -> false
-                com.streamflow.ui.theme.AppTheme.SYSTEM -> sysDark
-                else -> true
-            }
+            // Declared alongside the theme enum, so adding a theme can't leave
+            // this branch behind and strand the status bar on the wrong colour.
+            val darkTheme = themeStr.toAppTheme().isDarkSurface(sysDark)
             androidx.compose.runtime.LaunchedEffect(darkTheme) {
                 androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                     .isAppearanceLightStatusBars = !darkTheme

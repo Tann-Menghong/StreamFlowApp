@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.streamflow.data.BrowserDisplayMode
 import com.streamflow.ui.theme.appShape
 import androidx.core.view.WindowInsetsControllerCompat
 
@@ -576,7 +577,21 @@ fun AdblockBrowserScreen(
     val sitePrefs = remember { context.getSharedPreferences(prefsName, Context.MODE_PRIVATE) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
+    var canGoForward by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    // REAL load progress straight from WebView's own parser/resource counter
+    // (onProgressChanged). Never a synthesised animation — a progress number
+    // that isn't measuring anything is worse than no number, because the user
+    // trusts it and it lies about how long is left.
+    var progress by remember { mutableIntStateOf(0) }
+    // Set when the main document itself fails to load. Without this the tab just
+    // showed WebView's built-in white "net::ERR_..." page, which looks like the
+    // app broke and offers no way back.
+    var loadError by remember { mutableStateOf<String?>(null) }
+    // Desktop vs mobile layout for ALL site tabs. Read synchronously so the very
+    // first WebView is built with the right UA — see BrowserDisplayMode.
+    var desktopMode by remember { mutableStateOf(BrowserDisplayMode.isDesktop(context)) }
+    var showMenu by remember { mutableStateOf(false) }
     var pageTitle by remember { mutableStateOf(defaultTitle) }
     var customView by remember { mutableStateOf<android.view.View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -627,11 +642,12 @@ fun AdblockBrowserScreen(
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
-            // MOBILE UA: the desktop-mode experiment made some of these sites
-            // (donghuafun in particular) load unreliably AND surfaced more ads,
-            // so we serve their responsive mobile layout — it fits the phone and
-            // is what the ad-blocking script below is tuned against.
-            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+            // Desktop or mobile layout for every site tab, from one shared flag,
+            // so the tabs cannot drift apart. The matching viewport override is
+            // injected per page load below — the UA alone is not enough, since
+            // these sites pick their layout from the viewport tag. See
+            // BrowserDisplayMode for the full reasoning and the earlier attempt.
+            userAgentString = BrowserDisplayMode.userAgent(desktopMode)
             // Google Safe Browsing: an extra network-level shield that blocks
             // navigation to known malware / social-engineering domains — many of
             // the popunder/redirect ad destinations on pirate mirrors are already
@@ -694,13 +710,44 @@ fun AdblockBrowserScreen(
                 pageStartedAt = System.currentTimeMillis()
                 mainHandler.post {
                     isLoading = true
+                    progress = 0
+                    loadError = null
                     canGoBack = view.canGoBack()
+                    canGoForward = view.canGoForward()
                 }
                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
+                // Pin the layout width before the page's own stylesheets settle,
+                // so it never flashes the mobile column first.
+                view.evaluateJavascript(BrowserDisplayMode.viewportScript(desktopMode), null)
             }
+            // Deliberately the DEPRECATED 4-arg overload, not the API 23
+            // WebResourceError one. minSdk here is 21, and this project has
+            // already shipped crashes from touching APIs that don't exist on
+            // Android 5-7; this signature is called on every API level, and for
+            // main-frame failures on new ones too.
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(
+                view: WebView,
+                errorCode: Int,
+                description: String?,
+                failingUrl: String?
+            ) {
+                // Sub-resource failures are normal on these sites (every blocked
+                // ad is one). Only a failure of the page the user asked for is
+                // worth interrupting them about.
+                if (failingUrl != null && failingUrl != view.url) return
+                mainHandler.post {
+                    isLoading = false
+                    loadError = description?.takeIf { it.isNotBlank() }
+                        ?: "The page could not be loaded"
+                }
+            }
+
             override fun onPageFinished(view: WebView, url: String) {
                 mainHandler.post {
                     isLoading = false
+                    progress = 100
+                    canGoForward = view.canGoForward()
                     canGoBack = view.canGoBack()
                     // Only remember SAME-SITE pages. Saving an off-site ad/redirect
                     // URL (or an about:blank) meant the tab reopened on a broken /
@@ -711,6 +758,10 @@ fun AdblockBrowserScreen(
                     }
                 }
                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
+                // Re-assert the width: single-page navigations and late scripts
+                // on these sites rewrite the viewport tag after first paint,
+                // which silently dropped the tab back to the mobile layout.
+                view.evaluateJavascript(BrowserDisplayMode.viewportScript(desktopMode), null)
             }
             // Popunder/redirect blocking: streaming sites love navigating the
             // whole page to an ad URL on the first tap — swallow those instead
@@ -832,6 +883,16 @@ fun AdblockBrowserScreen(
                 }
             }
 
+            // Real, measured load progress — WebView reports it as the document
+            // and its sub-resources actually complete. Fed straight to the bar
+            // with no smoothing that would invent progress it hasn't made.
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                mainHandler.post {
+                    progress = newProgress
+                    if (newProgress >= 100) isLoading = false
+                }
+            }
+
             override fun onReceivedTitle(view: WebView, title: String) {
                 // Ads hijack document.title to fake a notification ("(1) New
                 // Message!", "You won!"). Ignore those and keep the real title.
@@ -915,11 +976,68 @@ fun AdblockBrowserScreen(
                             )
                         }
                     }
+                    // Forward was missing entirely: going back one page too far
+                    // left no way to return except re-navigating by hand.
+                    IconButton(
+                        onClick = { webViewRef?.goForward() },
+                        enabled = canGoForward
+                    ) {
+                        Icon(Icons.Rounded.ArrowForward, contentDescription = "Forward")
+                    }
                     IconButton(onClick = { webViewRef?.reload() }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = "Reload")
                     }
-                    IconButton(onClick = { webViewRef?.loadUrl(homeUrl) }) {
-                        Icon(Icons.Rounded.Home, contentDescription = "Home")
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "More options")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Home page") },
+                                leadingIcon = { Icon(Icons.Rounded.Home, null) },
+                                onClick = {
+                                    showMenu = false
+                                    webViewRef?.loadUrl(homeUrl)
+                                }
+                            )
+                            // Flips the mode for EVERY site tab, not just this
+                            // one — see BrowserDisplayMode. Keeping the tabs in
+                            // lockstep is the entire point, so a per-tab
+                            // override is intentionally not offered.
+                            DropdownMenuItem(
+                                text = { Text("Desktop site") },
+                                leadingIcon = {
+                                    Icon(
+                                        if (desktopMode) Icons.Rounded.DesktopWindows
+                                        else Icons.Rounded.PhoneAndroid,
+                                        null
+                                    )
+                                },
+                                trailingIcon = {
+                                    Switch(
+                                        checked = desktopMode,
+                                        onCheckedChange = null
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    val next = !desktopMode
+                                    desktopMode = next
+                                    BrowserDisplayMode.setDesktop(context, next)
+                                    // The user-agent is only consulted when a
+                                    // request is made, so the swap needs a
+                                    // reload to take effect.
+                                    webViewRef?.let { wv ->
+                                        wv.settings.userAgentString =
+                                            BrowserDisplayMode.userAgent(next)
+                                        wv.reload()
+                                    }
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -952,14 +1070,85 @@ fun AdblockBrowserScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (isLoading) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            // Determinate bar + numeric percent. The value is WebView's own
+            // measured progress; the animation only eases BETWEEN real readings,
+            // so the bar never shows progress the page hasn't actually made.
+            if (isLoading && loadError == null) {
+                val animated by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = progress / 100f,
+                    animationSpec = androidx.compose.animation.core.tween(180),
+                    label = "browser_progress"
                 )
+                Column(Modifier.align(Alignment.TopCenter)) {
+                    LinearProgressIndicator(
+                        progress = animated,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    )
+                    // Only worth showing once there is something to report —
+                    // "0%" on every tab open is noise.
+                    if (progress in 1..99) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = appShape(0.dp, 0.dp, 8.dp, 0.dp),
+                            modifier = Modifier.padding(start = 0.dp)
+                        ) {
+                            Text(
+                                "$progress%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Replaces WebView's built-in white error page, which looked like the
+            // app itself had died and gave no route back to a working page.
+            loadError?.let { msg ->
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CloudOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        Text(
+                            "Couldn't load $defaultTitle",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = {
+                                loadError = null
+                                webViewRef?.reload()
+                            }) { Text("Try again") }
+                            OutlinedButton(onClick = {
+                                loadError = null
+                                webViewRef?.loadUrl(homeUrl)
+                            }) { Text("Home page") }
+                        }
+                    }
+                }
             }
         }
     }

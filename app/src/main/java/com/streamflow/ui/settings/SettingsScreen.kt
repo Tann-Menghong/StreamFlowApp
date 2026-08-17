@@ -111,7 +111,7 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
     val language     by vm.language.collectAsState()
     val update       by vm.update.collectAsState()
 
-    val themeLabel = when (theme) { "AMOLED" -> "AMOLED"; "LIGHT" -> "Light"; "SYSTEM" -> "System"; else -> "Dark" }
+    val themeLabel = com.streamflow.ui.theme.themeLabelFor(theme)
     val notifFreqLabel = when (notifyFreq) { "1" -> "hourly"; "3" -> "every 3h"; "12" -> "every 12h"; "24" -> "daily"; else -> "every 6h" }
     val aiLabel = if (!AiEngine.isSupported()) "Not supported"
         else when (val s = aiState) {
@@ -523,7 +523,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     val fixedByTerminal = designStyle == "TERMINAL"
                     SettingsItem(Icons.Rounded.Palette, "Theme",
                         if (fixedByTerminal) "Fixed by Terminal style"
-                        else when (theme) { "AMOLED" -> "AMOLED Black"; "LIGHT" -> "Light"; "SYSTEM" -> "Follow system"; else -> "Dark" }
+                        else com.streamflow.ui.theme.themeLabelFor(theme)
                     ) { showThemeDialog = true }
                     SettingsDivider()
                     SettingsItem(Icons.Rounded.ColorLens, "Accent color",
@@ -692,6 +692,32 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         else
                             "Tap a tab to edit or remove it. Each keeps its own logins and cookies."
                     )
+
+                    // ── Site tab layout ───────────────────────────────────────
+                    // One switch for ALL site tabs. Deliberately not per-tab:
+                    // the point is that Donghua, Drama, MKissa and every custom
+                    // tab look the same as each other, every time.
+                    SettingsGroupLabel("Website tab layout")
+                    SettingsCard {
+                        var desktopSites by remember {
+                            mutableStateOf(com.streamflow.data.BrowserDisplayMode.isDesktop(context))
+                        }
+                        SettingsSwitchItem(
+                            if (desktopSites) Icons.Rounded.DesktopWindows else Icons.Rounded.PhoneAndroid,
+                            "Desktop site layout",
+                            "Donghua, Drama, MKissa and your own tabs all load the full desktop version",
+                            desktopSites
+                        ) {
+                            desktopSites = it
+                            com.streamflow.data.BrowserDisplayMode.setDesktop(context, it)
+                        }
+                    }
+                    SettingsFooter(
+                        "Applies to every website tab at once, so they never disagree. " +
+                        "Takes effect the next time a tab loads — or switch it from the ⋮ menu inside a tab to reload it now. " +
+                        "Turn it off if a site misbehaves on the desktop layout."
+                    )
+
                     SettingsGroupLabel("Start & defaults")
                     SettingsCard {
                         SettingsItem(Icons.Rounded.Start, "Start screen",
@@ -1132,7 +1158,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
         )
     }
     if (showThemeDialog) {
-        val opts = listOf("SYSTEM" to "Follow system", "DARK" to "Dark", "AMOLED" to "AMOLED Black", "LIGHT" to "Light")
+        val opts = com.streamflow.ui.theme.appThemeOptions
         PickerDialog("Theme", opts.map { it.second }, opts.indexOfFirst { it.first == theme }.coerceAtLeast(0),
             { vm.setTheme(opts[it].first); showThemeDialog = false }, { showThemeDialog = false })
     }
@@ -1622,7 +1648,12 @@ private fun PickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text  = {
-            Column {
+            // Scrollable: an AlertDialog clips its content rather than expanding,
+            // so a plain Column silently cut off the tail of every long list —
+            // the Equalizer's 12 presets and the country picker were already
+            // unreachable below the fold on a short screen, with nothing on
+            // screen to suggest there was more.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 options.forEachIndexed { i, label ->
                     Row(
                         Modifier.fillMaxWidth().clickable { onSelect(i) }.padding(vertical = 10.dp),

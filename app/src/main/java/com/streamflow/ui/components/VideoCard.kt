@@ -292,7 +292,7 @@ fun VideoCard(
                         onClick  = { showMenu = true },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Rounded.MoreVert, null,
+                        Icon(Icons.Rounded.MoreVert, "More options for this video",
                             tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.55f),
                             modifier = Modifier.size(18.dp))
                     }

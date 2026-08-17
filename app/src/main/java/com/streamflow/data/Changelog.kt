@@ -3,13 +3,16 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.5.0"
+    const val VERSION_NAME = "6.6.0"
 
     val notes = listOf(
-        "Fixed: Retry on a failed video now actually retries 🔁 — it used to reuse the same expired link and fail the same way for up to 30 minutes",
-        "The app now tells you when you're offline, and reminds you your downloads and library still work",
-        "If StreamFlow ever crashes, it now saves the details and offers to report them — nothing is sent unless you choose to",
-        "Your watch history and logins no longer get copied into Google cloud backup, which matches what App Lock promises",
-        "Screen reader users can now use every button in the app — ten unlabelled buttons were unreachable before"
+        "Website tabs now load the full desktop layout 🖥 — Donghua, Drama, MKissa and your own tabs all match each other, every time",
+        "Switch any tab back to the mobile layout from the ⋮ menu, or in Settings — it applies to all tabs at once so they never disagree",
+        "Four new themes: Midnight Blue, Cinema Purple, Minimal Graphite and High Contrast",
+        "Website tabs show a real loading percentage, and a proper Try again screen instead of a blank white page when a site is down",
+        "Added a Forward button to website tabs — going back one page too far no longer means starting over",
+        "Search remembers what you looked for and suggests it back, so you don't retype the same title every night",
+        "Twelve more player buttons can now be used with a screen reader, including play, rewind and fast-forward",
+        "Fixed: long option lists (Equalizer, themes, countries) were cut off on shorter screens with no way to scroll"
     )
 }
