@@ -7,6 +7,7 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * Whether the device currently has a usable internet connection.
@@ -35,16 +36,6 @@ object ConnectivityMonitor {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: return
 
-        // registerDefaultNetworkCallback is API 24+. Below that, fall back to a
-        // one-shot read: those releases lack the callback, and a stale-but-sane
-        // value beats crashing or pretending to be permanently offline.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            @Suppress("DEPRECATION")
-            _online.value = runCatching { cm.activeNetworkInfo?.isConnected == true }
-                .getOrDefault(true)
-            return
-        }
-
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { refresh(cm) }
             override fun onLost(network: Network) { refresh(cm) }
@@ -52,9 +43,42 @@ object ConnectivityMonitor {
                 network: Network, caps: NetworkCapabilities
             ) { refresh(cm) }
         }
-        // Never let a monitor take down the app it is monitoring.
-        runCatching { cm.registerDefaultNetworkCallback(callback) }
+
+        // registerDefaultNetworkCallback is API 24+, but the REQUEST-based
+        // registerNetworkCallback below it is API 21 — so older devices get live
+        // updates too, instead of the single stale read this used to do. That
+        // read never changed again for the life of the process, which meant a
+        // phone that started offline stayed "offline" to the app even after the
+        // network came back, and playback recovery had nothing to wait on.
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                cm.registerDefaultNetworkCallback(callback)
+            } else {
+                cm.registerNetworkCallback(
+                    android.net.NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build(),
+                    callback
+                )
+            }
+        }
         refresh(cm)
+    }
+
+    /**
+     * Suspend until the device is online, or [timeoutMs] elapses.
+     *
+     * Playback recovery uses this instead of counting retries down while the
+     * phone is in a tunnel: burning all five attempts in eight seconds with no
+     * network wastes them, and then the app is out of retries at the exact
+     * moment the signal returns. Returns true if we became (or already were)
+     * online.
+     */
+    suspend fun awaitOnline(timeoutMs: Long): Boolean {
+        if (_online.value) return true
+        return kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+            online.first { it }
+        } != null
     }
 
     private fun refresh(cm: ConnectivityManager) {

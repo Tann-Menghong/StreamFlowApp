@@ -201,6 +201,10 @@ fun PdTvScreen(onFullscreenChange: (Boolean) -> Unit = {}) {
                 /* bufferForPlaybackMs = */ 700,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_000
             )
+            // Same unbounded-buffer problem the main player had: unset, this
+            // defaults to 128 MB for video on every device regardless of how
+            // much memory it actually has.
+            .setTargetBufferBytes(com.streamflow.data.DeviceCaps.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(context)

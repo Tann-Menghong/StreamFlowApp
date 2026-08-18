@@ -3,16 +3,18 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.6.0"
+    const val VERSION_NAME = "6.7.0"
 
     val notes = listOf(
-        "Website tabs now load the full desktop layout 🖥 — Donghua, Drama, MKissa and your own tabs all match each other, every time",
-        "Switch any tab back to the mobile layout from the ⋮ menu, or in Settings — it applies to all tabs at once so they never disagree",
-        "Four new themes: Midnight Blue, Cinema Purple, Minimal Graphite and High Contrast",
-        "Website tabs show a real loading percentage, and a proper Try again screen instead of a blank white page when a site is down",
-        "Added a Forward button to website tabs — going back one page too far no longer means starting over",
-        "Search remembers what you looked for and suggests it back, so you don't retype the same title every night",
-        "Twelve more player buttons can now be used with a screen reader, including play, rewind and fast-forward",
-        "Fixed: long option lists (Equalizer, themes, countries) were cut off on shorter screens with no way to scroll"
+        "Playback now recovers on its own when the network drops 📶 — it waits for signal to come back, retries with growing pauses, and resumes from exactly where it stopped",
+        "Fixed the big one: audio or video stopping for good after you left the app. Expired stream links are now detected and refreshed automatically instead of ending playback",
+        "The next episode plays automatically even with the screen off or the app closed — auto-play used to only work while you were actually watching the player",
+        "The next video is prepared about 25 seconds before the current one ends, so episodes run into each other instead of pausing to load",
+        "Your position is saved every few seconds now, so a phone that kills the app in the background no longer restarts the episode from zero",
+        "A queued video that has been deleted, made private or blocked is skipped instead of silently ending the whole queue",
+        "\"Buffering\" now tells you the truth: Reconnecting 2/5, Waiting for network, or a clear message with a Try again button when it genuinely cannot recover",
+        "Lighter on older phones like the Galaxy Note 9 — buffer memory is now capped per device instead of being allowed to grow past 100 MB on any phone",
+        "Much easier on the battery when listening with the screen off: the player was waking the phone four times a second to update a screen nobody was looking at",
+        "Fixed: the custom Equalizer always opened with every slider at 0 dB, and pressing Apply wiped the band levels you had saved"
     )
 }

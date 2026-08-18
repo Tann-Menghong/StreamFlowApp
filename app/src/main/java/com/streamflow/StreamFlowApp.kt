@@ -40,6 +40,10 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
 
         com.streamflow.data.DeviceCaps.init(this)
         com.streamflow.data.ConnectivityMonitor.start(this)
+        // PlaybackService reads this to decide whether the player screen is
+        // around to run its own end-of-video countdown, or whether the service
+        // has to advance by itself (screen off / app backgrounded).
+        com.streamflow.data.AppForeground.install(this)
         NewPipe.init(OkHttpDownloader.instance)
 
         // Warm the TLS connections to YouTube's hosts right away so the first

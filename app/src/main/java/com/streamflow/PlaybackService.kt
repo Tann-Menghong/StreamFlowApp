@@ -154,20 +154,29 @@ class PlaybackService : MediaSessionService() {
 
         // Start playback with just 0.8s buffered (default is 2.5s) for faster video
         // start, while keeping a large max buffer for smooth long-form playback.
-        // High-RAM devices buffer further ahead and keep a back-buffer so small
-        // rewinds replay instantly instead of re-fetching from the network.
-        val highPerf = com.streamflow.data.DeviceCaps.isHighPerf
+        // Buffer budgets come from DeviceCaps.tier so a 2018 6 GB phone is not
+        // handed a flagship-sized buffer.
+        //
+        // setTargetBufferBytes is the important addition. It was never set, so
+        // DefaultLoadControl fell back to its per-track-type default of 128 MB
+        // for video: with setPrioritizeTimeOverSizeThresholds(true) the time
+        // limits are what usually stop loading, but on a high-bitrate stream the
+        // byte ceiling is what stands between a big buffer and an OutOfMemory
+        // kill on a device with less headroom. An explicit, tiered cap makes
+        // that bound real on every device instead of theoretical on all of them.
+        val caps = com.streamflow.data.DeviceCaps
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 20_000,
-                /* maxBufferMs = */ if (highPerf) 120_000 else 60_000,
+                /* maxBufferMs = */ caps.maxBufferMs,
                 /* bufferForPlaybackMs = */ 800,
                 /* bufferForPlaybackAfterRebufferMs = */ 1_500
             )
             .setBackBuffer(
-                /* backBufferDurationMs = */ if (highPerf) 20_000 else 0,
+                /* backBufferDurationMs = */ caps.backBufferMs,
                 /* retainBackBufferFromKeyframe = */ true
             )
+            .setTargetBufferBytes(caps.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -211,11 +220,39 @@ class PlaybackService : MediaSessionService() {
         // churn can't cancel it
         player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == androidx.media3.common.Player.STATE_ENDED &&
-                    com.streamflow.data.SleepTimer.endOfVideo.value) {
-                    player.pause()
-                    com.streamflow.data.SleepTimer.clear()
+                if (playbackState == androidx.media3.common.Player.STATE_READY) {
+                    // Real playback resumed: forget the retry budget so a later,
+                    // unrelated glitch gets its own full set of attempts rather
+                    // than inheriting a spent counter from an hour ago.
+                    retryAttempt = 0
+                    retryJob?.cancel(); retryJob = null
+                    com.streamflow.data.PlaybackRecovery.onRecovered()
                 }
+                if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                    if (com.streamflow.data.SleepTimer.endOfVideo.value) {
+                        player.pause()
+                        com.streamflow.data.SleepTimer.clear()
+                        return
+                    }
+                    maybeAutoAdvance()
+                }
+            }
+
+            // The app had no onPlayerError handler at all: media3 reported the
+            // failure, the player parked in STATE_IDLE, and nothing ever called
+            // prepare() again. That is why a moment of bad signal — or a stream
+            // URL expiring while the screen was off — ended playback for good.
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                handlePlayerError(error)
+            }
+
+            // Persist the resume position periodically while playing. It used to
+            // be written only when the player SCREEN was disposed, so a process
+            // killed in the background — the normal outcome on the aggressive
+            // OEM launchers this app already works around — lost the position
+            // entirely and restarted the episode from zero.
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) startPositionTicker() else { stopPositionTicker(); savePositionNow() }
             }
             // Track play history for the Previous button: whenever the item changes
             // to a genuinely different video, remember the one we just left.
@@ -233,6 +270,17 @@ class PlaybackService : MediaSessionService() {
                     }
                 }
                 lastMediaId = newId
+                // A different video is now loaded, so the previous one's
+                // end-of-video claim is spent — release it, or replaying that
+                // same video later would never auto-advance again.
+                com.streamflow.data.AutoAdvance.reset()
+                retryAttempt = 0
+                // Must reset with the item, or recovering a NEW video would seek
+                // it to the previous video's position.
+                lastGoodPositionMs = 0L
+                prefetchedFor = null
+                retryJob?.cancel(); retryJob = null
+                com.streamflow.data.PlaybackRecovery.onRecovered()
             }
         })
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
@@ -383,28 +431,299 @@ class PlaybackService : MediaSessionService() {
             .build()
     }
 
+    // ── Error recovery ───────────────────────────────────────────────────────
+
+    private var retryAttempt = 0
+    private var retryJob: kotlinx.coroutines.Job? = null
+    private var positionTicker: kotlinx.coroutines.Job? = null
+
+    // Where the failed item was when it died. currentPosition reads 0 once the
+    // player has reset to IDLE, so the position has to be captured continuously
+    // while things are healthy — otherwise every recovery restarts the episode.
+    private var lastGoodPositionMs = 0L
+
+    /** HTTP status behind this failure, or PlaybackRecovery.NO_STATUS. */
+    private fun httpStatusOf(error: androidx.media3.common.PlaybackException): Int {
+        var cause: Throwable? = error.cause
+        var hops = 0
+        while (cause != null && hops < 8) {
+            if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                return cause.responseCode
+            }
+            cause = cause.cause
+            hops++
+        }
+        return com.streamflow.data.PlaybackRecovery.NO_STATUS
+    }
+
+    private fun handlePlayerError(error: androidx.media3.common.PlaybackException) {
+        val player = mediaSession?.player ?: return
+        val mediaId = player.currentMediaItem?.mediaId
+        val remote = mediaId != null &&
+            !mediaId.startsWith("file://") && !mediaId.startsWith("content://")
+
+        val plan = com.streamflow.data.PlaybackRecovery.plan(
+            errorCode = error.errorCode,
+            httpStatus = httpStatusOf(error),
+            isRemote = remote
+        )
+
+        val exhausted = retryAttempt >= com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS
+        if (plan == com.streamflow.data.RecoveryPlan.FATAL || exhausted) {
+            // Say so rather than leaving a frozen frame behind an indicator that
+            // never resolves — that is indistinguishable from the app hanging.
+            com.streamflow.data.PlaybackRecovery.onGaveUp(plan, exhausted)
+            retryAttempt = 0
+            return
+        }
+
+        retryAttempt++
+        val attempt = retryAttempt
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            try {
+                // Waiting for the network beats spending attempts against it.
+                // Five retries fired blind take under 30 s and would all fail in
+                // a tunnel, leaving nothing in reserve for the moment signal
+                // actually returns.
+                if (!com.streamflow.data.ConnectivityMonitor.online.value) {
+                    com.streamflow.data.PlaybackRecovery.onAttempt(attempt, waitingForNetwork = true)
+                    // Bounded: a phone left offline must not hold a coroutine and
+                    // a wake lock indefinitely.
+                    com.streamflow.data.ConnectivityMonitor.awaitOnline(120_000L)
+                }
+                com.streamflow.data.PlaybackRecovery.onAttempt(attempt, waitingForNetwork = false)
+                delay(com.streamflow.data.PlaybackRecovery.backoffMs(attempt))
+
+                val p = mediaSession?.player ?: return@launch
+                val resumeAt = lastGoodPositionMs
+                if (plan == com.streamflow.data.RecoveryPlan.REEXTRACT && remote && mediaId != null) {
+                    reExtractInPlace(mediaId, resumeAt)
+                } else {
+                    // Same item, same position: re-preparing is all a transient
+                    // network failure needs.
+                    p.prepare()
+                    if (resumeAt > 0L) p.seekTo(resumeAt)
+                    p.play()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Recovery itself failed — extraction threw because the video was
+                // pulled, went private, or is geo-blocked. No further
+                // onPlayerError will arrive (prepare never happened), so this is
+                // the last chance to tell the user rather than leave them
+                // watching a still frame. The counter stays raised so repeated
+                // failures still walk toward the ceiling.
+                com.streamflow.data.PlaybackRecovery.onGaveUp(
+                    plan,
+                    exhausted = attempt >= com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS
+                )
+            }
+        }
+    }
+
+    /** Re-resolve an expired stream URL for the video already loaded, and
+     *  continue from where it stopped. */
+    private suspend fun reExtractInPlace(videoUrl: String, resumeAt: Long) {
+        // Drop every cached variant first. The 30-minute TTL is not enough on
+        // its own — a signed URL can die well inside it, and re-extracting
+        // straight from cache would hand the player the same dead URL back.
+        com.streamflow.data.VideoDetailsCache.invalidate(videoUrl)
+        val details = com.streamflow.data.YouTubeRepository()
+            .getVideoDetails(videoUrl, resumeQuality())
+        val player = mediaSession?.player ?: return
+        val extras = Bundle().apply { details.audioUrl?.let { putString("audioUrl", it) } }
+        val item = MediaItem.Builder()
+            .setUri(details.streamUrl)
+            // Same mediaId, so this is not a video change: no history push, no
+            // mini-player churn, no auto-advance claim released.
+            .setMediaId(videoUrl)
+            .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder()
+                .setTitle(details.title)
+                .setArtist(details.uploaderName)
+                .setArtworkUri(android.net.Uri.parse(details.thumbnailUrl))
+                .build())
+            .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())
+            .build()
+        player.setMediaItem(item, resumeAt)
+        player.prepare()
+        player.play()
+    }
+
+    // ── Resume-position persistence ──────────────────────────────────────────
+
+    private fun startPositionTicker() {
+        if (positionTicker?.isActive == true) return
+        positionTicker = serviceScope.launch {
+            while (true) {
+                delay(5_000L)
+                val p = mediaSession?.player ?: continue
+                val pos = try { p.currentPosition } catch (_: Exception) { 0L }
+                // Only track a position the player is genuinely at. Capturing it
+                // here is what lets recovery resume instead of restarting.
+                if (pos > 0L && p.playbackState == androidx.media3.common.Player.STATE_READY) {
+                    lastGoodPositionMs = pos
+                }
+                savePositionNow()
+                maybePrefetchNext(p)
+            }
+        }
+    }
+
+    // Video URL whose successor has already been warmed, so the prefetch runs
+    // once per video rather than on every 5-second tick.
+    private var prefetchedFor: String? = null
+
+    /**
+     * Warm the NEXT video's extraction shortly before the current one ends.
+     *
+     * Extraction is by far the slowest part of opening a video — it is the one
+     * number the stats overlay singles out — and until now auto-advance paid it
+     * in full, after the current video had already gone silent. That gap is the
+     * "unnecessary loading delay" between episodes.
+     *
+     * This only populates VideoDetailsCache; the advance path calls
+     * getVideoDetails as before and simply finds it already there. Nothing
+     * downstream had to change, and if the prefetch fails or never runs, the
+     * behaviour is exactly what it was.
+     */
+    private fun maybePrefetchNext(player: androidx.media3.common.Player) {
+        val currentId = player.currentMediaItem?.mediaId ?: return
+        if (prefetchedFor == currentId) return
+        val duration = player.duration
+        if (duration <= 0L) return // live or unknown length: no "nearly over"
+        val remaining = duration - player.currentPosition
+        // 25 s is comfortably longer than a typical extraction but short enough
+        // that a user who skips away has usually already gone.
+        if (remaining !in 0..25_000L) return
+        if (!com.streamflow.data.ConnectivityMonitor.online.value) return
+        prefetchedFor = currentId
+
+        serviceScope.launch {
+            try {
+                val next = com.streamflow.data.PlaybackQueue.queue.value.firstOrNull()?.url
+                    ?: relatedOfCurrent()
+                    ?: return@launch
+                if (isLocalOrDirectUrl(next)) return@launch // nothing to extract
+                com.streamflow.data.YouTubeRepository().getVideoDetails(next, resumeQuality())
+            } catch (_: Exception) {
+                // A failed warm-up costs nothing: the advance path re-extracts.
+            }
+        }
+    }
+
+    private fun stopPositionTicker() {
+        positionTicker?.cancel(); positionTicker = null
+    }
+
+    private fun savePositionNow() {
+        val p = mediaSession?.player ?: return
+        val id = p.currentMediaItem?.mediaId ?: return
+        val pos = try { p.currentPosition } catch (_: Exception) { 0L }
+        if (pos <= 1_000L) return
+        val app = application as StreamFlowApp
+        // Deliberately NOT serviceScope: onTaskRemoved and onDestroy both save,
+        // and onDestroy cancels serviceScope — a write launched there would be
+        // cancelled before Room finished it, losing the very position this call
+        // exists to protect. appScope outlives the service.
+        app.appScope.launch {
+            try {
+                if (app.prefs.incognito.first()) return@launch
+                app.database.historyDao().updatePosition(id, pos)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // ── End-of-video advancement ─────────────────────────────────────────────
+
+    /**
+     * Advance when the video ends and nothing else will.
+     *
+     * The player screen runs its own countdown with a Cancel button, and that UX
+     * is worth keeping — so the service stands down whenever a player screen is
+     * actually on screen. It steps in for the two cases that were silently
+     * broken: audio playing under the mini player with no player screen open,
+     * and the app backgrounded or the screen off, where the countdown effect had
+     * no one to show a countdown to.
+     */
+    private fun maybeAutoAdvance() {
+        val player = mediaSession?.player ?: return
+        val endedId = player.currentMediaItem?.mediaId ?: return
+        val uiOwnsIt = com.streamflow.data.PlayerUiPresence.active &&
+            com.streamflow.data.AppForeground.isForeground
+        if (uiOwnsIt) return
+        if (!com.streamflow.data.AutoAdvance.claim(endedId)) return
+        serviceScope.launch {
+            // The queue is explicit user intent and plays regardless of the
+            // toggle; related-video autoplay is what the toggle governs. This
+            // mirrors the on-screen rule exactly so the two paths cannot
+            // disagree about what "auto-play off" means.
+            val autoPlayOn = try {
+                (application as StreamFlowApp).prefs.autoPlay.first()
+            } catch (_: Exception) { true }
+            advance(allowRelated = autoPlayOn)
+        }
+    }
+
     // Advance to the next video, mirroring the on-screen "next": the queued video
     // takes priority (explicit user intent), otherwise the current video's first
     // related video. Runs off-main for extraction, then plays on the main thread.
     private fun playNext() {
+        // A button press is explicit intent, so it ignores the auto-play
+        // preference entirely — that toggle governs what happens on its own.
+        serviceScope.launch { advance(allowRelated = true, announce = true) }
+    }
+
+    /**
+     * Play whatever comes next: the queue first (explicit user intent), then the
+     * current video's first related video.
+     *
+     * A queued video that has been removed, made private or geo-blocked used to
+     * end the session silently — one failed extraction and the exception was
+     * swallowed with nothing playing. Now a failure moves on to the next
+     * candidate, so one dead entry in a long queue costs one skip rather than
+     * the rest of the queue.
+     *
+     * @param allowRelated whether falling through to the current video's first
+     *        related video is permitted. False when Settings > Playback >
+     *        Auto-play is off: the queue is still honoured there, because
+     *        queueing something is an explicit request to play it.
+     * @param announce whether to tell the user when there is genuinely nothing
+     *        left — appropriate for a button press, noise for the screen-off
+     *        end of the last video in a queue.
+     */
+    private suspend fun advance(allowRelated: Boolean, announce: Boolean = false) {
         if (advancing) return
         advancing = true
-        serviceScope.launch {
-            try {
-                val queued = com.streamflow.data.PlaybackQueue.popNext()
-                when {
-                    queued != null -> resolveAndPlay(queued.url, queued)
-                    else -> {
-                        val rel = relatedOfCurrent()
-                        if (rel != null) resolveAndPlay(rel, null)
-                        else android.widget.Toast.makeText(
-                            this@PlaybackService, "Nothing up next", android.widget.Toast.LENGTH_SHORT).show()
-                    }
+        try {
+            // Bounded so a queue full of dead links cannot spin: three failures
+            // in a row is a broken queue, not bad luck.
+            var attempts = 0
+            while (attempts < 3) {
+                val queued = com.streamflow.data.PlaybackQueue.popNext() ?: break
+                attempts++
+                try {
+                    resolveAndPlay(queued.url, queued)
+                    return
+                } catch (_: Exception) {
+                    // Dead entry: already popped, so the loop moves to the next.
                 }
-            } catch (_: Exception) {
-            } finally {
-                advancing = false
             }
+            if (!allowRelated) return
+            val rel = try { relatedOfCurrent() } catch (_: Exception) { null }
+            if (rel != null) {
+                try {
+                    resolveAndPlay(rel, null)
+                    return
+                } catch (_: Exception) {}
+            }
+            if (announce) {
+                android.widget.Toast.makeText(
+                    this@PlaybackService, "Nothing up next", android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        } finally {
+            advancing = false
         }
     }
 
@@ -520,7 +839,29 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
+    /**
+     * The user swiped the app off the Recents screen.
+     *
+     * Media3 leaves this to the app, and doing nothing has two bad outcomes at
+     * once: if playback is stopped the service lingers with a dead notification
+     * the user cannot get rid of, and if it is playing there is no guarantee the
+     * resume position survives the process going away. So: keep playing when
+     * playing (that is the whole point of a media session), but bank the
+     * position first, and shut down cleanly otherwise.
+     */
+    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+        val player = mediaSession?.player
+        savePositionNow()
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        stopPositionTicker()
+        retryJob?.cancel()
+        com.streamflow.data.PlaybackRecovery.onRecovered()
         serviceScope.cancel()
         backStack.clear()
         try { loudnessEnhancer?.release() } catch (_: Exception) {}

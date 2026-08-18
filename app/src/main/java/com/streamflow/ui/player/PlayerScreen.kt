@@ -66,6 +66,7 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -121,6 +122,7 @@ fun PlayerScreen(
     // Clip-moment bookmarks shown as amber markers on the seekbar
     val videoBookmarks by vm.videoBookmarks.collectAsState()
     val playerScope = rememberCoroutineScope()
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     val context = LocalContext.current
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
@@ -136,7 +138,10 @@ fun PlayerScreen(
     // ── MediaController ──────────────────────────────────────────────────────
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
 
-    DisposableEffect(context) {
+    // Bumped by the watchdog below to rebuild a connection that never completed.
+    var controllerAttempt by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(context, controllerAttempt) {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
@@ -155,7 +160,81 @@ fun PlayerScreen(
     val mainActivity = context as? MainActivity
     DisposableEffect(Unit) {
         mainActivity?.isPlayerActive = true
-        onDispose { mainActivity?.isPlayerActive = false }
+        // Process-wide twin of the above, readable from PlaybackService (which
+        // has no handle on the Activity). It tells the service that a player
+        // screen exists and will run its own end-of-video countdown, so the
+        // service must not advance underneath it.
+        com.streamflow.data.PlayerUiPresence.active = true
+        onDispose {
+            mainActivity?.isPlayerActive = false
+            com.streamflow.data.PlayerUiPresence.active = false
+        }
+    }
+
+    // ── Follow the service when IT advances ──────────────────────────────────
+    // With the app backgrounded or only the mini player showing, PlaybackService
+    // moves to the next video on its own. Without this the screen would keep
+    // showing the finished video's title, description and related list while a
+    // different video played — and the position-saving effect below would write
+    // the new video's position onto the old video's row.
+    val latestOnVideoClick = rememberUpdatedState(onVideoClick)
+    // Player -> Player navigation pops this entry, but the outgoing composition
+    // survives its exit transition — during which the INCOMING screen sets its
+    // own media item. Without a one-shot guard the dying screen would see that
+    // as a background advance and navigate again, and two screens bouncing
+    // navigate() off each other is how a loop starts.
+    var resyncedTo by remember(videoUrl) { mutableStateOf<String?>(null) }
+    DisposableEffect(mediaController, videoUrl) {
+        val mc = mediaController
+        if (mc == null) return@DisposableEffect onDispose { }
+        val listener = object : Player.Listener {
+            override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+                val id = item?.mediaId ?: return
+                // Only a genuinely different video. Subtitle and audio-track
+                // switches rebuild the item with the SAME mediaId, and must not
+                // be mistaken for a navigation.
+                if (id == videoUrl || id == resyncedTo || !id.startsWith("http")) return
+                resyncedTo = id
+                latestOnVideoClick.value(id)
+            }
+        }
+        mc.addListener(listener)
+        onDispose { mc.removeListener(listener) }
+    }
+
+    // ── Watchdog: a session that never connects ──────────────────────────────
+    //
+    // Everything downstream is keyed on a non-null MediaController: the media
+    // item is set in an effect that returns early without one, so if the
+    // connection never completes the screen sits on "Ready" with a black frame,
+    // no spinner and no error — indistinguishable from a hang, and with no way
+    // out except backing out of the video.
+    //
+    // The effect is keyed on mediaController, so a normal connection (well under
+    // a second for a local service) cancels the wait before it can fire. Only a
+    // genuine failure reaches the timeout, so a slow network cannot trigger a
+    // false positive here — this checks whether the SESSION connected, not
+    // whether the video buffered.
+    LaunchedEffect(state, mediaController, controllerAttempt) {
+        if (state !is PlayerUiState.Ready) return@LaunchedEffect
+        if (mediaController != null) return@LaunchedEffect
+        delay(12_000L)
+        if (controllerAttempt < 2) controllerAttempt++
+        else com.streamflow.data.PlaybackRecovery.onSessionUnavailable()
+    }
+
+    // Live recovery state, so a stall the app is actively working on reads
+    // differently from one it has given up on. "Buffering" forever is what an
+    // unrecoverable failure used to look like, which is precisely the wrong
+    // signal: it says wait, when the truth is either "retrying, attempt 2 of 5"
+    // or "there is no network to retry on".
+    val recovery by com.streamflow.data.PlaybackRecovery.state.collectAsState()
+    // Set only when automatic recovery has actually given up.
+    val playbackFatal by com.streamflow.data.PlaybackRecovery.fatal.collectAsState()
+    val bufferLabel = when {
+        recovery.waitingForNetwork -> "Waiting for network"
+        recovery.active -> "Reconnecting ${recovery.attempt}/${com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS}"
+        else -> "Buffering"
     }
 
     // ── Cleanup on exit ──────────────────────────────────────────────────────
@@ -191,7 +270,11 @@ fun PlayerScreen(
 
     BackHandler(enabled = isFullscreen) { isFullscreen = false }
 
-    LaunchedEffect(videoUrl) { vm.loadVideo(videoUrl) }
+    LaunchedEffect(videoUrl) {
+        // A stale "playback stopped" banner must not survive into the next video.
+        com.streamflow.data.PlaybackRecovery.clearFatal()
+        vm.loadVideo(videoUrl)
+    }
 
     // ── Controls overlay visibility (portrait + fullscreen) ──────────────────
     var showFsControls by remember { mutableStateOf(true) }
@@ -215,6 +298,20 @@ fun PlayerScreen(
         val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
         val mc = mediaController ?: return@LaunchedEffect
         val d = ready.details
+
+        // Already playing this exact video: don't rebuild the item.
+        //
+        // This effect is keyed on the controller, and the controller is a NEW
+        // instance every time the session reconnects — returning from
+        // picture-in-picture, or after the service is rebound. Re-running
+        // setMediaItem/prepare/play there tore down healthy playback and
+        // re-buffered from scratch, and if the service had meanwhile advanced in
+        // the background it also yanked the user back to the previous video.
+        val alreadyOnThisVideo = try {
+            mc.currentMediaItem?.mediaId == videoUrl &&
+                mc.playbackState != Player.STATE_IDLE
+        } catch (_: Exception) { false }
+        if (alreadyOnThisVideo) return@LaunchedEffect
 
         val extras = Bundle().apply {
             if (d.audioUrl != null) putString("audioUrl", d.audioUrl)
@@ -430,18 +527,29 @@ fun PlayerScreen(
     }
 
     // ── Chapter tracking ──────────────────────────────────────────────────────
-    LaunchedEffect(state) {
+    LaunchedEffect(state, lifecycleOwner) {
         val chs = (state as? PlayerUiState.Ready)?.details?.chapters ?: return@LaunchedEffect
         if (chs.isEmpty()) return@LaunchedEffect
-        while (true) {
-            delay(500L)
-            val pos = mediaController?.currentPosition ?: 0L
-            currentChapterTitle = chs.lastOrNull { pos >= it.startMs }?.title ?: ""
+        // Same reasoning as the position poll: a chapter title nobody can read
+        // is not worth a wakeup twice a second.
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                delay(500L)
+                val pos = mediaController?.currentPosition ?: 0L
+                currentChapterTitle = chs.lastOrNull { pos >= it.startMs }?.title ?: ""
+            }
         }
     }
 
     // ── Position / playback state polling ─────────────────────────────────────
-    LaunchedEffect(mediaController) {
+    // Gated on STARTED. This loop woke the CPU four times a second for the whole
+    // session — including with the screen off during background audio, where it
+    // recomputed a seekbar position, a buffered percentage and a stall counter
+    // that nothing could display. On an older phone that is measurable battery
+    // spent on nothing. STARTED (not RESUMED) keeps it alive in picture-in-
+    // picture, where the numbers ARE visible.
+    LaunchedEffect(mediaController, lifecycleOwner) {
+      lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
         while (true) {
             delay(250L)
             val mc = mediaController ?: continue
@@ -468,6 +576,7 @@ fun PlayerScreen(
             }
             bufferedPercent = mc.bufferedPercentage.coerceIn(0, 100)
         }
+      }
     }
 
     // ── Fullscreen controls auto-hide (3 s after last interaction) ────────────
@@ -681,10 +790,16 @@ fun PlayerScreen(
     // ── Auto-play countdown (when video ends, auto-navigate to next) ─────────
     var autoPlayCountdown by remember { mutableIntStateOf(0) }
     var autoPlayTarget by remember { mutableStateOf("") }
-    LaunchedEffect(state, mediaController) {
+    LaunchedEffect(state, mediaController, lifecycleOwner) {
         val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
         val nextUrl = ready.details.relatedVideos.firstOrNull()?.url ?: return@LaunchedEffect
         autoPlayCountdown = 0; autoPlayTarget = ""
+        // Restarted on every return to the foreground. It has to be: the loop
+        // stands down while backgrounded (PlaybackService owns advancement
+        // there), and without repeatOnLifecycle it would break once and stay
+        // broken -- so coming back mid-video would leave the countdown dead for
+        // the rest of that video.
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
         while (true) {
             delay(500L)
             val mc = mediaController ?: continue
@@ -692,6 +807,14 @@ fun PlayerScreen(
                 // "End of video" sleep: the service pauses playback — nothing
                 // may auto-advance past it, not even the queue
                 if (sleepEndOfVideo) break
+                // Backgrounded or screen off: PlaybackService owns the advance,
+                // because a 5-second countdown with a Cancel button is
+                // meaningless to someone who is not looking at the screen.
+                if (!com.streamflow.data.AppForeground.isForeground) break
+                // Claim BEFORE the countdown, not after. If the user backgrounds
+                // the app mid-countdown the service would otherwise also advance,
+                // and the episode after this one would be skipped entirely.
+                if (!com.streamflow.data.AutoAdvance.claim(videoUrl)) break
                 // Queue takes priority over related video auto-play (and plays
                 // regardless of the toggle — queueing is explicit user intent)
                 if (PlaybackQueue.hasNext()) {
@@ -710,6 +833,7 @@ fun PlayerScreen(
                 if (autoPlayTarget.isNotEmpty()) onVideoClick(autoPlayTarget)
                 break
             }
+        }
         }
     }
 
@@ -957,13 +1081,24 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // is dead code at best — and where the PlayerView itself sits inside
             // the Ready branch (the portrait player) it shadowed the video and
             // left a black screen. Never add a duplicate branch to these blocks.
-            if (state is PlayerUiState.Ready && isRebuffering) {
+            if (state is PlayerUiState.Ready && (isRebuffering || recovery.active)) {
                 com.streamflow.ui.components.VideoLoadingIndicator(
                     progress = bufferedPercent / 100f,
-                    label = "Buffering",
+                    label = bufferLabel,
                     modifier = Modifier.align(Alignment.Center),
                     size = 64.dp
                 )
+            }
+            // Automatic recovery gave up. Without this the video simply froze on
+            // its last frame with no explanation and no way forward.
+            playbackFatal?.let { msg ->
+                if (state is PlayerUiState.Ready) PlaybackStoppedOverlay(msg) {
+                    com.streamflow.data.PlaybackRecovery.clearFatal()
+                    // Reset the connection attempts too: if the failure WAS the
+                    // session, re-extracting alone would change nothing.
+                    controllerAttempt = 0
+                    vm.loadVideo(videoUrl, forceRefresh = true)
+                }
             }
 
             if (!isLocked && state is PlayerUiState.Ready) {
@@ -1565,13 +1700,20 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         // Inside the Ready branch, AFTER the PlayerView — not as a
                         // second `is Ready ->` branch, which would shadow the
                         // PlayerView above and black out the video.
-                        if (isRebuffering && !audioOnly) {
+                        if ((isRebuffering || recovery.active) && !audioOnly) {
                             com.streamflow.ui.components.VideoLoadingIndicator(
                                 progress = bufferedPercent / 100f,
-                                label = "Buffering",
+                                label = bufferLabel,
                                 modifier = Modifier.align(Alignment.Center),
                                 size = 60.dp
                             )
+                        }
+                        playbackFatal?.let { msg ->
+                            PlaybackStoppedOverlay(msg) {
+                                com.streamflow.data.PlaybackRecovery.clearFatal()
+                                controllerAttempt = 0
+                                vm.loadVideo(videoUrl, forceRefresh = true)
+                            }
                         }
                         if (!audioOnly) {
                             DoubleTapZones()
@@ -2875,3 +3017,42 @@ private suspend fun averageThumbColor(context: android.content.Context, url: Str
         else Color(red = (r / n) / 255f, green = (g / n) / 255f, blue = (b / n) / 255f)
     }
 } catch (_: Exception) { null }
+
+/**
+ * Shown when automatic playback recovery has stopped trying.
+ *
+ * Deliberately a scrim over the video rather than a toast: a toast disappears
+ * after two seconds and leaves the same unexplained frozen frame behind. This
+ * states what happened and gives the one action that helps — a full re-extract,
+ * not another prepare() of the URL that already failed.
+ */
+@Composable
+private fun BoxScope.PlaybackStoppedOverlay(message: String, onRetry: () -> Unit) {
+    Box(
+        Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(0.72f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 28.dp)
+        ) {
+            Icon(
+                Icons.Rounded.CloudOff,
+                contentDescription = null,
+                tint = Color.White.copy(0.85f),
+                modifier = Modifier.size(34.dp)
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                message,
+                color = Color.White,
+                fontSize = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(onClick = onRetry) { Text("Try again") }
+        }
+    }
+}

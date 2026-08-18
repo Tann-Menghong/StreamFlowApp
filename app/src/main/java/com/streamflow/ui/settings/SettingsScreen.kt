@@ -1195,8 +1195,17 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
         // Standard 5-band Android EQ center frequencies; extra device bands
         // simply keep the closest slider's value
         val bandLabels = listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz")
-        val savedBands = vm.eqBands.value
-        val levels = remember {
+        // Was `vm.eqBands.value`, which never returned anything but emptyList().
+        // eqBands is stateIn(WhileSubscribed), so with no collector the flow was
+        // never started and .value stayed at its initial value forever — every
+        // reopening of this dialog showed five sliders at 0 dB regardless of what
+        // the user had saved, and pressing Apply then overwrote their real
+        // settings with zeros.
+        val savedBands by vm.eqBands.collectAsState()
+        // Keyed on savedBands: collectAsState emits the initial empty list first
+        // and the stored values a frame later, so a plain remember{} would still
+        // capture the zeros.
+        val levels = remember(savedBands) {
             mutableStateListOf(*Array(5) { i -> (savedBands.getOrNull(i) ?: 0).toFloat() })
         }
         AlertDialog(
