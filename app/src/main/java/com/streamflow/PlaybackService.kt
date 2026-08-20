@@ -12,7 +12,6 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
-import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -30,28 +29,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // Downloaded files and other direct streams aren't YouTube URLs — running them
-// through the extractor during Bluetooth playback resumption would just throw
-private fun isLocalOrDirectUrl(url: String): Boolean {
-    val lower = url.lowercase()
-    // Kept in sync with PlayerViewModel.isDirectStream: a /hls/ or /stream/ URL is
-    // a direct media link too, and skipping it here meant Bluetooth resume would
-    // hand it to the YouTube extractor (which throws) and abort resumption.
-    return lower.startsWith("file://") || lower.startsWith("content://") ||
-        lower.contains(".m3u8") || lower.contains(".mp4") ||
-        lower.contains(".m4a") || lower.contains(".webm") ||
-        lower.contains("/hls/") || lower.contains("/stream/")
-}
+// through the extractor during Bluetooth playback resumption would just throw.
+//
+// This used to be a local copy of the rule, one of three that had drifted apart.
+// It now delegates to the single classifier so the service, the player screen
+// and the ViewModel cannot disagree about what a file:// URI is again.
+private fun isLocalOrDirectUrl(url: String): Boolean =
+    com.streamflow.data.MediaUrl.isLocalOrDirect(url)
 
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // Custom "Next" button for the media notification / lock screen. The app plays
-    // one MediaItem at a time (the queue + related auto-play are app-managed, not
-    // an ExoPlayer playlist), so the native next button never appears — this
-    // command reproduces the on-screen "next" behaviour: play the queued video,
-    // else the current video's first related video.
+    // Legacy custom next/previous commands. The notification no longer uses
+    // them — PlayerCommandBridge exposes the NATIVE commands instead, so
+    // headsets, cars and Android Auto can drive them too. These stay registered
+    // because they are cheap and anything already sending them keeps working.
     private val nextCommand = SessionCommand(CUSTOM_NEXT, android.os.Bundle.EMPTY)
     private val prevCommand = SessionCommand(CUSTOM_PREV, android.os.Bundle.EMPTY)
     private var advancing = false // guard against double-taps while resolving
@@ -121,19 +115,39 @@ class PlaybackService : MediaSessionService() {
         // Reuse the app-wide client (same UA headers) so media requests share the
         // warm connection pool instead of opening cold connections
         val httpClient = com.streamflow.data.OkHttpDownloader.instance.client
+
+        // DefaultDataSource wraps the OkHttp source and adds the schemes OkHttp
+        // cannot speak: file://, content://, asset://. That matters now that
+        // downloaded files reach the player instead of being misrouted into the
+        // WebView — handing a file:// URI straight to OkHttpDataSource fails
+        // immediately, so the fix to the routing would have achieved nothing on
+        // its own. http(s) still goes to the same warm OkHttp connection pool.
+        val baseFactory = androidx.media3.datasource.DefaultDataSource.Factory(
+            this, OkHttpDataSource.Factory(httpClient)
+        )
+
         // Read-through disk cache on top: replaying a video or seeking backwards
         // past the back-buffer streams from disk instead of the network
         val dsf = androidx.media3.datasource.cache.CacheDataSource.Factory()
             .setCache(com.streamflow.data.MediaCache.get(this))
-            .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(httpClient))
+            .setUpstreamDataSourceFactory(baseFactory)
             .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
         val defaultMsf = DefaultMediaSourceFactory(dsf)
+        // No disk cache for a file that is already on the disk — caching a
+        // download would store a second copy of it and evict genuinely useful
+        // stream data to do so.
+        val localMsf = DefaultMediaSourceFactory(baseFactory)
+
         val mediaSourceFactory = object : androidx.media3.exoplayer.source.MediaSource.Factory
             by defaultMsf {
             override fun createMediaSource(
                 mediaItem: MediaItem
             ): androidx.media3.exoplayer.source.MediaSource {
+                val scheme = mediaItem.localConfiguration?.uri?.scheme?.lowercase()
+                if (scheme == null || scheme == "file" || scheme == "content") {
+                    return localMsf.createMediaSource(mediaItem)
+                }
                 val audioUrl = mediaItem.requestMetadata.extras?.getString("audioUrl")
                 return if (audioUrl != null) {
                     val video = ProgressiveMediaSource.Factory(dsf).createMediaSource(mediaItem)
@@ -224,9 +238,22 @@ class PlaybackService : MediaSessionService() {
                     // Real playback resumed: forget the retry budget so a later,
                     // unrelated glitch gets its own full set of attempts rather
                     // than inheriting a spent counter from an hour ago.
+                    if (retryAttempt > 0) {
+                        com.streamflow.data.PlaybackLog.info(
+                            "recovery", "recovered after $retryAttempt attempt(s)")
+                    }
                     retryAttempt = 0
                     retryJob?.cancel(); retryJob = null
                     com.streamflow.data.PlaybackRecovery.onRecovered()
+                    // A video restarted from the beginning has spent no
+                    // end-of-video claim yet. reset() only ran on a media-item
+                    // transition, and replaying the same video fires none — so
+                    // the claim from the first play-through stood and the second
+                    // ending advanced nowhere.
+                    val id = player.currentMediaItem?.mediaId
+                    if (id != null && player.currentPosition < 2_000L) {
+                        com.streamflow.data.AutoAdvance.releaseIfClaimed(id)
+                    }
                 }
                 if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
                     if (com.streamflow.data.SleepTimer.endOfVideo.value) {
@@ -334,25 +361,30 @@ class PlaybackService : MediaSessionService() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Previous + Next buttons for the notification + lock-screen controls.
-        // Order matters: [Prev, Next] renders as the familiar |◀  ▶| pair around
-        // play/pause in the compact notification.
-        val prevButton = CommandButton.Builder()
-            .setDisplayName("Previous")
-            .setIconResId(R.drawable.ic_notif_prev)
-            .setSessionCommand(prevCommand)
-            .setEnabled(true)
-            .build()
-        val nextButton = CommandButton.Builder()
-            .setDisplayName("Next")
-            .setIconResId(R.drawable.ic_notif_next)
-            .setSessionCommand(nextCommand)
-            .setEnabled(true)
-            .build()
+        // Previous / Next are now NATIVE commands, not a custom layout.
+        //
+        // The custom CommandButtons that used to live here only ever worked in
+        // our own notification. A custom SessionCommand can only be invoked by
+        // something that knows it exists, and a Bluetooth headset, a car head
+        // unit, Android Auto and Wear all speak plain media-button vocabulary
+        // instead — so on the surface that matters most for background
+        // listening, "next" did nothing at all.
+        //
+        // PlayerCommandBridge advertises COMMAND_SEEK_TO_NEXT / _PREVIOUS and
+        // routes them into the same playNext() / playPrevious() the buttons
+        // called. media3's notification provider renders its own prev/next as
+        // soon as those commands are available, which is why setCustomLayout is
+        // gone: keeping it would put two of each button in the notification.
+        // The custom commands themselves stay registered below, so anything
+        // already sending them keeps working.
+        val sessionPlayer = PlayerCommandBridge(
+            player,
+            onNext = { playNext() },
+            onPrevious = { playPrevious() }
+        )
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaSession.Builder(this, sessionPlayer)
             .setSessionActivity(sessionActivity)
-            .setCustomLayout(listOf(prevButton, nextButton))
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(
                     session: MediaSession,
@@ -462,16 +494,31 @@ class PlaybackService : MediaSessionService() {
         val remote = mediaId != null &&
             !mediaId.startsWith("file://") && !mediaId.startsWith("content://")
 
+        val status = httpStatusOf(error)
         val plan = com.streamflow.data.PlaybackRecovery.plan(
             errorCode = error.errorCode,
-            httpStatus = httpStatusOf(error),
+            httpStatus = status,
             isRemote = remote
+        )
+
+        // The single most useful line in the whole log: what failed, what the
+        // server said about it, and which of the three plans that produced.
+        com.streamflow.data.PlaybackLog.warn(
+            "player",
+            "error code=${error.errorCode}" +
+                (if (status != com.streamflow.data.PlaybackRecovery.NO_STATUS) " http=$status" else "") +
+                " plan=$plan video=${com.streamflow.data.PlaybackLog.ref(mediaId)}"
         )
 
         val exhausted = retryAttempt >= com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS
         if (plan == com.streamflow.data.RecoveryPlan.FATAL || exhausted) {
             // Say so rather than leaving a frozen frame behind an indicator that
             // never resolves — that is indistinguishable from the app hanging.
+            com.streamflow.data.PlaybackLog.error(
+                "recovery",
+                if (exhausted) "gave up after ${com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS} attempts"
+                else "unrecoverable (${error.errorCodeName})"
+            )
             com.streamflow.data.PlaybackRecovery.onGaveUp(plan, exhausted)
             retryAttempt = 0
             return
@@ -487,10 +534,14 @@ class PlaybackService : MediaSessionService() {
                 // a tunnel, leaving nothing in reserve for the moment signal
                 // actually returns.
                 if (!com.streamflow.data.ConnectivityMonitor.online.value) {
+                    com.streamflow.data.PlaybackLog.info(
+                        "recovery", "attempt $attempt waiting for network")
                     com.streamflow.data.PlaybackRecovery.onAttempt(attempt, waitingForNetwork = true)
                     // Bounded: a phone left offline must not hold a coroutine and
                     // a wake lock indefinitely.
-                    com.streamflow.data.ConnectivityMonitor.awaitOnline(120_000L)
+                    val back = com.streamflow.data.ConnectivityMonitor.awaitOnline(120_000L)
+                    if (!back) com.streamflow.data.PlaybackLog.warn(
+                        "recovery", "still offline after 120s")
                 }
                 com.streamflow.data.PlaybackRecovery.onAttempt(attempt, waitingForNetwork = false)
                 delay(com.streamflow.data.PlaybackRecovery.backoffMs(attempt))
@@ -498,8 +549,12 @@ class PlaybackService : MediaSessionService() {
                 val p = mediaSession?.player ?: return@launch
                 val resumeAt = lastGoodPositionMs
                 if (plan == com.streamflow.data.RecoveryPlan.REEXTRACT && remote && mediaId != null) {
+                    com.streamflow.data.PlaybackLog.info(
+                        "recovery", "attempt $attempt re-extracting from ${resumeAt / 1000}s")
                     reExtractInPlace(mediaId, resumeAt)
                 } else {
+                    com.streamflow.data.PlaybackLog.info(
+                        "recovery", "attempt $attempt re-preparing from ${resumeAt / 1000}s")
                     // Same item, same position: re-preparing is all a transient
                     // network failure needs.
                     p.prepare()
@@ -514,6 +569,8 @@ class PlaybackService : MediaSessionService() {
                 // the last chance to tell the user rather than leave them
                 // watching a still frame. The counter stays raised so repeated
                 // failures still walk toward the ceiling.
+                com.streamflow.data.PlaybackLog.error(
+                    "recovery", "attempt $attempt failed: ${e.javaClass.simpleName} ${e.message ?: ""}")
                 com.streamflow.data.PlaybackRecovery.onGaveUp(
                     plan,
                     exhausted = attempt >= com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS
@@ -552,8 +609,26 @@ class PlaybackService : MediaSessionService() {
 
     // ── Resume-position persistence ──────────────────────────────────────────
 
+    /**
+     * The in-memory capture stays on a 5-second beat — recovery reads
+     * lastGoodPositionMs and a coarser sample would make every recovery restart
+     * further back than it needs to. What changed is the DATABASE write.
+     *
+     * Persisting on every tick meant 720 Room writes an hour, most of them
+     * recording a position the previous write had almost already recorded, and
+     * all of them continuing with the screen off during background listening.
+     * The 5-second frequency was chosen to survive an OEM process kill, which
+     * is right; the cost was never weighed. Writing every third tick, and only
+     * when the position has genuinely moved, keeps the guarantee (at most 15 s
+     * of a resume position lost, which is a comfort feature, not data) at a
+     * third of the disk traffic.
+     */
+    private var ticksSinceSave = 0
+    private var lastSavedPositionMs = 0L
+
     private fun startPositionTicker() {
         if (positionTicker?.isActive == true) return
+        ticksSinceSave = 0
         positionTicker = serviceScope.launch {
             while (true) {
                 delay(5_000L)
@@ -564,7 +639,13 @@ class PlaybackService : MediaSessionService() {
                 if (pos > 0L && p.playbackState == androidx.media3.common.Player.STATE_READY) {
                     lastGoodPositionMs = pos
                 }
-                savePositionNow()
+                ticksSinceSave++
+                if (ticksSinceSave >= SAVE_EVERY_N_TICKS) {
+                    ticksSinceSave = 0
+                    // A paused or stalled player reports the same position tick
+                    // after tick; there is nothing to record.
+                    if (kotlin.math.abs(pos - lastSavedPositionMs) >= 5_000L) savePositionNow()
+                }
                 maybePrefetchNext(p)
             }
         }
@@ -621,6 +702,7 @@ class PlaybackService : MediaSessionService() {
         val id = p.currentMediaItem?.mediaId ?: return
         val pos = try { p.currentPosition } catch (_: Exception) { 0L }
         if (pos <= 1_000L) return
+        lastSavedPositionMs = pos
         val app = application as StreamFlowApp
         // Deliberately NOT serviceScope: onTaskRemoved and onDestroy both save,
         // and onDestroy cancels serviceScope — a write launched there would be
@@ -630,7 +712,10 @@ class PlaybackService : MediaSessionService() {
             try {
                 if (app.prefs.incognito.first()) return@launch
                 app.database.historyDao().updatePosition(id, pos)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                com.streamflow.data.PlaybackLog.warn(
+                    "position", "save failed: ${e.javaClass.simpleName}")
+            }
         }
     }
 
@@ -704,9 +789,16 @@ class PlaybackService : MediaSessionService() {
                 attempts++
                 try {
                     resolveAndPlay(queued.url, queued)
+                    com.streamflow.data.PlaybackLog.info(
+                        "advance", "queued -> ${com.streamflow.data.PlaybackLog.ref(queued.url)}")
                     return
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     // Dead entry: already popped, so the loop moves to the next.
+                    com.streamflow.data.PlaybackLog.warn(
+                        "advance",
+                        "skipped dead queue entry ${com.streamflow.data.PlaybackLog.ref(queued.url)}" +
+                            " (${e.javaClass.simpleName})"
+                    )
                 }
             }
             if (!allowRelated) return
@@ -714,9 +806,15 @@ class PlaybackService : MediaSessionService() {
             if (rel != null) {
                 try {
                     resolveAndPlay(rel, null)
+                    com.streamflow.data.PlaybackLog.info(
+                        "advance", "related -> ${com.streamflow.data.PlaybackLog.ref(rel)}")
                     return
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    com.streamflow.data.PlaybackLog.warn(
+                        "advance", "related video failed (${e.javaClass.simpleName})")
+                }
             }
+            com.streamflow.data.PlaybackLog.info("advance", "nothing up next")
             if (announce) {
                 android.widget.Toast.makeText(
                     this@PlaybackService, "Nothing up next", android.widget.Toast.LENGTH_SHORT
@@ -879,5 +977,8 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val CUSTOM_NEXT = "com.streamflow.action.NEXT"
         private const val CUSTOM_PREV = "com.streamflow.action.PREV"
+
+        /** Position is captured every 5 s but written every third capture. */
+        private const val SAVE_EVERY_N_TICKS = 3
     }
 }

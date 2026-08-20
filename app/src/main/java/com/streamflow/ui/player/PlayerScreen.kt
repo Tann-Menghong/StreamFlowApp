@@ -76,7 +76,6 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
-import com.streamflow.MainActivity
 import com.streamflow.PlaybackService
 import com.streamflow.data.PlaybackQueue
 import com.streamflow.data.ai.AiEngine
@@ -127,10 +126,20 @@ fun PlayerScreen(
     val activity = context as? Activity
     val prefs = AppPreferences.get(context)
 
+    // Only a REMOTE direct stream belongs in the WebView player below.
+    //
+    // This used to be an inline extension check with no scheme guard, so a
+    // downloaded file — stored as file:///storage/.../Title.mp4 — matched on
+    // ".mp4" and was rendered in the WebView, whose base URL is an https origin
+    // and which therefore cannot load a file:// source at all. Every completed
+    // download was unplayable, and none of the media session's features applied
+    // to it. MediaUrl checks the scheme before the extension.
+    // A local file is deliberately NOT included: it plays through ExoPlayer like
+    // anything else (PlayerViewModel synthesises its details rather than
+    // extracting), which is what gives a downloaded video background audio, the
+    // media notification, a resume position and the recovery path.
     val isDirectStream = remember(videoUrl) {
-        val lower = videoUrl.lowercase()
-        lower.contains(".m3u8") || lower.contains(".mp4") || lower.contains(".webm") ||
-        lower.contains("/hls/") || lower.contains("/stream/")
+        com.streamflow.data.MediaUrl.isDirectStream(videoUrl)
     }
     // Like YouTube: open in portrait; fullscreen only when the user asks
     var isFullscreen by remember { mutableStateOf(false) }
@@ -157,17 +166,16 @@ fun PlayerScreen(
     }
 
     // ── Tell MainActivity we're in the player (for auto-PiP) ─────────────────
-    val mainActivity = context as? MainActivity
     DisposableEffect(Unit) {
-        mainActivity?.isPlayerActive = true
-        // Process-wide twin of the above, readable from PlaybackService (which
-        // has no handle on the Activity). It tells the service that a player
-        // screen exists and will run its own end-of-video countdown, so the
-        // service must not advance underneath it.
-        com.streamflow.data.PlayerUiPresence.active = true
+        // A depth counter, not a flag. Player -> Player navigation keeps the
+        // outgoing composition alive through its exit transition while this one
+        // is already composing, so assigning true/false here ran "set true"
+        // followed by the OLD screen's "set false" — and left the app believing
+        // no player was on screen while one plainly was. MainActivity reads the
+        // same counter now, so the Activity and the service cannot disagree.
+        com.streamflow.data.PlayerUiPresence.enter()
         onDispose {
-            mainActivity?.isPlayerActive = false
-            com.streamflow.data.PlayerUiPresence.active = false
+            com.streamflow.data.PlayerUiPresence.exit()
         }
     }
 
@@ -325,7 +333,12 @@ fun PlayerScreen(
                 MediaMetadata.Builder()
                     .setTitle(d.title)
                     .setArtist(d.uploaderName)
-                    .setArtworkUri(d.thumbnailUrl.toUri())
+                    // A downloaded file has no thumbnail URL. Setting an empty
+                    // Uri here leaves the notification trying to load nothing;
+                    // leaving it unset lets it fall back to the app icon.
+                    .apply {
+                        if (d.thumbnailUrl.isNotEmpty()) setArtworkUri(d.thumbnailUrl.toUri())
+                    }
                     .build()
             )
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setExtras(extras).build())

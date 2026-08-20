@@ -19,6 +19,8 @@ import com.streamflow.data.local.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.NewPipe
@@ -45,6 +47,29 @@ class StreamFlowApp : Application(), ImageLoaderFactory {
         // has to advance by itself (screen off / app backgrounded).
         com.streamflow.data.AppForeground.install(this)
         NewPipe.init(OkHttpDownloader.instance)
+
+        // The playback log records events regardless of incognito — knowing that
+        // playback failed is not private — but it must not record which video.
+        appScope.launch {
+            try {
+                prefs.incognito.collect { com.streamflow.data.PlaybackLog.setRedactUrls(it) }
+            } catch (_: Exception) {}
+        }
+        // Connectivity transitions are the single most useful context for
+        // reading back a playback failure: "it stopped" and "the network went
+        // away four seconds earlier" are the same event, and without this line
+        // there was no way to tell them apart afterwards.
+        appScope.launch {
+            try {
+                com.streamflow.data.ConnectivityMonitor.online
+                    .drop(1)
+                    .distinctUntilChanged()
+                    .collect { online ->
+                        com.streamflow.data.PlaybackLog.info(
+                            "network", if (online) "online" else "offline")
+                    }
+            } catch (_: Exception) {}
+        }
 
         // Warm the TLS connections to YouTube's hosts right away so the first
         // feed load / thumbnail / video extraction skips the handshake cost.

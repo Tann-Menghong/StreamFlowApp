@@ -197,6 +197,18 @@ object AutoAdvance {
     /** Called when a new video starts, so replaying the same video later can
      *  still auto-advance when IT ends. */
     fun reset() = synchronized(lock) { claimedFor = null }
+
+    /**
+     * Release the claim on a video that has started over from the beginning.
+     *
+     * reset() only ran on a media-item transition, but replaying the video you
+     * just finished — a seek back to zero, or repeat-one — fires no transition
+     * at all. The claim from the first play-through therefore stood, and the
+     * second time it ended nothing advanced.
+     */
+    fun releaseIfClaimed(mediaId: String) = synchronized(lock) {
+        if (claimedFor == mediaId) claimedFor = null
+    }
 }
 
 /**
@@ -204,8 +216,34 @@ object AutoAdvance {
  * end-of-video countdown. PlaybackService reads this to decide whether to
  * advance by itself — audio playing under the mini player, or with the screen
  * off, has no countdown to wait for.
+ *
+ * This is a COUNTER, not a boolean, and the difference was a real bug.
+ *
+ * Player -> Player navigation (autoplay, tapping a related video) pops the old
+ * back-stack entry, but its composition survives its exit transition while the
+ * incoming screen is already composing. So a plain boolean ran in this order:
+ *
+ *      incoming screen composes  ->  active = true
+ *      outgoing screen disposes  ->  active = false
+ *
+ * leaving the flag false while a player screen was very much on screen. From
+ * that point on the service stopped standing down, so the 5-second countdown
+ * with its Cancel button never appeared again for the rest of the session, and
+ * auto-PiP stopped firing on the Home press.
+ *
+ * A depth counter is immune to the ordering: two screens overlapping reads as
+ * two, and only the last one to leave takes it back to zero. This is the same
+ * reasoning — and the same fix — as AppForeground's started-activity count.
  */
 object PlayerUiPresence {
-    @Volatile
-    var active: Boolean = false
+
+    private val depth = java.util.concurrent.atomic.AtomicInteger(0)
+
+    val active: Boolean get() = depth.get() > 0
+
+    fun enter() { depth.incrementAndGet() }
+
+    /** Clamped at zero: an unbalanced dispose must not drive the count
+     *  negative, which would report "no player UI" forever afterwards. */
+    fun exit() { depth.updateAndGet { if (it > 0) it - 1 else 0 } }
 }

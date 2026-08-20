@@ -37,7 +37,13 @@ class MainActivity : ComponentActivity() {
     var isInPip by mutableStateOf(false)
         private set
 
-    var isPlayerActive by mutableStateOf(false)
+    // Derived from the process-wide presence counter rather than assigned by the
+    // player screen. As two independent booleans these could — and did —
+    // disagree: PlayerScreen assigned both, and Player -> Player navigation left
+    // both reading false while a player was on screen, which silently disabled
+    // auto-PiP. One counter, one answer.
+    private val isPlayerActive: Boolean
+        get() = com.streamflow.data.PlayerUiPresence.active
 
     // Mirrors the autoPip pref for the synchronous onUserLeaveHint callback
     private var autoPipEnabled = false

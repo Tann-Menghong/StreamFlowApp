@@ -1,5 +1,6 @@
 package com.streamflow.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -16,6 +17,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -477,6 +479,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     var showVersionsDialog   by remember { mutableStateOf(false) }
     var showAddTabDialog     by remember { mutableStateOf(false) }
     var showCrashDialog      by remember { mutableStateOf(false) }
+    var showPlaybackLogDialog by remember { mutableStateOf(false) }
     var editingTab by remember {
         mutableStateOf<com.streamflow.data.local.entity.CustomTabEntity?>(null)
     }
@@ -1038,6 +1041,21 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         "Install any release — newer or older"
                     ) { showVersionsDialog = true; vm.loadVersions() }
                     SettingsDivider()
+                    // In-memory only, cleared when the app closes. It exists
+                    // because 40 catch blocks in this app were completely empty:
+                    // when playback stopped there was nothing to consult
+                    // afterwards, so every diagnosis was a guess.
+                    run {
+                        val logRevision by com.streamflow.data.PlaybackLog.revision.collectAsState()
+                        val eventCount = remember(logRevision) {
+                            com.streamflow.data.PlaybackLog.snapshot().size
+                        }
+                        SettingsItem(Icons.AutoMirrored.Rounded.Article, "Playback log",
+                            if (eventCount == 0) "Nothing to report this session"
+                            else "$eventCount event${if (eventCount == 1) "" else "s"} — tap to view"
+                        ) { showPlaybackLogDialog = true }
+                    }
+                    SettingsDivider()
                     SettingsItem(Icons.Rounded.Code, "Source code",
                         "github.com/Tann-Menghong/StreamFlowApp"
                     ) {
@@ -1107,6 +1125,52 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                 TextButton(onClick = { vm.dismissCrashReport(); showCrashDialog = false }) {
                     Text("Dismiss")
                 }
+            },
+            shape = appShape(16.dp)
+        )
+    }
+
+    // Playback log viewer. Same posture as the crash dialog: shown in full,
+    // copied only on request, never sent anywhere on its own.
+    if (showPlaybackLogDialog) {
+        val logRevision by com.streamflow.data.PlaybackLog.revision.collectAsState()
+        val logText = remember(logRevision) { com.streamflow.data.PlaybackLog.asText() }
+        AlertDialog(
+            onDismissRequest = { showPlaybackLogDialog = false },
+            title = { Text("Playback log", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                    Text(
+                        "What happened to playback since the app started — errors, " +
+                        "retries, network changes and skipped videos. Kept in memory " +
+                        "only and cleared when the app closes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        logText,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching {
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                            as android.content.ClipboardManager
+                        cm.setPrimaryClip(
+                            android.content.ClipData.newPlainText("StreamFlow playback log", logText))
+                        android.widget.Toast.makeText(
+                            context, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("Copy") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPlaybackLogDialog = false }) { Text("Close") }
             },
             shape = appShape(16.dp)
         )

@@ -20,12 +20,34 @@ import java.io.File
 object MediaCache {
     @Volatile private var cache: SimpleCache? = null
 
+    /**
+     * How much disk this cache may use.
+     *
+     * The budget used to be chosen from RAM alone — 768 MB on a "high
+     * performance" device, 256 MB otherwise. RAM does not predict free storage,
+     * so a 12 GB phone with 2 GB left got the largest budget of all, and the
+     * image cache asked for a further 256 MB beside it. Now the RAM-derived
+     * figure is only a ceiling: the actual budget is capped at a tenth of what
+     * is genuinely free, so the app never competes with the user's photos for
+     * the last gigabyte.
+     */
+    fun budgetBytes(context: Context): Long {
+        val ceiling = if (DeviceCaps.isHighPerf) 768L * 1024 * 1024 else 256L * 1024 * 1024
+        val free = try {
+            val stat = android.os.StatFs(context.cacheDir.absolutePath)
+            stat.availableBlocksLong * stat.blockSizeLong
+        } catch (_: Exception) {
+            return ceiling // unreadable: keep the old behaviour rather than guess
+        }
+        // A floor as well as a cap: below about 64 MB the cache stops being
+        // useful for anything, and a tiny one just churns.
+        return (free / 10).coerceIn(64L * 1024 * 1024, ceiling)
+    }
+
     fun get(context: Context): SimpleCache = cache ?: synchronized(this) {
         cache ?: SimpleCache(
             File(context.cacheDir, "media_cache"),
-            LeastRecentlyUsedCacheEvictor(
-                if (DeviceCaps.isHighPerf) 768L * 1024 * 1024 else 256L * 1024 * 1024
-            ),
+            LeastRecentlyUsedCacheEvictor(budgetBytes(context)),
             StandaloneDatabaseProvider(context)
         ).also { cache = it }
     }
