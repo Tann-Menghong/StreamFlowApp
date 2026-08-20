@@ -396,7 +396,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     // contributor to how long a video takes to open, and until
                     // now nothing recorded it. Shown in the stats overlay.
                     val extractStart = android.os.SystemClock.elapsedRealtime()
-                    val details = repo.getVideoDetails(videoUrl, quality)
+                    // Retries a timeout or a dropped connection, and waits for
+                    // signal when there is none. Playback that had already
+                    // started recovered from exactly these failures; opening a
+                    // video gave up on the first one and showed an error screen
+                    // with a button the user had to press themselves.
+                    val details = com.streamflow.data.ExtractionRetry.run("open video") {
+                        repo.getVideoDetails(videoUrl, quality)
+                    }
                     _extractionMs.value = android.os.SystemClock.elapsedRealtime() - extractStart
                     if (gen == loadGeneration) {
                         _uiState.value = PlayerUiState.Loading(LoadStage.PREPARING)
@@ -612,13 +619,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // Caps `pref` at `cap` without ever RAISING a quality the user picked lower
     // than the cap (e.g. battery saver capping at 480P must leave a manual
     // 360P choice alone, not bump it up).
-    private fun capQuality(pref: String, cap: String): String {
-        if (pref == "AUTO") return cap
-        val order = listOf("360P", "480P", "720P", "1080P")
-        val prefIdx = order.indexOf(pref)
-        val capIdx = order.indexOf(cap)
-        return if (prefIdx == -1 || capIdx == -1 || prefIdx <= capIdx) pref else cap
-    }
+    // The ladder lives in QualityLadder now — PlaybackService needs the same
+    // rungs to step down after repeated stalls, and a second private copy here
+    // is exactly how the three URL predicates drifted apart.
+    private fun capQuality(pref: String, cap: String): String =
+        com.streamflow.data.QualityLadder.cap(pref, cap)
 
     // activeNetwork/getNetworkCapabilities are API 23. Below that they raise
     // NoSuchMethodError, an Error that `catch (Exception)` lets through — so the

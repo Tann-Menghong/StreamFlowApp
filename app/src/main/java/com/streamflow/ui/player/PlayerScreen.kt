@@ -61,6 +61,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -913,7 +918,39 @@ fun PlayerScreen(
         //
         // This is the same defect already fixed in MiniPlayerBar and VideoCard;
         // these four zones were missed.
-        Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+        //
+        // ── Accessibility ────────────────────────────────────────────────────
+        // The project's icon-label checker reports 75 labelled buttons and 0
+        // unlabelled, which is genuinely good — but it counts contentDescription
+        // on IconButtons, and the player's core interactions are not buttons at
+        // all. Double-tap seek, drag-scrub and hold-for-2x are raw pointerInput
+        // handlers: invisible to TalkBack and unreachable by switch access. On
+        // the one screen where audio is the whole point, the controls could not
+        // be operated without sight.
+        //
+        // Custom actions expose the same three operations through the
+        // accessibility API without changing anything for a sighted user.
+        val a11ySeconds = (skipMs / 1000).toInt()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .semantics {
+                    contentDescription = "Video player"
+                    stateDescription = if (playerIsPlaying) "Playing" else "Paused"
+                    customActions = listOf(
+                        CustomAccessibilityAction("Play or pause") {
+                            if (mc.isPlaying) mc.pause() else mc.play(); true
+                        },
+                        CustomAccessibilityAction("Skip forward $a11ySeconds seconds") {
+                            mc.seekTo(mc.currentPosition + skipMs); true
+                        },
+                        CustomAccessibilityAction("Skip back $a11ySeconds seconds") {
+                            mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)); true
+                        }
+                    )
+                }
+        ) {
             Box(
                 Modifier.weight(0.3f).fillMaxHeight()
                     .pointerInput(mc, skipMs) {

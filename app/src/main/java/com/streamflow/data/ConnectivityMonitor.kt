@@ -28,6 +28,13 @@ object ConnectivityMonitor {
      *  the first frame never flashes an offline banner before the callback fires. */
     val online: StateFlow<Boolean> = _online
 
+    private val _metered = MutableStateFlow(false)
+
+    /** True on mobile data (or a metered hotspot). PlaybackService reads this to
+     *  apply the user's mobile-data quality preference, which it previously had
+     *  no way to see — it returned a flat AUTO or 480P regardless. */
+    val metered: StateFlow<Boolean> = _metered
+
     @Volatile private var started = false
 
     fun start(context: Context) {
@@ -94,5 +101,17 @@ object ConnectivityMonitor {
             }
         }.getOrDefault(true)
         _online.value = ok
+
+        _metered.value = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                // Absence of NOT_METERED is the reliable signal; asking for a
+                // CELLULAR transport misses metered hotspots and tethering.
+                caps != null && !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            } else {
+                @Suppress("DEPRECATION")
+                cm.isActiveNetworkMetered
+            }
+        }.getOrDefault(false)
     }
 }

@@ -736,6 +736,64 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                 }
 
                 "Playback" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    // Playback health first, because on a Vivo/iQOO/Xiaomi phone
+                    // it is the setting that decides whether anything below it
+                    // matters. It used to sit three levels down among a dozen
+                    // toggles, where the people who need it never found it.
+                    run {
+                        // Re-read on every return to this screen: the user leaves
+                        // to grant the exemption and comes straight back, and a
+                        // row still reading "off" would look like it failed.
+                        var healthTick by remember { mutableIntStateOf(0) }
+                        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner) {
+                            val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) healthTick++
+                            }
+                            lifecycleOwner.lifecycle.addObserver(obs)
+                            onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+                        }
+                        val health = com.streamflow.data.BackgroundHealth
+                        val exempt = remember(healthTick) { health.isBatteryExempt(context) }
+                        val notif = remember(healthTick) { health.hasNotificationPermission(context) }
+                        val saver = remember(healthTick) { health.isSystemPowerSaveOn(context) }
+
+                        SettingsGroupLabel("Playback health")
+                        SettingsCard {
+                            SettingsItem(
+                                if (exempt) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
+                                "Background play protection",
+                                if (exempt) "Granted — playback won't be killed"
+                                else if (health.isAggressiveOem)
+                                    "Off — this phone will stop playback in the background"
+                                else "Off — tap to allow uninterrupted background audio"
+                            ) {
+                                // Some OEM builds refuse the direct dialog; fall
+                                // through to the app's own settings page.
+                                for (i in health.exemptionIntents(context)) {
+                                    if (runCatching { context.startActivity(i) }.isSuccess) break
+                                }
+                            }
+                            SettingsDivider()
+                            SettingsItem(
+                                if (notif) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
+                                "Media notification",
+                                if (notif) "Allowed — lock-screen and headset controls work"
+                                else "Blocked — you'll have no controls outside the app"
+                            ) {
+                                runCatching {
+                                    context.startActivity(Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}")))
+                                }
+                            }
+                            if (saver) {
+                                SettingsDivider()
+                                SettingsItem(Icons.Rounded.BatterySaver, "System battery saver",
+                                    "On — Android may still throttle background playback") {}
+                            }
+                        }
+                    }
                     SettingsGroupLabel("Stream quality")
                     SettingsCard {
                         SettingsItem(Icons.Rounded.HighQuality, "Video quality",
@@ -761,34 +819,6 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.PictureInPicture, "Pop-up video on exit",
                             "Off: leaving the app keeps playing in the notification only", autoPip, vm::setAutoPip)
-                        SettingsDivider()
-                        SettingsItem(Icons.Rounded.BatteryChargingFull, "Background play protection",
-                            "Stop the phone from killing playback (recommended on Vivo/iQOO/Xiaomi)"
-                        ) {
-                            try {
-                                val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
-                                    as android.os.PowerManager
-                                if (android.os.Build.VERSION.SDK_INT >= 23 &&
-                                    !pm.isIgnoringBatteryOptimizations(context.packageName)) {
-                                    val i = android.content.Intent(
-                                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                        android.net.Uri.parse("package:${context.packageName}"))
-                                    context.startActivity(i)
-                                } else {
-                                    android.widget.Toast.makeText(context,
-                                        "Already protected — playback won't be killed",
-                                        android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (_: Exception) {
-                                // Some OEM builds block the dialog; open the app's battery settings instead
-                                try {
-                                    val i = android.content.Intent(
-                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        android.net.Uri.parse("package:${context.packageName}"))
-                                    context.startActivity(i)
-                                } catch (_: Exception) {}
-                            }
-                        }
                         SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.PlayCircle, "Auto-play",
                             "Play related videos automatically", autoPlay

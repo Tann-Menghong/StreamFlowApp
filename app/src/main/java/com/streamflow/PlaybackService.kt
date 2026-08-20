@@ -255,6 +255,14 @@ class PlaybackService : MediaSessionService() {
                         com.streamflow.data.AutoAdvance.releaseIfClaimed(id)
                     }
                 }
+                // A MID-PLAYBACK stall only. Buffering at position zero is
+                // normal startup, and buffering while paused is the user's
+                // doing — neither says anything about the link's capacity.
+                if (playbackState == androidx.media3.common.Player.STATE_BUFFERING &&
+                    player.currentPosition > 0L && player.playWhenReady
+                ) {
+                    noteStall()
+                }
                 if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
                     if (com.streamflow.data.SleepTimer.endOfVideo.value) {
                         player.pause()
@@ -302,6 +310,11 @@ class PlaybackService : MediaSessionService() {
                 // same video later would never auto-advance again.
                 com.streamflow.data.AutoAdvance.reset()
                 retryAttempt = 0
+                // Stall evidence is per-video: a bad patch during the last
+                // episode should not step the next one down before it has had a
+                // chance. The chosen override survives, because the link that
+                // caused it has not changed.
+                recentStalls.clear()
                 // Must reset with the item, or recovering a NEW video would seek
                 // it to the previous video's position.
                 lastGoodPositionMs = 0L
@@ -854,10 +867,112 @@ class PlaybackService : MediaSessionService() {
         } catch (_: Exception) { null }
     }
 
-    // Battery/data-saver cap, shared with headset resume
+    /**
+     * The quality to extract at, mirroring what the player screen would choose.
+     *
+     * This used to return a flat "AUTO" or "480P" and never looked at the user's
+     * quality setting at all — so someone who had pinned 360p on mobile data got
+     * AUTO the moment the service advanced to the next episode by itself, which
+     * is exactly when they were least likely to be watching for it.
+     */
     private suspend fun resumeQuality(): String {
         val prefs = (application as StreamFlowApp).prefs
-        return if (prefs.batterySaver.first() || prefs.dataSaver.first()) "480P" else "AUTO"
+        val cellularPref = try { prefs.qualityCellular.first() } catch (_: Exception) { "SAME" }
+        val base = if (com.streamflow.data.ConnectivityMonitor.metered.value && cellularPref != "SAME") {
+            cellularPref
+        } else {
+            try { prefs.quality.first() } catch (_: Exception) { com.streamflow.data.QualityLadder.AUTO }
+        }
+        // A stall-driven step-down outranks the preference for the rest of this
+        // service's life: the network told us something the setting could not.
+        val effective = stallQualityOverride?.let {
+            com.streamflow.data.QualityLadder.cap(base, it)
+        } ?: base
+        val saverOn = try { prefs.batterySaver.first() } catch (_: Exception) { false }
+        val dataSaverOn = try { prefs.dataSaver.first() } catch (_: Exception) { false }
+        return when {
+            saverOn -> com.streamflow.data.QualityLadder.cap(effective, "480P")
+            effective == com.streamflow.data.QualityLadder.AUTO && dataSaverOn -> "480P"
+            else -> effective
+        }
+    }
+
+    // ── Adaptive quality ─────────────────────────────────────────────────────
+    //
+    // The app plays progressive streams, not adaptive DASH, so ExoPlayer's own
+    // track selection has nothing to switch between: quality is fixed at
+    // extraction and never revisited. A connection that degrades mid-video
+    // therefore produces an endless rebuffer loop at a bitrate the link can no
+    // longer carry — the player stalls, recovers, stalls again, forever, and
+    // never tries the one thing that would fix it.
+    //
+    // Three stalls inside a minute is not bad luck, it is a link that cannot
+    // sustain this stream. Stepping down one rung and re-extracting at the same
+    // position turns stopped video into degraded video.
+
+    private val recentStalls = ArrayDeque<Long>()
+    private var stallQualityOverride: String? = null
+    private var downgrading = false
+    /** Re-preparing after a step-down buffers by definition; that buffering must
+     *  not be counted as evidence for another step-down. */
+    private var ignoreStallsUntil = 0L
+
+    private fun noteStall() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now < ignoreStallsUntil) return
+        recentStalls.addLast(now)
+        while (recentStalls.isNotEmpty() && now - recentStalls.first() > STALL_WINDOW_MS) {
+            recentStalls.removeFirst()
+        }
+        if (recentStalls.size >= STALL_THRESHOLD) maybeStepDownQuality()
+    }
+
+    private fun maybeStepDownQuality() {
+        if (downgrading) return
+        val player = mediaSession?.player ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        if (!com.streamflow.data.MediaUrl.classify(mediaId).let {
+                it == com.streamflow.data.MediaKind.YOUTUBE
+            }) return
+        // A live stream has no fixed ladder to walk down and re-extracting it
+        // would jump the user to the live edge.
+        if (try { player.isCurrentMediaItemLive } catch (_: Exception) { false }) return
+
+        downgrading = true
+        recentStalls.clear()
+        serviceScope.launch {
+            try {
+                val current = resumeQuality()
+                val next = com.streamflow.data.QualityLadder.stepDown(
+                    current, com.streamflow.data.DeviceCaps.autoMaxHeight
+                )
+                if (next == null) {
+                    com.streamflow.data.PlaybackLog.info(
+                        "quality", "stalling at ${com.streamflow.data.QualityLadder.label(current)}, already lowest")
+                    return@launch
+                }
+                com.streamflow.data.PlaybackLog.warn(
+                    "quality",
+                    "$STALL_THRESHOLD stalls in ${STALL_WINDOW_MS / 1000}s -> " +
+                        "${com.streamflow.data.QualityLadder.label(current)} to " +
+                        com.streamflow.data.QualityLadder.label(next)
+                )
+                stallQualityOverride = next
+                ignoreStallsUntil = android.os.SystemClock.elapsedRealtime() + DOWNGRADE_SETTLE_MS
+                android.widget.Toast.makeText(
+                    this@PlaybackService,
+                    "Lowered to ${com.streamflow.data.QualityLadder.label(next)} for a smoother stream",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                reExtractInPlace(mediaId, lastGoodPositionMs)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.streamflow.data.PlaybackLog.warn(
+                    "quality", "step-down failed: ${e.javaClass.simpleName}")
+            } finally {
+                downgrading = false
+            }
+        }
     }
 
     // Per-channel speed override wins over the global default (mirrors PlayerScreen)
@@ -897,7 +1012,13 @@ class PlaybackService : MediaSessionService() {
             return
         }
 
-        val details = com.streamflow.data.YouTubeRepository().getVideoDetails(url, resumeQuality())
+        // Retries a timeout, but NOT a removed or geo-blocked video: advance()
+        // relies on a permanent failure throwing straight through so it can skip
+        // the dead entry instead of stalling the queue on it three times over.
+        val q = resumeQuality()
+        val details = com.streamflow.data.ExtractionRetry.run("advance") {
+            com.streamflow.data.YouTubeRepository().getVideoDetails(url, q)
+        }
         val extras = Bundle().apply { details.audioUrl?.let { putString("audioUrl", it) } }
         val builder = MediaItem.Builder()
             .setUri(details.streamUrl)
@@ -980,5 +1101,13 @@ class PlaybackService : MediaSessionService() {
 
         /** Position is captured every 5 s but written every third capture. */
         private const val SAVE_EVERY_N_TICKS = 3
+
+        /** Three stalls inside a minute is a link that cannot carry this
+         *  stream, not a run of bad luck. */
+        private const val STALL_THRESHOLD = 3
+        private const val STALL_WINDOW_MS = 60_000L
+        /** Grace period after a step-down, so the re-prepare's own buffering
+         *  cannot be counted as evidence for another one. */
+        private const val DOWNGRADE_SETTLE_MS = 20_000L
     }
 }
