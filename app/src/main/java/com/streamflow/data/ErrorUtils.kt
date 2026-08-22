@@ -24,8 +24,13 @@ enum class ExtractionError {
     /** A timeout or a dropped connection. The same request will probably work. */
     TRANSIENT,
 
-    /** Removed, private, or never existed. Retrying reaches the same answer. */
+    /** Removed or never existed. Retrying reaches the same answer. */
     UNAVAILABLE,
+
+    /** Uploaded but not shared. Distinct from UNAVAILABLE because the user can
+     *  act on it — a private video is one they may have access to via an
+     *  account, where a deleted one is simply gone. */
+    PRIVATE,
 
     /** Blocked in this country. */
     GEO_BLOCKED,
@@ -56,8 +61,8 @@ fun classifyExtractionError(e: Throwable): ExtractionError {
         name.contains("GeographicRestriction") -> ExtractionError.GEO_BLOCKED
         name.contains("Paid") -> ExtractionError.PAID
         name.contains("ReCaptcha") -> ExtractionError.CAPTCHA
-        name.contains("Private") ||
-            name.contains("SoundCloudGoPlus") ||
+        name.contains("Private") -> ExtractionError.PRIVATE
+        name.contains("SoundCloudGoPlus") ||
             name.contains("ContentNotAvailable") ||
             name.contains("ContentNotSupported") -> ExtractionError.UNAVAILABLE
         // NewPipe raises ParsingException (and ExtractionException) when the
@@ -85,6 +90,7 @@ fun ExtractionError.userMessage(): String = when (this) {
     ExtractionError.OFFLINE -> "No internet connection. Check your network and try again."
     ExtractionError.TRANSIENT -> "Network error. Check your connection and try again."
     ExtractionError.UNAVAILABLE -> "This video is unavailable."
+    ExtractionError.PRIVATE -> "This video is private."
     ExtractionError.GEO_BLOCKED -> "This video isn't available in your country."
     ExtractionError.AGE_RESTRICTED -> "This video is age-restricted and can't be played."
     ExtractionError.PAID -> "This video requires a paid membership."

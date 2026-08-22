@@ -395,16 +395,23 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     // Measured, not estimated: this is the single biggest
                     // contributor to how long a video takes to open, and until
                     // now nothing recorded it. Shown in the stats overlay.
-                    val extractStart = android.os.SystemClock.elapsedRealtime()
                     // Retries a timeout or a dropped connection, and waits for
                     // signal when there is none. Playback that had already
                     // started recovered from exactly these failures; opening a
                     // video gave up on the first one and showed an error screen
                     // with a button the user had to press themselves.
+                    //
+                    // Timed INSIDE the retry, around the attempt that succeeded.
+                    // Timing the whole sequence reported retry backoff and time
+                    // spent waiting for signal as "extraction", so the stats
+                    // overlay would show 20 s for an extraction that took 900 ms
+                    // on a phone that had briefly lost signal.
                     val details = com.streamflow.data.ExtractionRetry.run("open video") {
-                        repo.getVideoDetails(videoUrl, quality)
+                        val t0 = android.os.SystemClock.elapsedRealtime()
+                        repo.getVideoDetails(videoUrl, quality).also {
+                            _extractionMs.value = android.os.SystemClock.elapsedRealtime() - t0
+                        }
                     }
-                    _extractionMs.value = android.os.SystemClock.elapsedRealtime() - extractStart
                     if (gen == loadGeneration) {
                         _uiState.value = PlayerUiState.Loading(LoadStage.PREPARING)
                     }
@@ -625,32 +632,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private fun capQuality(pref: String, cap: String): String =
         com.streamflow.data.QualityLadder.cap(pref, cap)
 
-    // activeNetwork/getNetworkCapabilities are API 23. Below that they raise
-    // NoSuchMethodError, an Error that `catch (Exception)` lets through — so the
-    // data-saver check crashed instead of degrading. Catch Throwable and use the
-    // deprecated activeNetworkInfo on older releases.
-    private fun isOnCellular(): Boolean = try {
-        val cm = getApplication<Application>()
-            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
-            as android.net.ConnectivityManager
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-            caps != null &&
-                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
-                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
-        } else {
-            @Suppress("DEPRECATION")
-            (cm.activeNetworkInfo?.type == android.net.ConnectivityManager.TYPE_MOBILE)
-        }
-    } catch (_: Throwable) { false }
+    /**
+     * "Is the user paying for these bytes?"
+     *
+     * Was a private TRANSPORT_CELLULAR test, which disagreed with the service's
+     * ConnectivityMonitor.metered in both directions: a Wi-Fi network the user
+     * marked as metered, and most VPNs, read as free here and as metered there.
+     * The same video then opened at a different quality depending on whether the
+     * player screen or the background service started it. One definition now,
+     * and it is the one that asks the question the setting is actually about.
+     */
+    private fun isOnCellular(): Boolean = com.streamflow.data.ConnectivityMonitor.metered.value
 
-    private fun isDirectStream(url: String): Boolean {
-        val lower = url.lowercase()
-        return lower.startsWith("file://") || lower.startsWith("content://") ||
-               lower.contains(".m3u8") || lower.contains(".mp4") ||
-               lower.contains(".m4a") || lower.contains(".webm") ||
-               lower.contains("/hls/") || lower.contains("/stream/")
-    }
+    // A sixth copy of the URL rule used to live here, and it had drifted: it
+    // knew file:// and content:// but not the bare /storage/, /data/ and
+    // /sdcard/ paths, so a downloaded file opened by absolute path was sent to
+    // the YouTube extractor. MediaUrl is the single classifier.
+    private fun isDirectStream(url: String): Boolean =
+        com.streamflow.data.MediaUrl.isLocalOrDirect(url)
 
     private fun extractTitleFromUrl(url: String): String {
         return try {

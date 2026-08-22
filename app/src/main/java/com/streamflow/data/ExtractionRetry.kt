@@ -33,8 +33,25 @@ object ExtractionRetry {
     /** Bounded wait for signal. Short: someone is watching a spinner. */
     private const val OFFLINE_WAIT_MS = 15_000L
 
-    suspend fun <T> run(what: String, block: suspend () -> T): T {
+    /**
+     * @param attempts how many tries in total. The default suits a user staring
+     *   at a loading screen; callers acting on a button press the user expects
+     *   to respond immediately (skip to next) should ask for fewer.
+     * @param waitForNetwork whether an OFFLINE failure may pause for signal. A
+     *   press of "next" on a headset must not hang for half a minute.
+     */
+    suspend fun <T> run(
+        what: String,
+        attempts: Int = MAX_ATTEMPTS,
+        waitForNetwork: Boolean = true,
+        block: suspend () -> T
+    ): T {
         var attempt = 0
+        // At most ONE wait for signal per sequence. Waiting on every retryable
+        // failure multiplied the budget by the attempt count: three attempts
+        // meant the user could watch a spinner for 15 s + 15 s + backoff before
+        // being told what a single immediate error would have said.
+        var waitedForNetwork = false
         while (true) {
             attempt++
             try {
@@ -42,7 +59,7 @@ object ExtractionRetry {
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 val kind = classifyExtractionError(e)
-                if (!kind.isRetryable || attempt >= MAX_ATTEMPTS) {
+                if (!kind.isRetryable || attempt >= attempts) {
                     PlaybackLog.warn(
                         "extract",
                         "$what failed: $kind after $attempt attempt(s)" +
@@ -50,8 +67,11 @@ object ExtractionRetry {
                     )
                     throw e
                 }
-                PlaybackLog.info("extract", "$what $kind, retry $attempt/$MAX_ATTEMPTS")
-                if (kind.needsNetwork && !ConnectivityMonitor.online.value) {
+                PlaybackLog.info("extract", "$what $kind, retry $attempt/$attempts")
+                if (kind.needsNetwork && waitForNetwork && !waitedForNetwork &&
+                    !ConnectivityMonitor.online.value
+                ) {
+                    waitedForNetwork = true
                     ConnectivityMonitor.awaitOnline(OFFLINE_WAIT_MS)
                 }
                 delay(PlaybackRecovery.backoffMs(attempt))

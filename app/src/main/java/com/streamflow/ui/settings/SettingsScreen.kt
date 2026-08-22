@@ -768,10 +768,22 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                                     "Off — this phone will stop playback in the background"
                                 else "Off — tap to allow uninterrupted background audio"
                             ) {
-                                // Some OEM builds refuse the direct dialog; fall
-                                // through to the app's own settings page.
-                                for (i in health.exemptionIntents(context)) {
-                                    if (runCatching { context.startActivity(i) }.isSuccess) break
+                                if (exempt) {
+                                    // Already granted. Re-asking shows the system
+                                    // "let this app always run in the background?"
+                                    // prompt to someone whose row says "Granted",
+                                    // which reads as the setting having failed.
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Already allowed — nothing to change",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    // Some OEM builds refuse the direct dialog; fall
+                                    // through to the app's own settings page.
+                                    for (i in health.exemptionIntents(context)) {
+                                        if (runCatching { context.startActivity(i) }.isSuccess) break
+                                    }
                                 }
                             }
                             SettingsDivider()

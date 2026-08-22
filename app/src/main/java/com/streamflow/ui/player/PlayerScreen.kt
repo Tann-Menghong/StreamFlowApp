@@ -931,6 +931,28 @@ fun PlayerScreen(
         // Custom actions expose the same three operations through the
         // accessibility API without changing anything for a sighted user.
         val a11ySeconds = (skipMs / 1000).toInt()
+        // remember-ed deliberately. The semantics lambda re-runs on every
+        // play/pause because it reads playerIsPlaying for stateDescription, and
+        // rebuilding the list there hands Compose three new action objects each
+        // time — new accessibility action ids, reassigned underneath TalkBack's
+        // local context menu while the user has it open. The actions themselves
+        // depend only on the controller and the skip length.
+        val a11yActions = remember(mc, skipMs, a11ySeconds) {
+            listOf(
+                CustomAccessibilityAction("Play or pause") {
+                    if (mc.isPlaying) mc.pause() else mc.play(); true
+                },
+                CustomAccessibilityAction("Skip forward $a11ySeconds seconds") {
+                    // Clamped like its sibling below. Unbounded, this seeks past
+                    // the end when invoked in the last few seconds of a video.
+                    val end = if (mc.duration > 0L) mc.duration else Long.MAX_VALUE
+                    mc.seekTo((mc.currentPosition + skipMs).coerceAtMost(end)); true
+                },
+                CustomAccessibilityAction("Skip back $a11ySeconds seconds") {
+                    mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)); true
+                }
+            )
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -938,17 +960,7 @@ fun PlayerScreen(
                 .semantics {
                     contentDescription = "Video player"
                     stateDescription = if (playerIsPlaying) "Playing" else "Paused"
-                    customActions = listOf(
-                        CustomAccessibilityAction("Play or pause") {
-                            if (mc.isPlaying) mc.pause() else mc.play(); true
-                        },
-                        CustomAccessibilityAction("Skip forward $a11ySeconds seconds") {
-                            mc.seekTo(mc.currentPosition + skipMs); true
-                        },
-                        CustomAccessibilityAction("Skip back $a11ySeconds seconds") {
-                            mc.seekTo((mc.currentPosition - skipMs).coerceAtLeast(0L)); true
-                        }
-                    )
+                    customActions = a11yActions
                 }
         ) {
             Box(

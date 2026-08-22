@@ -102,7 +102,7 @@ class ExtractionErrorTest {
         val permanent = listOf(
             AgeRestrictedContentException() to ExtractionError.AGE_RESTRICTED,
             GeographicRestrictionException() to ExtractionError.GEO_BLOCKED,
-            PrivateContentException() to ExtractionError.UNAVAILABLE,
+            PrivateContentException() to ExtractionError.PRIVATE,
             ContentNotAvailableException() to ExtractionError.UNAVAILABLE,
             ReCaptchaException() to ExtractionError.CAPTCHA,
             PaidContentException() to ExtractionError.PAID
@@ -112,6 +112,17 @@ class ExtractionErrorTest {
             assertEquals(e.javaClass.simpleName, expected, kind)
             assertFalse("$expected must not be retried", kind.isRetryable)
         }
+    }
+
+    @Test
+    fun `a private video is not just unavailable`() {
+        // "This video is unavailable" is what a deleted video gets. A private
+        // one is a different situation the user can sometimes act on, and
+        // collapsing the two threw that away.
+        val kind = classifyExtractionError(PrivateContentException())
+        assertEquals(ExtractionError.PRIVATE, kind)
+        assertFalse(kind.isRetryable)
+        assertTrue(kind.userMessage().contains("private"))
     }
 
     @Test
