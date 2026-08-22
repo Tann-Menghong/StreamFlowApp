@@ -244,9 +244,18 @@ fun PlayerScreen(
     val recovery by com.streamflow.data.PlaybackRecovery.state.collectAsState()
     // Set only when automatic recovery has actually given up.
     val playbackFatal by com.streamflow.data.PlaybackRecovery.fatal.collectAsState()
+    // The opening buffer, before a single frame has decoded. Tracked apart
+    // from isRebuffering so playback STATS stay honest while the UI stops
+    // pretending nothing is happening.
+    var isOpeningBuffer by remember(videoUrl) { mutableStateOf(false) }
+    // Distinct labels for distinct states. "Buffering" during the very first
+    // load is misleading -- nothing has played yet, so there is nothing to
+    // re-buffer -- and an unlabelled spinner is what made a slow start
+    // indistinguishable from a hang.
     val bufferLabel = when {
         recovery.waitingForNetwork -> "Waiting for network"
         recovery.active -> "Reconnecting ${recovery.attempt}/${com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS}"
+        isOpeningBuffer -> "Starting video"
         else -> "Buffering"
     }
 
@@ -588,6 +597,17 @@ fun PlayerScreen(
                 stallStartedAt = 0L
             }
             isRebuffering = stalling
+            // Kept SEPARATE from `stalling` on purpose. The rebuffer counter is
+            // a quality metric and must keep excluding the initial load, but the
+            // SPINNER must not: extraction finishing flips the state to Ready,
+            // and from that moment until the first frame decodes the player is
+            // buffering at position 0 — which `stalling` excludes. The result
+            // was a black frame with no spinner, no progress and no error for
+            // the entire opening buffer, which is precisely the "stuck" a user
+            // reports. Any buffering the player is actually trying to resolve
+            // now shows something.
+            isOpeningBuffer = mc.playbackState == Player.STATE_BUFFERING &&
+                mc.currentPosition <= 0L && mc.playWhenReady
             // First moment the player actually had content ready to show.
             if (timeToPlayMs == 0L && mc.playbackState == Player.STATE_READY) {
                 timeToPlayMs = now - loadStartedAt
@@ -1143,7 +1163,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // is dead code at best — and where the PlayerView itself sits inside
             // the Ready branch (the portrait player) it shadowed the video and
             // left a black screen. Never add a duplicate branch to these blocks.
-            if (state is PlayerUiState.Ready && (isRebuffering || recovery.active)) {
+            if (state is PlayerUiState.Ready && (isRebuffering || isOpeningBuffer || recovery.active)) {
                 com.streamflow.ui.components.VideoLoadingIndicator(
                     progress = bufferedPercent / 100f,
                     label = bufferLabel,
@@ -1762,7 +1782,7 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         // Inside the Ready branch, AFTER the PlayerView — not as a
                         // second `is Ready ->` branch, which would shadow the
                         // PlayerView above and black out the video.
-                        if ((isRebuffering || recovery.active) && !audioOnly) {
+                        if ((isRebuffering || isOpeningBuffer || recovery.active) && !audioOnly) {
                             com.streamflow.ui.components.VideoLoadingIndicator(
                                 progress = bufferedPercent / 100f,
                                 label = bufferLabel,

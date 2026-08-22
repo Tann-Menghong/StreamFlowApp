@@ -235,6 +235,9 @@ class PlaybackService : MediaSessionService() {
         // churn can't cancel it
         player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
+                // Arm or disarm the "buffering that never ends" watchdog. Must
+                // run for every state, including the ones that END a stall.
+                updateBufferWatchdog(player)
                 if (playbackState == androidx.media3.common.Player.STATE_READY) {
                     // Real playback resumed: forget the retry budget so a later,
                     // unrelated glitch gets its own full set of attempts rather
@@ -311,6 +314,13 @@ class PlaybackService : MediaSessionService() {
             // entirely and restarted the episode from zero.
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) startPositionTicker() else { stopPositionTicker(); savePositionNow() }
+            }
+
+            // Pausing during a buffer does not change playbackState, so without
+            // this the watchdog would keep counting and "recover" a video the
+            // user had deliberately paused.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                updateBufferWatchdog(player)
             }
             // Track play history for the Previous button: whenever the item changes
             // to a genuinely different video, remember the one we just left.
@@ -540,6 +550,79 @@ class PlaybackService : MediaSessionService() {
         return com.streamflow.data.PlaybackRecovery.NO_STATUS
     }
 
+    // ── Buffering watchdog ───────────────────────────────────────────────────
+    //
+    // ExoPlayer has no buffering timeout of its own. It reports STATE_BUFFERING
+    // and waits — forever, if that is how long the bytes take. An error is only
+    // raised when the data source actually fails, so a server that accepts the
+    // connection and then trickles (or sends nothing at all, on a link too slow
+    // to trip OkHttp's 20 s read timeout between packets) leaves the player
+    // buffering with no error, no timeout and nothing to recover from.
+    //
+    // The v6.9.0 stall detector cannot see it either: it requires
+    // currentPosition > 0, so the entire initial load — the case users
+    // describe as "stuck loading" — was explicitly excluded from the only
+    // stall-detection the app had.
+    //
+    // This closes that hole at the layer that already owns bounded retries, so
+    // a stuck load walks the same attempt budget as a failed one and ends at the
+    // same visible give-up state rather than an indicator that never resolves.
+
+    private var bufferWatchdog: kotlinx.coroutines.Job? = null
+    private var bufferingSince = 0L
+
+    /** Called on every state change; starts or clears the watchdog. */
+    private fun updateBufferWatchdog(player: androidx.media3.common.Player) {
+        val buffering = player.playbackState == androidx.media3.common.Player.STATE_BUFFERING &&
+            player.playWhenReady
+        if (!buffering) {
+            bufferingSince = 0L
+            bufferWatchdog?.cancel()
+            bufferWatchdog = null
+            return
+        }
+        if (bufferWatchdog?.isActive == true) return // already watching this stall
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        bufferingSince = startedAt
+        // Startup gets longer: a cold DNS lookup, a redirect chain and the first
+        // segment of a high-bitrate stream legitimately take time on a slow
+        // link, and cutting that short would re-extract videos that were about
+        // to play. Mid-playback there is already a buffer, so silence for this
+        // long means the link is gone, not slow.
+        val limit = if (player.currentPosition <= 0L) STARTUP_STALL_MS else MIDPLAY_STALL_MS
+        bufferWatchdog = serviceScope.launch {
+            delay(limit)
+            val p = mediaSession?.player ?: return@launch
+            // Re-check rather than trust the timer: anything that resolved in
+            // the meantime cleared bufferingSince.
+            if (bufferingSince != startedAt) return@launch
+            if (p.playbackState != androidx.media3.common.Player.STATE_BUFFERING ||
+                !p.playWhenReady
+            ) return@launch
+            onBufferTimedOut(p, limit)
+        }
+    }
+
+    private fun onBufferTimedOut(
+        player: androidx.media3.common.Player,
+        waitedMs: Long
+    ) {
+        val mediaId = player.currentMediaItem?.mediaId
+        val atStartup = player.currentPosition <= 0L
+        com.streamflow.data.PlaybackLog.warn(
+            "watchdog",
+            "no data for ${waitedMs / 1000}s " +
+                (if (atStartup) "while starting" else "at ${player.currentPosition / 1000}s") +
+                " video=${com.streamflow.data.PlaybackLog.ref(mediaId)}"
+        )
+        val remote = mediaId != null && !com.streamflow.data.MediaUrl.isLocalFile(mediaId)
+        // A local file that will not buffer is not going to be fixed by
+        // re-extracting a URL it does not have.
+        val plan = if (remote) com.streamflow.data.RecoveryPlan.REEXTRACT
+        else com.streamflow.data.RecoveryPlan.RETRY
+        scheduleRecovery(plan, mediaId, remote, "stalled")
+    }
+
     private fun handlePlayerError(error: androidx.media3.common.PlaybackException) {
         val player = mediaSession?.player ?: return
         val mediaId = player.currentMediaItem?.mediaId
@@ -562,6 +645,25 @@ class PlaybackService : MediaSessionService() {
                 " plan=$plan video=${com.streamflow.data.PlaybackLog.ref(mediaId)}"
         )
 
+        scheduleRecovery(plan, mediaId, remote, error.errorCodeName)
+    }
+
+    /**
+     * The one recovery path, shared by a reported error and a silent stall.
+     *
+     * Both failures want identical treatment — bounded attempts, wait for signal
+     * rather than spend attempts against a dead network, re-extract or re-prepare,
+     * and a visible give-up when the budget runs out — so they share one
+     * implementation and one attempt counter. A stall that keeps retrying on its
+     * own schedule while errors retry on another is how two recovery systems
+     * fight each other.
+     */
+    private fun scheduleRecovery(
+        plan: com.streamflow.data.RecoveryPlan,
+        mediaId: String?,
+        remote: Boolean,
+        cause: String
+    ) {
         val exhausted = retryAttempt >= com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS
         if (plan == com.streamflow.data.RecoveryPlan.FATAL || exhausted) {
             // Say so rather than leaving a frozen frame behind an indicator that
@@ -569,7 +671,7 @@ class PlaybackService : MediaSessionService() {
             com.streamflow.data.PlaybackLog.error(
                 "recovery",
                 if (exhausted) "gave up after ${com.streamflow.data.PlaybackRecovery.MAX_ATTEMPTS} attempts"
-                else "unrecoverable (${error.errorCodeName})"
+                else "unrecoverable ($cause)"
             )
             com.streamflow.data.PlaybackRecovery.onGaveUp(plan, exhausted)
             retryAttempt = 0
@@ -1242,5 +1344,21 @@ class PlaybackService : MediaSessionService() {
          *  skip causes, short enough that a genuinely failing link is still
          *  caught within the same minute. */
         private const val SEEK_SETTLE_MS = 6_000L
+        /**
+         * How long the player may sit in STATE_BUFFERING before the app stops
+         * believing it.
+         *
+         * Startup is the more generous of the two because a cold connection,
+         * a redirect chain and the first segment of a high-bitrate stream are
+         * genuinely slow on a weak link, and cutting that short would
+         * re-extract videos that were a second from playing. Mid-playback a
+         * buffer already exists, so this much silence means the link is gone.
+         *
+         * These are recovery triggers, not a way to hide a slow load: nothing
+         * is shown to the user at the deadline, the app re-resolves the stream
+         * and keeps the position.
+         */
+        private const val STARTUP_STALL_MS = 30_000L
+        private const val MIDPLAY_STALL_MS = 20_000L
     }
 }
