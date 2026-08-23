@@ -73,6 +73,35 @@ object BufferHealth {
     fun exhausted(waitedMs: Long, sinceProgressMs: Long, atStartup: Boolean): Boolean =
         sinceProgressMs >= NO_PROGRESS_MS || waitedMs >= hardLimitMs(atStartup)
 
+    // ── What the loading ring should actually show ───────────────────────
+
+    /**
+     * Buffer ahead at which playback reliably begins, for DISPLAY only.
+     *
+     * Not a control threshold -- ExoPlayer's own bufferForPlaybackMs decides
+     * when playback starts and is untouched by this. This is the denominator
+     * for the ring, chosen slightly above the player's real trigger so the arc
+     * is still climbing when playback begins rather than sitting full and
+     * waiting.
+     */
+    const val START_TARGET_MS = 2_500L
+
+    /**
+     * Progress toward being able to play, 0f..1f.
+     *
+     * The indicator was previously fed `bufferedPercentage`, which is the
+     * fraction of the WHOLE VIDEO that is buffered. During the opening buffer of
+     * a forty-minute video, twenty seconds of data is 0.8% -- so the ring sat at
+     * zero and looked frozen through exactly the wait it exists to explain, and
+     * the number it showed answered a question nobody was asking. How far
+     * through the video the buffer reaches is irrelevant while you are waiting
+     * to start; how close the buffer is to being playable is the whole question.
+     *
+     * Both quantities are real. This one is the one the user is waiting on.
+     */
+    fun startupProgress(aheadMs: Long): Float =
+        (aheadMs.toFloat() / START_TARGET_MS).coerceIn(0f, 1f)
+
     // ── Sustained health, used by the quality ladder ─────────────────────────
 
     /** Buffer ahead of the playhead below this and the next hiccup is a stall. */

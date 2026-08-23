@@ -488,7 +488,7 @@ fun PlayerScreen(
     var playerDuration by remember { mutableLongStateOf(0L) }
     // Rebuffer state, driven by the same 250ms poll below.
     var isRebuffering by remember { mutableStateOf(false) }
-    var bufferedPercent by remember { mutableIntStateOf(0) }
+    var bufferedAheadMs by remember(videoUrl) { mutableLongStateOf(0L) }
     // ── Playback quality metrics (shown in the stats overlay) ────────────────
     // Measured, never estimated. Rebuffer count and stall time are the two
     // numbers that actually describe "does this video lag", and nothing in the
@@ -635,7 +635,12 @@ fun PlayerScreen(
             if (timeToPlayMs == 0L && mc.playbackState == Player.STATE_READY) {
                 timeToPlayMs = now - loadStartedAt
             }
-            bufferedPercent = mc.bufferedPercentage.coerceIn(0, 100)
+            // How much playable video sits ahead of the playhead. This
+            // replaced bufferedPercentage (the fraction of the WHOLE video that
+            // is buffered) as the loading ring's input: twenty seconds of data
+            // in a forty-minute video is 0.8%, so the ring sat at zero and
+            // looked frozen through exactly the wait it exists to explain.
+            bufferedAheadMs = (mc.bufferedPosition - mc.currentPosition).coerceAtLeast(0L)
         }
       }
     }
@@ -1255,7 +1260,8 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
             // left a black screen. Never add a duplicate branch to these blocks.
             if (state is PlayerUiState.Ready && (isRebuffering || isOpeningBuffer || recovery.active)) {
                 com.streamflow.ui.components.VideoLoadingIndicator(
-                    progress = bufferedPercent / 100f,
+                    // Progress toward PLAYABLE, not toward the end of the video.
+                    progress = com.streamflow.data.BufferHealth.startupProgress(bufferedAheadMs),
                     label = bufferLabel,
                     modifier = Modifier.align(Alignment.Center),
                     size = 64.dp
@@ -1882,7 +1888,9 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                         // PlayerView above and black out the video.
                         if ((isRebuffering || isOpeningBuffer || recovery.active) && !audioOnly) {
                             com.streamflow.ui.components.VideoLoadingIndicator(
-                                progress = bufferedPercent / 100f,
+                                // Same as the fullscreen indicator: progress
+                                // toward playable, not toward the video's end.
+                                progress = com.streamflow.data.BufferHealth.startupProgress(bufferedAheadMs),
                                 label = bufferLabel,
                                 modifier = Modifier.align(Alignment.Center),
                                 size = 60.dp

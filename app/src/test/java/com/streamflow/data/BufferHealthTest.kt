@@ -177,6 +177,41 @@ class BufferHealthTest {
         )
     }
 
+    // ── What the loading ring reports ───────────────────────────────
+
+    @Test
+    fun `an empty buffer reads as no progress`() {
+        assertEquals(0f, BufferHealth.startupProgress(0L), 0.001f)
+    }
+
+    @Test
+    fun `progress climbs with the buffer`() {
+        // The regression this exists for: fed bufferedPercentage, the ring
+        // showed 0.008 for twenty seconds of a forty-minute video and looked
+        // frozen. Against what is actually needed to start, the same buffer is
+        // a full ring.
+        val quarter = BufferHealth.startupProgress(BufferHealth.START_TARGET_MS / 4)
+        val half = BufferHealth.startupProgress(BufferHealth.START_TARGET_MS / 2)
+        assertTrue(quarter > 0f)
+        assertTrue(half > quarter)
+    }
+
+    @Test
+    fun `progress never exceeds full`() {
+        // A buffer well past the start target must not drive the arc past 360
+        // degrees, and a negative reading must not drive it backwards.
+        assertEquals(1f, BufferHealth.startupProgress(BufferHealth.START_TARGET_MS * 20), 0.001f)
+        assertEquals(0f, BufferHealth.startupProgress(-5_000L), 0.001f)
+    }
+
+    @Test
+    fun `the display target is above the player's own start threshold`() {
+        // DefaultLoadControl starts playback at 800 ms buffered. A display
+        // target at or below that would show a full ring before playback began,
+        // which is the frozen-looking indicator again with a different value.
+        assertTrue(BufferHealth.START_TARGET_MS > 800L)
+    }
+
     // ── The ladder climbing back up ──────────────────────────────────────────
 
     @Test
