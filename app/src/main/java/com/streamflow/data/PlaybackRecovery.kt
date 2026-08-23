@@ -198,6 +198,53 @@ object AutoAdvance {
      *  still auto-advance when IT ends. */
     fun reset() = synchronized(lock) { claimedFor = null }
 
+    // ── Sequence continuation ────────────────────────────────────────────────
+    //
+    // PlaybackService.advance() already skips up to three dead entries before
+    // giving up, because a queue full of expired links must not spin. The
+    // player SCREEN's countdown had no equivalent: it popped one entry,
+    // navigated to it, and if that video would not extract -- deleted, private,
+    // geo-blocked, a link that rotted in a queue saved last week -- the user
+    // landed on an error page with "Go back" and "Retry" as the only options.
+    //
+    // popNext() had already consumed the entry, so the rest of the queue was
+    // still there and nothing could reach it. One dead video stopped the whole
+    // sequence, which is the failure a queue exists to prevent.
+    //
+    // These three calls let the screen tell the difference between a video the
+    // USER opened (leave the error alone; they asked for this one) and one the
+    // SEQUENCE opened (skip it and keep going, up to a limit).
+
+    /** Consecutive automatic skips allowed before the sequence stops and asks.
+     *  Bounded for the same reason the service's loop is: a queue of dead links
+     *  must not silently burn through fifty extractions. */
+    const val MAX_SEQUENCE_SKIPS = 3
+
+    private var autoTarget: String? = null
+    private var sequenceFailures = 0
+
+    /** The sequence is opening [url] on its own. */
+    fun markAuto(url: String) = synchronized(lock) { autoTarget = url }
+
+    /**
+     * Was [url] opened by the sequence rather than by the user?
+     *
+     * Consumes the mark, so a later manual retry of the same video is treated
+     * as the user's choice and left alone.
+     */
+    fun consumeAuto(url: String): Boolean = synchronized(lock) {
+        if (autoTarget == url) { autoTarget = null; true } else false
+    }
+
+    /** @return true while the sequence may still skip to another video. */
+    fun onSequenceFailure(): Boolean = synchronized(lock) {
+        sequenceFailures++
+        sequenceFailures <= MAX_SEQUENCE_SKIPS
+    }
+
+    /** Anything that plays proves the sequence is healthy again. */
+    fun onSequenceProgress() = synchronized(lock) { sequenceFailures = 0 }
+
     /**
      * Release the claim on a video that has started over from the beginning.
      *

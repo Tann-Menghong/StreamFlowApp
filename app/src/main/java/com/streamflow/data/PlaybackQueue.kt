@@ -67,6 +67,11 @@ object PlaybackQueue {
         return item
     }
 
+    /** The next item WITHOUT consuming it. The skip-a-dead-video path has to
+     *  know something is there before it commits to moving on, and popping
+     *  first is what stranded the rest of the queue when the move failed. */
+    fun peekNext(): VideoItem? = _queue.value.firstOrNull()
+
     fun hasNext() = _queue.value.isNotEmpty()
 
     fun clear() { _queue.value = emptyList() }

@@ -543,6 +543,18 @@ fun PlayerScreen(
     // during onDestroy is not cancelled with the service, skips writes where the
     // position has not moved, and logs failures instead of dropping them.
 
+    // Anything that actually plays clears the consecutive-failure count, so a
+    // later bad patch gets the full skip budget rather than inheriting a spent one.
+    LaunchedEffect(state, videoUrl) {
+        if (state !is PlayerUiState.Ready) return@LaunchedEffect
+        com.streamflow.data.AutoAdvance.onSequenceProgress()
+        // Consume the mark on SUCCESS too, or it would outlive the navigation it
+        // belongs to: a video the sequence opened successfully would stay marked
+        // forever, and if the user later opened that same video by hand and it
+        // failed, the app would skip past it as though the sequence had.
+        com.streamflow.data.AutoAdvance.consumeAuto(videoUrl)
+    }
+
     // ── Load sponsor segments on video load ───────────────────────────────────
     LaunchedEffect(videoUrl) { vm.loadSponsorSegments(videoUrl) }
 
@@ -845,6 +857,39 @@ fun PlayerScreen(
         }
     }
 
+    // ── One dead video must not stop the sequence ────────────────────────────
+    //
+    // The countdown above pops a queue entry and navigates to it. If that video
+    // will not extract -- deleted, private, geo-blocked, or a link that rotted
+    // while it sat in the queue -- this screen used to show an error with "Go
+    // back" and "Retry" and nothing else, while the rest of the queue sat
+    // unreachable behind the entry popNext() had already consumed.
+    //
+    // Only videos the SEQUENCE opened are skipped. One the user chose stays put
+    // and keeps its error, because they asked for that video specifically.
+    var autoSkipping by remember(videoUrl) { mutableStateOf(false) }
+    LaunchedEffect(state, videoUrl) {
+        if (state !is PlayerUiState.Error) return@LaunchedEffect
+        if (!com.streamflow.data.AutoAdvance.consumeAuto(videoUrl)) return@LaunchedEffect
+        val next = PlaybackQueue.peekNext() ?: return@LaunchedEffect
+        // Bounded, so a queue of fifty dead links cannot burn fifty extractions.
+        // At the limit the sequence stops and leaves the error and its buttons.
+        if (!com.streamflow.data.AutoAdvance.onSequenceFailure()) {
+            com.streamflow.data.PlaybackLog.warn(
+                "sequence", "stopping after ${com.streamflow.data.AutoAdvance.MAX_SEQUENCE_SKIPS} unplayable videos")
+            return@LaunchedEffect
+        }
+        com.streamflow.data.PlaybackLog.info(
+            "sequence", "skipping unplayable ${com.streamflow.data.PlaybackLog.ref(videoUrl)}")
+        autoSkipping = true
+        // Long enough to read, short enough not to feel stuck. Told, not hidden:
+        // silently jumping videos looks like the app losing the user's place.
+        delay(1200L)
+        PlaybackQueue.popNext()
+        com.streamflow.data.AutoAdvance.markAuto(next.url)
+        onVideoClick(next.url)
+    }
+
     // ── Auto-play countdown (when video ends, auto-navigate to next) ─────────
     var autoPlayCountdown by remember { mutableIntStateOf(0) }
     var autoPlayTarget by remember { mutableStateOf("") }
@@ -876,7 +921,15 @@ fun PlayerScreen(
                 // Queue takes priority over related video auto-play (and plays
                 // regardless of the toggle — queueing is explicit user intent)
                 if (PlaybackQueue.hasNext()) {
-                    PlaybackQueue.popNext()?.let { onVideoClick(it.url) }; break
+                    PlaybackQueue.popNext()?.let {
+                        // Mark it: if this one will not extract, the screen that
+                        // opens next has to know the sequence put it there and
+                        // keep going, rather than stopping on an error page with
+                        // the rest of the queue stranded behind it.
+                        com.streamflow.data.AutoAdvance.markAuto(it.url)
+                        onVideoClick(it.url)
+                    }
+                    break
                 }
                 if (!autoPlayEnabled) continue
                 autoPlayTarget = nextUrl
@@ -888,7 +941,10 @@ fun PlayerScreen(
                     delay(1000L)
                 }
                 autoPlayCountdown = 0
-                if (autoPlayTarget.isNotEmpty()) onVideoClick(autoPlayTarget)
+                if (autoPlayTarget.isNotEmpty()) {
+                    com.streamflow.data.AutoAdvance.markAuto(autoPlayTarget)
+                    onVideoClick(autoPlayTarget)
+                }
                 break
             }
         }
@@ -1168,11 +1224,25 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     Text(s.message, color = Color.White, fontSize = 14.sp,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick = { isFullscreen = false; onBack() }) {
-                            Text("Go back", color = Color.White)
+                    if (autoSkipping) {
+                        Text("Skipping to the next video\u2026", color = Color.White.copy(0.75f),
+                            fontSize = 13.sp)
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedButton(onClick = { isFullscreen = false; onBack() }) {
+                                Text("Go back", color = Color.White)
+                            }
+                            Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
                         }
-                        Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
+                        // The rest of the queue is still there. Without this it
+                        // was unreachable: the entry that failed had already
+                        // been popped, so nothing on this screen could move on.
+                        if (PlaybackQueue.hasNext()) {
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = {
+                                PlaybackQueue.popNext()?.let { onVideoClick(it.url) }
+                            }) { Text("Skip to next video", color = Color.White) }
+                        }
                     }
                 }
                 else -> {}
@@ -1756,7 +1826,17 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                     ) {
                         Text(s.message, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp))
                         Spacer(Modifier.height(10.dp))
-                        Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
+                        if (autoSkipping) {
+                            Text("Skipping to the next video\u2026",
+                                color = Color.White.copy(0.75f), fontSize = 12.sp)
+                        } else {
+                            Button(onClick = { vm.loadVideo(videoUrl, forceRefresh = true) }) { Text("Retry") }
+                            if (PlaybackQueue.hasNext()) {
+                                TextButton(onClick = {
+                                    PlaybackQueue.popNext()?.let { onVideoClick(it.url) }
+                                }) { Text("Skip to next video", color = Color.White) }
+                            }
+                        }
                     }
                     is PlayerUiState.Ready -> {
                         AndroidView(
