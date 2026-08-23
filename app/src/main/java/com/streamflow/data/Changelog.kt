@@ -3,15 +3,16 @@ package com.streamflow.data
 // User-facing release notes shown in the "What's New" dialog after an update.
 // MUST be updated on every version bump so users see what changed.
 object Changelog {
-    const val VERSION_NAME = "6.9.0"
+    const val VERSION_NAME = "6.10.0"
 
     val notes = listOf(
-        "Video quality now drops itself when your connection can't keep up 📶 — after three stalls in a minute StreamFlow steps down a level and carries on from the same spot, instead of buffering forever at a quality your signal can't carry",
-        "Opening a video survives a bad moment. A single timeout used to give you an error screen and a Retry button; now it quietly tries again, and waits for signal if you've lost it",
-        "Error messages tell you the truth. \"Video unavailable\", \"not available in your country\" and \"StreamFlow couldn't read this video — check for an app update\" are three different problems and now read as three different problems",
-        "Auto-play to the next episode finally respects your quality setting. The app skipped straight to Auto whenever it advanced on its own — including on mobile data, where you'd deliberately set it lower",
-        "New: Settings › Playback opens with Playback health — whether your phone is allowed to keep playing in the background, whether the media notification is permitted, and whether battery saver is interfering. On Vivo, iQOO, Xiaomi and similar phones this is the setting that decides whether background audio works at all, and it used to be buried three levels down",
-        "The player can now be used with a screen reader. Skip forward, skip back and play/pause were swipe and double-tap gestures only, which meant they were invisible to TalkBack and unusable without sight",
-        "Fixed: a video the app couldn't open — deleted, private or blocked — is now skipped straight away instead of being retried three times first"
+        "Videos no longer get stuck on a loading screen 🔄 — StreamFlow now watches whether video is actually arriving, not just how long it has been waiting. A stream that has gone silent is retried within seconds instead of spinning forever, and one that is merely slow is given more time to finish loading rather than being cut off",
+        "You can finally see that a video is starting. The spinner only appeared once playback had already begun, so the slowest part of opening a video showed nothing at all — just a black frame and no way to tell whether anything was happening",
+        "Quality that drops on a weak signal now comes back. A twenty-second dead spot used to pin the rest of a long video to the lowest quality with no way to undo it short of restarting the app; StreamFlow now notices when your connection has recovered and quietly restores it",
+        "Quality drops before the video stops, not after. It used to wait for three stalls — meaning you watched the video freeze three times before anything happened — and now acts on the buffer running low",
+        "Fixed: recovering from a dropped connection could restart a long video from the beginning instead of resuming where it stopped",
+        "Fixed: a video that could not be recovered kept retrying forever, quietly using data and battery in your pocket. Recovery now stops and tells you, with a button to try again",
+        "Fixed: skipping forward or scrubbing on perfect Wi-Fi was mistaken for a weak connection, so a few double-taps told you your signal was too slow and interrupted the video to \"fix\" it",
+        "Fixed: on a video only uploaded in low quality, \"lowering quality for a smoother stream\" reloaded the identical stream — an interruption and a message for no change at all"
     )
 }
