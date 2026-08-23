@@ -11,7 +11,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM, MIDNIGHT, CINEMA, GRAPHITE, CONTRAST }
+enum class AppTheme { DARK, AMOLED, LIGHT, SYSTEM, MIDNIGHT, CINEMA, GRAPHITE, CONTRAST, PAPER, NORDIC }
 
 /**
  * Every theme, in the order they are offered to the user, with their labels.
@@ -27,6 +27,8 @@ val appThemeOptions: List<Pair<String, String>> = listOf(
     "DARK"     to "Dark",
     "AMOLED"   to "AMOLED Black",
     "LIGHT"    to "Light",
+    "PAPER"    to "Warm Paper",
+    "NORDIC"   to "Nordic Frost",
     "MIDNIGHT" to "Midnight Blue",
     "CINEMA"   to "Cinema Purple",
     "GRAPHITE" to "Minimal Graphite",
@@ -50,6 +52,8 @@ val ManropeFamily = FontFamily(
 fun String.toAppTheme(): AppTheme = when (this) {
     "AMOLED"   -> AppTheme.AMOLED
     "LIGHT"    -> AppTheme.LIGHT
+    "PAPER"    -> AppTheme.PAPER
+    "NORDIC"   -> AppTheme.NORDIC
     "SYSTEM"   -> AppTheme.SYSTEM
     "MIDNIGHT" -> AppTheme.MIDNIGHT
     "CINEMA"   -> AppTheme.CINEMA
@@ -65,7 +69,10 @@ fun String.toAppTheme(): AppTheme = when (this) {
  * be added without this being the obvious place to declare which way it goes.
  */
 fun AppTheme.isDarkSurface(systemInDark: Boolean): Boolean = when (this) {
-    AppTheme.LIGHT  -> false
+    // Every light-surface theme must be listed here. Missing one does not fail
+    // to compile -- it falls into `else` and paints white status-bar icons onto
+    // a white background, leaving the clock and battery invisible.
+    AppTheme.LIGHT, AppTheme.PAPER, AppTheme.NORDIC -> false
     AppTheme.SYSTEM -> systemInDark
     else            -> true
 }
@@ -155,6 +162,16 @@ private val surfacePalettes: Map<AppTheme, SurfacePalette> = mapOf(
     AppTheme.LIGHT to SurfacePalette(
         BackgroundLight, SurfaceLight, SurfaceVariantLight,
         OnSurfaceLight, SubtextLight, Color(0xFFDDDFE8), Color(0xFFEBECF2),
+        light = true
+    ),
+    AppTheme.PAPER to SurfacePalette(
+        BackgroundPaper, SurfacePaper, SurfaceVariantPaper,
+        OnSurfacePaper, SubtextPaper, OutlinePaper, OutlineVariantPaper,
+        light = true
+    ),
+    AppTheme.NORDIC to SurfacePalette(
+        BackgroundNordic, SurfaceNordic, SurfaceVariantNordic,
+        OnSurfaceNordic, SubtextNordic, OutlineNordic, OutlineVariantNordic,
         light = true
     ),
     AppTheme.MIDNIGHT to SurfacePalette(

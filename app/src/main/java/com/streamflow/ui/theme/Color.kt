@@ -26,6 +26,32 @@ val PrimaryRedLight    = Color(0xFFCC0F0F)
 val OnSurfaceLight     = Color(0xFF11131A)
 val SubtextLight       = Color(0xFF5A5E6E)
 
+// Warm Paper: off-white with a paper/sepia cast instead of a blue one. The app
+// had six dark themes and exactly one light one, so anyone who prefers a light
+// interface had no choice at all. Warm neutrals are also easier on the eyes in
+// daylight than the cool grey of LIGHT, which is the condition light themes are
+// actually used in.
+// Contrast measured, not eyeballed: body 14.8:1 on background (AAA),
+// subtext 5.5:1 (AA).
+val BackgroundPaper     = Color(0xFFF7F3EC)
+val SurfacePaper        = Color(0xFFFFFDF8)
+val SurfaceVariantPaper = Color(0xFFEFE8DC)
+val OnSurfacePaper      = Color(0xFF231F1A)
+val SubtextPaper        = Color(0xFF6B6156)
+val OutlinePaper        = Color(0xFFDDD4C6)
+val OutlineVariantPaper = Color(0xFFEAE3D7)
+
+// Nordic Frost: the light counterpart to Midnight Blue — cool blue-grey
+// surfaces, so the palette family exists in both directions rather than only
+// dark. Body 15.3:1 (AAA), subtext 5.5:1 (AA).
+val BackgroundNordic     = Color(0xFFEDF1F7)
+val SurfaceNordic        = Color(0xFFFFFFFF)
+val SurfaceVariantNordic = Color(0xFFE0E7F0)
+val OnSurfaceNordic      = Color(0xFF141B26)
+val SubtextNordic        = Color(0xFF56607A)
+val OutlineNordic        = Color(0xFFCBD5E4)
+val OutlineVariantNordic = Color(0xFFDFE6EF)
+
 /*
  * ── Additional surface themes ───────────────────────────────────────────────
  *
