@@ -81,18 +81,18 @@ fun AppTheme.isDarkSurface(systemInDark: Boolean): Boolean = when (this) {
 // Headings carry slight negative tracking (tighter letter-spacing) — the editorial
 // look that reads as "designed" rather than default — while body text keeps neutral
 // tracking and small labels keep positive tracking for legibility at size.
-private fun appTypography(s: Float, f: FontFamily?) = Typography(
-    displaySmall = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 28.sp * s, lineHeight = 34.sp * s, letterSpacing = (-0.5).sp),
-    headlineMedium= TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,    fontSize = 22.sp * s, lineHeight = 28.sp * s, letterSpacing = (-0.4).sp),
-    titleLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 20.sp * s, lineHeight = 26.sp * s, letterSpacing = (-0.3).sp),
-    titleMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 16.sp * s, lineHeight = 22.sp * s, letterSpacing = (-0.2).sp),
-    titleSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 14.sp * s, lineHeight = 20.sp * s, letterSpacing = (-0.1).sp),
-    bodyLarge    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 15.sp * s, lineHeight = 22.sp * s),
-    bodyMedium   = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 13.sp * s, lineHeight = 19.sp * s),
-    bodySmall    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 12.sp * s, lineHeight = 16.sp * s),
-    labelLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 13.sp * s, letterSpacing = 0.1.sp),
-    labelMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 11.sp * s, letterSpacing = 0.3.sp),
-    labelSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 10.sp * s, letterSpacing = 0.5.sp),
+private fun appTypography(f: FontFamily?) = Typography(
+    displaySmall = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.5).sp),
+    headlineMedium= TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,    fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.4).sp),
+    titleLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.Bold,     fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.3).sp),
+    titleMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-0.2).sp),
+    titleSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = (-0.1).sp),
+    bodyLarge    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium   = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 13.sp, lineHeight = 19.sp),
+    bodySmall    = TextStyle(fontFamily = f, fontWeight = FontWeight.Normal,   fontSize = 12.sp, lineHeight = 16.sp),
+    labelLarge   = TextStyle(fontFamily = f, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.1.sp),
+    labelMedium  = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 11.sp, letterSpacing = 0.3.sp),
+    labelSmall   = TextStyle(fontFamily = f, fontWeight = FontWeight.Medium,   fontSize = 10.sp, letterSpacing = 0.5.sp),
 )
 
 private data class AccentPalette(
@@ -223,6 +223,26 @@ private fun buildColors(s: SurfacePalette, p: AccentPalette): ColorScheme =
         outlineVariant     = s.outlineVariant,
     )
 
+/**
+ * The font-size preference, applied to the WHOLE app.
+ *
+ * It used to reach only text drawn from the typography styles, because that is
+ * where the scale factor was multiplied in. But 216 places in this UI set
+ * `fontSize = 13.sp` (and similar) directly -- deliberately, to size a specific
+ * label -- and every one of them ignored the setting completely. Someone who
+ * turned text size up got a handful of headings growing while the labels beside
+ * them stayed put: not just ineffective, actively worse, because it broke the
+ * size relationships the design depends on.
+ *
+ * Scaling the Density instead is how Android's own font-size setting works. It
+ * changes how every `sp` converts to pixels, so hard-coded sizes and typography
+ * styles scale together and stay in proportion. `dp` is untouched, so
+ * containers, icons and touch targets keep their measurements.
+ *
+ * The scale factor is therefore removed from appTypography/terminalTypography
+ * below -- applying it in both places would square it, and LARGE would come out
+ * far larger than intended.
+ */
 @Composable
 fun StreamFlowTheme(
     theme: AppTheme = AppTheme.DARK,
@@ -238,10 +258,32 @@ fun StreamFlowTheme(
     designStyle: String = "MODERN",
     content: @Composable () -> Unit
 ) {
+    val base = androidx.compose.ui.platform.LocalDensity.current
+    val scaled = androidx.compose.runtime.remember(base.density, base.fontScale, fontScale) {
+        androidx.compose.ui.unit.Density(
+            density = base.density,
+            fontScale = base.fontScale * fontScale
+        )
+    }
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides scaled
+    ) {
+        StreamFlowThemeSurfaces(theme, accent, fontFamilyPref, designStyle, content)
+    }
+}
+
+@Composable
+private fun StreamFlowThemeSurfaces(
+    theme: AppTheme,
+    accent: String,
+    fontFamilyPref: String,
+    designStyle: String,
+    content: @Composable () -> Unit
+) {
     if (designStyle == "TERMINAL") {
         MaterialTheme(
             colorScheme = terminalColorScheme(),
-            typography  = terminalTypography(fontScale),
+            typography  = terminalTypography(),
             shapes      = TerminalShapes,
             content     = content
         )
@@ -272,7 +314,7 @@ fun StreamFlowTheme(
     }
     MaterialTheme(
         colorScheme = colors,
-        typography  = appTypography(fontScale, fontFamily),
+        typography  = appTypography(fontFamily),
         content     = content
     )
 }

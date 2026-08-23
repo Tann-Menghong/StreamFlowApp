@@ -7,3 +7,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 node tools/a11y-check/check-icon-labels.js
+node tools/a11y-check/check-touch-targets.js

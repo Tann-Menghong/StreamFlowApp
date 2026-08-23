@@ -144,11 +144,15 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                         }
                     )
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }, modifier = Modifier.size(20.dp)) {
+                        // 46.dp = the search bar's own fixed height, so this cannot make the
+                        // row taller. A 20dp target is hard to hit deliberately and much
+                        // harder with reduced dexterity, and clearing a search is a
+                        // frequent action. The weighted text field absorbs the width.
+                        IconButton(onClick = { query = "" }, modifier = Modifier.size(46.dp)) {
                             Icon(Icons.Rounded.Close, "Clear search", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
                     } else {
-                        IconButton(onClick = { startVoiceSearch() }, modifier = Modifier.size(24.dp)) {
+                        IconButton(onClick = { startVoiceSearch() }, modifier = Modifier.size(46.dp)) {
                             Icon(Icons.Rounded.Mic, "Voice search",
                                 tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }

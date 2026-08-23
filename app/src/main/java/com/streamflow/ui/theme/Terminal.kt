@@ -142,13 +142,13 @@ val TerminalShapes = Shapes(
  * up. Positive tracking on headers is what gives the "SYSTEM READOUT" feel;
  * the rest stays at 0 so columns of text align.
  */
-fun terminalTypography(scale: Float): Typography {
+fun terminalTypography(): Typography {
     val mono = FontFamily.Monospace
     fun t(size: Int, line: Int, weight: FontWeight, tracking: Double = 0.0) = TextStyle(
         fontFamily = mono,
         fontWeight = weight,
-        fontSize = (size * scale).sp,
-        lineHeight = (line * scale).sp,
+        fontSize = size.sp,
+        lineHeight = line.sp,
         letterSpacing = tracking.sp,
     )
     return Typography(

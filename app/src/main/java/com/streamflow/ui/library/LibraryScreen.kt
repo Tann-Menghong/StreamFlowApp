@@ -634,7 +634,10 @@ private fun VideoListWithSearch(
                         }
                     )
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(18.dp)) {
+                        // 38.dp = this bar's own fixed height, the ceiling a child can take
+                        // without changing the layout. Still under the 48dp guideline, but
+                        // an 18dp target was barely hittable.
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(38.dp)) {
                             Icon(Icons.Rounded.Close, "Clear search",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(14.dp))
