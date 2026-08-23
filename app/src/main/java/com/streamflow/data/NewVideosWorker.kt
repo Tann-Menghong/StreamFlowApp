@@ -70,16 +70,18 @@ class NewVideosWorker(
         var notified = 0
         var newCount = 0
 
-        // Fetch all channels in parallel — 20 sequential extractions kept the
-        // worker alive for minutes on slow networks; parallel finishes in one
-        // round-trip's worth of time (notifications still posted in order below)
-        val latestByChannel = coroutineScope {
-            subs.map { sub ->
-                async {
-                    sub to try { repo.getChannelInfo(sub.channelUrl).videos.firstOrNull() }
-                           catch (_: Exception) { null }
-                }
-            }.awaitAll()
+        // Fetch channels in parallel — 20 sequential extractions kept the worker
+        // alive for minutes on slow networks — but BOUNDED. This used to launch
+        // one coroutine per subscription with no cap, so someone with 150
+        // channels ran 150 extractions at once inside a background job: the
+        // sockets queue behind OkHttp's per-host limit anyway, while every
+        // parked fetch holds its buffers and every completed one competes for
+        // CPU to parse. The parallelism is latency-bound, so a handful captures
+        // nearly all of the speed-up at a fraction of the peak memory.
+        // (Notifications are still posted in order below.)
+        val latestByChannel = subs.mapParallel(CHANNEL_FETCH_PARALLELISM) { sub ->
+            sub to try { repo.getChannelInfo(sub.channelUrl).videos.firstOrNull() }
+                   catch (_: Exception) { null }
         }
 
         // Refresh the widget feed regardless of notification settings

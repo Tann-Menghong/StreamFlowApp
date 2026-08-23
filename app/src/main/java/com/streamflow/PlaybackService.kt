@@ -412,7 +412,7 @@ class PlaybackService : MediaSessionService() {
         serviceScope.launch {
             com.streamflow.data.SleepTimer.deadlineAt.collectLatest { deadline ->
                 if (deadline <= 0L) return@collectLatest
-                delay((deadline - System.currentTimeMillis()).coerceAtLeast(0L))
+                delay((deadline - com.streamflow.data.SleepTimer.now()).coerceAtLeast(0L))
                 mediaSession?.player?.pause()
                 com.streamflow.data.SleepTimer.clear()
             }

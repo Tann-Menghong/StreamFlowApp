@@ -7,6 +7,7 @@ import com.streamflow.StreamFlowApp
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
 import com.streamflow.data.model.VideoItem
+import com.streamflow.data.mapParallel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -82,16 +83,15 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                 // High-perf devices can afford more parallel channel fetches —
                 // capping at 12 silently hid channels 13+ from the feed
                 val channelCap = if (com.streamflow.data.DeviceCaps.isHighPerf) 20 else 12
-                val fetched = coroutineScope {
-                    subs.sortedByDescending { it.notify }.take(channelCap).map { sub ->
-                        async {
-                            try {
-                                repo.getChannelInfo(sub.channelUrl).videos.take(5)
-                                    .map { sub.channelUrl to it }
-                            } catch (_: Exception) { emptyList() }
-                        }
-                    }.awaitAll().flatten()
-                }.distinctBy { it.second.url }
+                val fetched = subs.sortedByDescending { it.notify }.take(channelCap)
+                    .mapParallel(com.streamflow.data.CHANNEL_FETCH_PARALLELISM) { sub ->
+                        try {
+                            repo.getChannelInfo(sub.channelUrl).videos.take(5)
+                                .map { sub.channelUrl to it }
+                        } catch (_: Exception) { emptyList() }
+                    }
+                    .flatten()
+                    .distinctBy { it.second.url }
                 if (gen != feedGeneration) return@launch // superseded by a newer load
                 videosByChannel = fetched
                 if (videosByChannel.isEmpty()) {

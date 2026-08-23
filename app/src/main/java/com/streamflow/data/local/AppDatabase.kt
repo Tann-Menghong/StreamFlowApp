@@ -24,7 +24,7 @@ import com.streamflow.data.local.entity.WatchLaterEntity
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class, WatchLaterEntity::class, SubscriptionEntity::class, BlockedItemEntity::class, DownloadEntity::class, PlaylistEntity::class, PlaylistItemEntity::class, com.streamflow.data.local.entity.BookmarkEntity::class, com.streamflow.data.local.entity.CustomTabEntity::class],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +40,29 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
+
+        /**
+         * Indexes only -- no schema change, no data touched.
+         *
+         * The index NAMES matter: Room validates the opened database against the
+         * entities and throws if an index it expects is missing or named
+         * differently, which would crash every upgrading user on first launch.
+         * `index_<table>_<column>` is the name Room generates for
+         * `@Index("column")`, so these two statements must stay in step with the
+         * `indices = [...]` on HistoryEntity and BookmarkEntity.
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_history_watchedAt` " +
+                    "ON `history` (`watchedAt`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_bookmarks_videoUrl` " +
+                    "ON `bookmarks` (`videoUrl`)"
+                )
+            }
+        }
 
         // Adds the subscriptions table without wiping favorites/history/watch-later
         private val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -169,7 +192,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "streamflow.db")
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     // Destructive fallback ONLY from the ancient v1 schema (no
                     // migration exists for it). The blanket fallback was a data
                     // landmine: any future version bump missing a migration would

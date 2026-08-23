@@ -522,20 +522,26 @@ fun PlayerScreen(
         }
     }
 
-    // ── Auto-save position every 5 s while playing ──────────────────────────
-    LaunchedEffect(videoUrl, mediaController) {
-        while (true) {
-            delay(5_000L)
-            val mc = mediaController ?: continue
-            // mediaId check: while this screen is loading, the controller may
-            // still be playing the previous video (mini player) — don't write
-            // its position under this video's URL
-            if (mc.isPlaying && mc.currentPosition > 1_000L &&
-                mc.currentMediaItem?.mediaId == videoUrl) {
-                vm.savePosition(videoUrl, mc.currentPosition)
-            }
-        }
-    }
+    // ── Resume position: written by PlaybackService, not here ───────────────
+    //
+    // There used to be a second 5-second loop in this screen writing exactly
+    // what the service's ticker writes -- the same historyDao().updatePosition,
+    // under the same incognito guard, gated on the same isPlaying. It could only
+    // ever run while the service was playing, so it never covered a case the
+    // service did not.
+    //
+    // What it did do was quietly undo the v6.7.0 optimisation. That change
+    // deliberately dropped position writes from every 5 s to every 15 s -- 720
+    // Room writes an hour down to 240, most of the originals re-recording a
+    // position the previous write had almost already recorded, all of them
+    // continuing with the screen off. This loop then wrote every 5 s anyway
+    // whenever the player screen existed, which is nearly always, so the saving
+    // was real only while the app was closed.
+    //
+    // The service's version is also the more robust one: it saves on pause
+    // rather than skipping paused players, writes on appScope so a save started
+    // during onDestroy is not cancelled with the service, skips writes where the
+    // position has not moved, and logs failures instead of dropping them.
 
     // ── Load sponsor segments on video load ───────────────────────────────────
     LaunchedEffect(videoUrl) { vm.loadSponsorSegments(videoUrl) }
@@ -786,13 +792,22 @@ fun PlayerScreen(
     var sleepRemaining by remember { mutableLongStateOf(0L) }
     var showSleepMenu by remember { mutableStateOf(false) }
 
-    LaunchedEffect(sleepDeadline) {
+    LaunchedEffect(sleepDeadline, lifecycleOwner) {
         if (sleepDeadline <= 0L) { sleepRemaining = 0L; return@LaunchedEffect }
-        while (true) {
-            val left = (sleepDeadline - System.currentTimeMillis() + 999) / 1000
-            if (left <= 0L) { sleepRemaining = 0L; break }
-            sleepRemaining = left
-            delay(1000L)
+        // Same reasoning as the position poll and the chapter tracker: this is a
+        // countdown nobody can read while the app is in the background, and it
+        // recomposed a text once a second for the whole timer -- through exactly
+        // the screen-off background listening the sleep timer exists to serve.
+        // The DEADLINE is enforced by PlaybackService and is unaffected; this
+        // only stops drawing it. Re-entering STARTED restarts the block, so the
+        // number is correct the moment it can be seen again.
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                val left = (sleepDeadline - com.streamflow.data.SleepTimer.now() + 999) / 1000
+                if (left <= 0L) { sleepRemaining = 0L; break }
+                sleepRemaining = left
+                delay(1000L)
+            }
         }
     }
 

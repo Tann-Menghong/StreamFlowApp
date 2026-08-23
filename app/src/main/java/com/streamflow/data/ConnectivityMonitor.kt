@@ -88,6 +88,18 @@ object ConnectivityMonitor {
         } != null
     }
 
+    /**
+     * What "metered" should read after an observation.
+     *
+     * @param observed true/false when a network was present to measure, null
+     *                 when there was none -- which is a missing answer, not a
+     *                 negative one. Answering "unmetered" for "no network" is
+     *                 what made losing signal on mobile data look like a change
+     *                 of network type.
+     */
+    internal fun nextMetered(previous: Boolean, observed: Boolean?): Boolean =
+        observed ?: previous
+
     private fun refresh(cm: ConnectivityManager) {
         val ok = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -102,16 +114,31 @@ object ConnectivityMonitor {
         }.getOrDefault(true)
         _online.value = ok
 
-        _metered.value = runCatching {
+        // "Is this connection metered?" has no answer when there IS no
+        // connection, and the previous code answered "no" -- caps == null made
+        // the whole expression false, i.e. UNMETERED. Losing signal on mobile
+        // data therefore reported a transition to unmetered, and regaining it
+        // reported another back, so one tunnel produced two spurious network
+        // changes. PlaybackService treats each as a new link and drops the
+        // quality step-down it is holding, so a step-down taken FOR the tunnel
+        // was discarded inside it. It also opened a window where the user's
+        // mobile-data quality cap read as absent, which is the one setting whose
+        // whole purpose is not spending their data.
+        //
+        // Keeping the last known value is the honest answer: the network that
+        // just went away is the best available guess at the one coming back.
+        val meteredNow = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                    ?: return@runCatching null
                 // Absence of NOT_METERED is the reliable signal; asking for a
                 // CELLULAR transport misses metered hotspots and tethering.
-                caps != null && !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
             } else {
                 @Suppress("DEPRECATION")
-                cm.isActiveNetworkMetered
+                if (cm.activeNetworkInfo == null) null else cm.isActiveNetworkMetered
             }
-        }.getOrDefault(false)
+        }.getOrNull()
+        _metered.value = nextMetered(_metered.value, meteredNow)
     }
 }
