@@ -44,6 +44,24 @@ object QualityLadder {
         return ORDER[idx - 1]
     }
 
+    /**
+     * One rung up, never past a ceiling, or null when there is nowhere to go.
+     *
+     * The counterpart to [stepDown], and the reason it needs one: a step-down
+     * taken during a twenty-second dead spot used to pin the rest of a
+     * forty-minute video to 360p, because nothing in the app could ever decide
+     * the link had recovered. The ceiling is the user's own preference, so this
+     * only ever undoes what the app did to them -- it can never raise quality
+     * above what they asked for, on any evidence.
+     */
+    fun stepUp(current: String, ceiling: String, autoMaxHeight: Int): String? {
+        val top = if (ceiling == AUTO) heightToPref(autoMaxHeight) else ceiling
+        val topIdx = ORDER.indexOf(top)
+        val idx = ORDER.indexOf(if (current == AUTO) heightToPref(autoMaxHeight) else current)
+        if (idx == -1 || topIdx == -1 || idx >= topIdx) return null
+        return ORDER[idx + 1]
+    }
+
     fun heightToPref(height: Int): String = when {
         height >= 1080 -> "1080P"
         height >= 720 -> "720P"

@@ -15,24 +15,15 @@ import org.junit.Test
  * so the entire initial load was excluded from it.
  *
  * These cover the decision logic that arms and fires the watchdog, mirrored
- * from PlaybackService.updateBufferWatchdog / onBufferTimedOut. The coroutine
- * timing itself needs a device; what is testable here is when it should count
- * at all, and that is where the bug lived.
+ * from PlaybackService.updateBufferWatchdog / watchBuffer. The coroutine timing
+ * itself needs a device; what is testable here is when it should count at all,
+ * and that is where the bug lived.
  */
 class BufferWatchdogTest {
-
-    private companion object {
-        const val STARTUP_STALL_MS = 30_000L
-        const val MIDPLAY_STALL_MS = 20_000L
-    }
 
     /** Mirrors the arming condition in updateBufferWatchdog(). */
     private fun shouldWatch(buffering: Boolean, playWhenReady: Boolean) =
         buffering && playWhenReady
-
-    /** Mirrors the deadline choice. */
-    private fun limitFor(positionMs: Long) =
-        if (positionMs <= 0L) STARTUP_STALL_MS else MIDPLAY_STALL_MS
 
     /** Mirrors the plan choice in onBufferTimedOut(). */
     private fun planFor(mediaId: String) =
@@ -44,7 +35,6 @@ class BufferWatchdogTest {
         // position > 0, so a video that never produced a first frame was the
         // one case nothing was watching.
         assertTrue(shouldWatch(buffering = true, playWhenReady = true))
-        assertEquals(STARTUP_STALL_MS, limitFor(0L))
     }
 
     @Test
@@ -60,18 +50,14 @@ class BufferWatchdogTest {
     }
 
     @Test
-    fun `mid-playback gets the shorter deadline`() {
-        // A buffer already exists there, so this much silence means the link is
-        // gone rather than slow.
-        assertEquals(MIDPLAY_STALL_MS, limitFor(1L))
-        assertEquals(MIDPLAY_STALL_MS, limitFor(600_000L))
-    }
-
-    @Test
     fun `startup is given more room than mid-playback`() {
         // Cutting startup short would re-extract videos that were about to
-        // play, which is the failure mode of a naive timeout.
-        assertTrue(limitFor(0L) > limitFor(5_000L))
+        // play, which is the failure mode of a naive timeout. Mid-playback a
+        // buffer already existed and was consumed, which is stronger evidence.
+        assertTrue(
+            BufferHealth.hardLimitMs(atStartup = true) >
+                BufferHealth.hardLimitMs(atStartup = false)
+        )
     }
 
     @Test

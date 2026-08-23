@@ -358,6 +358,8 @@ class PlaybackService : MediaSessionService() {
                 // chance. The chosen override survives, because the link that
                 // caused it has not changed.
                 recentStalls.clear()
+                recentAhead.clear()
+                comfortableStreak = 0
                 // Must reset with the item, or recovering a NEW video would seek
                 // it to the previous video's position.
                 lastGoodPositionMs = 0L
@@ -584,34 +586,69 @@ class PlaybackService : MediaSessionService() {
         if (bufferWatchdog?.isActive == true) return // already watching this stall
         val startedAt = android.os.SystemClock.elapsedRealtime()
         bufferingSince = startedAt
-        // Startup gets longer: a cold DNS lookup, a redirect chain and the first
-        // segment of a high-bitrate stream legitimately take time on a slow
-        // link, and cutting that short would re-extract videos that were about
-        // to play. Mid-playback there is already a buffer, so silence for this
-        // long means the link is gone, not slow.
-        val limit = if (player.currentPosition <= 0L) STARTUP_STALL_MS else MIDPLAY_STALL_MS
-        bufferWatchdog = serviceScope.launch {
-            delay(limit)
-            val p = mediaSession?.player ?: return@launch
-            // Re-check rather than trust the timer: anything that resolved in
-            // the meantime cleared bufferingSince.
-            if (bufferingSince != startedAt) return@launch
+        val atStartup = player.currentPosition <= 0L
+        bufferWatchdog = serviceScope.launch { watchBuffer(startedAt, atStartup) }
+    }
+
+    /**
+     * Watch the buffer FILL, not the clock.
+     *
+     * A single delay() cannot tell a dead connection from a slow one, and the
+     * two want opposite deadlines: nothing arriving is decided in twelve
+     * seconds, while a 1080p stream trickling in over a weak link deserves the
+     * full ceiling because it is still on its way to playing. Polling the
+     * buffered position answers that directly -- as long as the buffer grows the
+     * app keeps waiting, and the hard limit still bounds the whole wait.
+     *
+     * The poll exists only while playback is stuck, which is rare and
+     * self-terminating; a healthy video never runs this loop at all.
+     */
+    private suspend fun watchBuffer(startedAt: Long, atStartup: Boolean) {
+        var lastAhead = -1L
+        var lastProgressAt = startedAt
+        while (true) {
+            delay(WATCH_POLL_MS)
+            val p = mediaSession?.player ?: return
+            // Anything that resolved the stall cleared bufferingSince.
+            if (bufferingSince != startedAt) return
             if (p.playbackState != androidx.media3.common.Player.STATE_BUFFERING ||
                 !p.playWhenReady
-            ) return@launch
-            onBufferTimedOut(p, limit)
+            ) return
+
+            val now = android.os.SystemClock.elapsedRealtime()
+            val ahead = try {
+                (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)
+            } catch (_: Exception) { 0L }
+            if (lastAhead < 0L || com.streamflow.data.BufferHealth.progressed(lastAhead, ahead)) {
+                lastProgressAt = now
+            }
+            lastAhead = ahead
+
+            if (com.streamflow.data.BufferHealth.exhausted(
+                    waitedMs = now - startedAt,
+                    sinceProgressMs = now - lastProgressAt,
+                    atStartup = atStartup
+                )
+            ) {
+                onBufferTimedOut(p, now - startedAt, now - lastProgressAt, ahead)
+                return
+            }
         }
     }
 
     private fun onBufferTimedOut(
         player: androidx.media3.common.Player,
-        waitedMs: Long
+        waitedMs: Long,
+        sinceProgressMs: Long,
+        aheadMs: Long
     ) {
         val mediaId = player.currentMediaItem?.mediaId
         val atStartup = player.currentPosition <= 0L
+        val dead = sinceProgressMs >= com.streamflow.data.BufferHealth.NO_PROGRESS_MS
         com.streamflow.data.PlaybackLog.warn(
             "watchdog",
-            "no data for ${waitedMs / 1000}s " +
+            (if (dead) "buffer stopped growing for ${sinceProgressMs / 1000}s"
+            else "only ${aheadMs / 1000}s buffered after ${waitedMs / 1000}s") + " " +
                 (if (atStartup) "while starting" else "at ${player.currentPosition / 1000}s") +
                 " video=${com.streamflow.data.PlaybackLog.ref(mediaId)}"
         )
@@ -774,6 +811,10 @@ class PlaybackService : MediaSessionService() {
         // a minute produced a bogus "Lowered to 480p" that no amount of
         // bandwidth would have prevented.
         recentStalls.clear()
+        // Occupancy samples were measured against the bitrate this call is
+        // replacing, so they say nothing about the stream that follows.
+        recentAhead.clear()
+        comfortableStreak = 0
         ignoreStallsUntil = android.os.SystemClock.elapsedRealtime() + DOWNGRADE_SETTLE_MS
         if (wasPlaying) player.play()
     }
@@ -810,6 +851,9 @@ class PlaybackService : MediaSessionService() {
                 if (pos > 0L && p.playbackState == androidx.media3.common.Player.STATE_READY) {
                     lastGoodPositionMs = pos
                 }
+                // One reading of the buffer, on a ticker that was already
+                // running, drives the ladder in both directions.
+                noteBufferHealth(p)
                 ticksSinceSave++
                 if (ticksSinceSave >= SAVE_EVERY_N_TICKS) {
                     ticksSinceSave = 0
@@ -1096,6 +1140,16 @@ class PlaybackService : MediaSessionService() {
      *  not be counted as evidence for another step-down. */
     private var ignoreStallsUntil = 0L
 
+    /** Rolling buffer-occupancy samples, one per 5 s ticker beat. */
+    private val recentAhead = ArrayDeque<Long>()
+    private var comfortableStreak = 0
+    /** The rung a step-up moved to, on probation until it proves itself. */
+    private var stepUpRung: String? = null
+    private var stepUpAt = 0L
+    /** Rungs this link has demonstrably failed to carry. Cleared when the
+     *  network changes, because the evidence belonged to the old link. */
+    private val failedRungs = mutableSetOf<String>()
+
     /**
      * Forget stall evidence gathered on a different connection.
      *
@@ -1104,6 +1158,10 @@ class PlaybackService : MediaSessionService() {
      */
     private fun onNetworkChanged() {
         recentStalls.clear()
+        recentAhead.clear()
+        comfortableStreak = 0
+        stepUpRung = null
+        failedRungs.clear()
         if (stallQualityOverride != null) {
             com.streamflow.data.PlaybackLog.info("quality", "network changed, dropping step-down")
             stallQualityOverride = null
@@ -1111,9 +1169,151 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Read the buffer once per ticker beat and let it drive the ladder.
+     *
+     * The step-down this feeds already existed, but its only evidence was
+     * STALLS -- three of them, meaning the app acted only after the user had
+     * watched the video stop three separate times. A buffer draining toward
+     * zero says the same thing before the first stall, from data the player was
+     * already reporting, so the fix now lands ahead of the symptom instead of
+     * behind it.
+     *
+     * And it is the only signal that can UNDO a step-down. Until now one bad
+     * patch pinned the rest of the session to a lower rung, with nothing in the
+     * app able to decide the link had recovered.
+     */
+    private fun noteBufferHealth(player: androidx.media3.common.Player) {
+        // Only a playing video measures the link. Paused or buffering readings
+        // describe the player's state, not the connection's capacity.
+        if (player.playbackState != androidx.media3.common.Player.STATE_READY ||
+            !player.playWhenReady
+        ) return
+        // A live stream deliberately keeps a small buffer near the edge; that is
+        // not starvation, and there is no ladder to walk for it anyway.
+        if (try { player.isCurrentMediaItemLive } catch (_: Exception) { false }) return
+
+        val ahead = try {
+            (player.bufferedPosition - player.currentPosition).coerceAtLeast(0L)
+        } catch (_: Exception) { return }
+
+        recentAhead.addLast(ahead)
+        while (recentAhead.size > com.streamflow.data.BufferHealth.STARVING_SAMPLES) {
+            recentAhead.removeFirst()
+        }
+        comfortableStreak =
+            if (com.streamflow.data.BufferHealth.comfortable(ahead)) comfortableStreak + 1 else 0
+
+        // The settle window after any re-extract covers this too: a buffer
+        // refilling from zero looks starved for the first few seconds.
+        if (android.os.SystemClock.elapsedRealtime() < ignoreStallsUntil) return
+
+        if (com.streamflow.data.BufferHealth.starving(recentAhead.toList())) {
+            com.streamflow.data.PlaybackLog.info(
+                "quality", "buffer down to ${ahead / 1000}s, stepping down before it stalls")
+            // This path never reaches noteStall(), so probation has to be
+            // judged here too or a rung could fail silently and be retried.
+            failProbationIfRecent(android.os.SystemClock.elapsedRealtime())
+            recentAhead.clear()
+            maybeStepDownQuality()
+            return
+        }
+
+        val duration = try { player.duration } catch (_: Exception) { 0L }
+        val remaining = if (duration > 0L) duration - player.currentPosition else -1L
+        if (com.streamflow.data.BufferHealth.readyToStepUp(
+                comfortableStreak, stallQualityOverride != null, remaining)
+        ) {
+            comfortableStreak = 0
+            maybeStepUpQuality()
+        }
+    }
+
+    /**
+     * Give back quality the app took away, once the link has earned it.
+     *
+     * This is the one place the app re-extracts a video that is playing
+     * perfectly well, so every guard here exists to make that rare and
+     * worthwhile: two full minutes of a comfortable buffer against fifteen
+     * seconds to step down, never past what the user asked for, never inside
+     * the last minute of a video, and never onto a rung this link has already
+     * failed. A rung that stalls inside its probation window is retired for the
+     * session rather than retried every two minutes for the rest of the film.
+     */
+    private fun maybeStepUpQuality() {
+        if (downgrading) return
+        val player = mediaSession?.player ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        if (com.streamflow.data.MediaUrl.classify(mediaId) !=
+            com.streamflow.data.MediaKind.YOUTUBE
+        ) return
+        val current = stallQualityOverride ?: return
+        val resumeFrom = try { player.currentPosition } catch (_: Exception) { lastGoodPositionMs }
+
+        downgrading = true
+        serviceScope.launch {
+            try {
+                val ceiling = basePreference()
+                val next = com.streamflow.data.QualityLadder.stepUp(
+                    current, ceiling, com.streamflow.data.DeviceCaps.autoMaxHeight
+                )
+                if (next == null || next in failedRungs) {
+                    // Nowhere useful to go. Hold the reading down so this does
+                    // not re-evaluate every two minutes for the rest of the video.
+                    ignoreStallsUntil =
+                        android.os.SystemClock.elapsedRealtime() + DOWNGRADE_SETTLE_MS
+                    return@launch
+                }
+                com.streamflow.data.PlaybackLog.info(
+                    "quality",
+                    "buffer healthy -> ${com.streamflow.data.QualityLadder.label(current)} " +
+                        "back up to ${com.streamflow.data.QualityLadder.label(next)}"
+                )
+                // Reaching the user's own preference means the step-down is
+                // fully undone; an override equal to the preference would only
+                // survive to confuse the next read.
+                if (next == ceiling) {
+                    stallQualityOverride = null
+                    overrideBaseline = null
+                } else {
+                    stallQualityOverride = next
+                }
+                stepUpRung = next
+                stepUpAt = android.os.SystemClock.elapsedRealtime()
+                ignoreStallsUntil = stepUpAt + DOWNGRADE_SETTLE_MS
+                reExtractInPlace(mediaId, resumeFrom)
+                // No toast. The user never asked for the step-down and mostly
+                // did not notice it; announcing its reversal would draw
+                // attention to a problem that is already over.
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.streamflow.data.PlaybackLog.warn(
+                    "quality", "step-up failed: ${e.javaClass.simpleName}")
+            } finally {
+                downgrading = false
+            }
+        }
+    }
+
+    /** A rung that could not survive its probation window is the wrong rung for
+     *  this link, and must not be offered again while the link lasts. */
+    private fun failProbationIfRecent(now: Long) {
+        val rung = stepUpRung ?: return
+        if (now - stepUpAt >= com.streamflow.data.BufferHealth.STEP_UP_PROBATION_MS) {
+            stepUpRung = null
+            return
+        }
+        com.streamflow.data.PlaybackLog.warn(
+            "quality",
+            "${com.streamflow.data.QualityLadder.label(rung)} stalled within probation, retiring it")
+        failedRungs += rung
+        stepUpRung = null
+    }
+
     private fun noteStall() {
         val now = android.os.SystemClock.elapsedRealtime()
         if (now < ignoreStallsUntil) return
+        failProbationIfRecent(now)
         recentStalls.addLast(now)
         while (recentStalls.isNotEmpty() && now - recentStalls.first() > STALL_WINDOW_MS) {
             recentStalls.removeFirst()
@@ -1178,6 +1378,12 @@ class PlaybackService : MediaSessionService() {
                 // would cancel the step-down on the very next read.
                 stallQualityOverride = next
                 overrideBaseline = basePreference()
+                // Deliberately NOT recorded in failedRungs. That set exists
+                // to retire a rung the app CHOSE to climb back to and that
+                // then failed; blacklisting the rung a step-down is leaving
+                // would make it permanently unreachable and disable the
+                // climb back entirely.
+                stepUpRung = null
                 ignoreStallsUntil = android.os.SystemClock.elapsedRealtime() + DOWNGRADE_SETTLE_MS
                 reExtractInPlace(mediaId, resumeFrom)
                 // Only claim it after it happened. Announcing first meant that
@@ -1345,20 +1551,14 @@ class PlaybackService : MediaSessionService() {
          *  caught within the same minute. */
         private const val SEEK_SETTLE_MS = 6_000L
         /**
-         * How long the player may sit in STATE_BUFFERING before the app stops
-         * believing it.
+         * How often the watchdog looks at the buffer while playback is stuck.
          *
-         * Startup is the more generous of the two because a cold connection,
-         * a redirect chain and the first segment of a high-bitrate stream are
-         * genuinely slow on a weak link, and cutting that short would
-         * re-extract videos that were a second from playing. Mid-playback a
-         * buffer already exists, so this much silence means the link is gone.
-         *
-         * These are recovery triggers, not a way to hide a slow load: nothing
-         * is shown to the user at the deadline, the app re-resolves the stream
-         * and keeps the position.
+         * There is no fixed buffering deadline any more: the limits live in
+         * BufferHealth and are expressed against how much data has actually
+         * arrived, so a stream that keeps filling keeps its time and one that
+         * has gone silent is caught in twelve seconds instead of thirty. This
+         * poll runs only while stuck, and stops the moment playback resolves.
          */
-        private const val STARTUP_STALL_MS = 30_000L
-        private const val MIDPLAY_STALL_MS = 20_000L
+        private const val WATCH_POLL_MS = 2_000L
     }
 }
