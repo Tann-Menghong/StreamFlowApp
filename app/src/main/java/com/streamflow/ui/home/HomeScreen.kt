@@ -651,7 +651,16 @@ fun HomeScreen(
                     }
 
                     is HomeUiState.Success -> {
-                        val cols = gridCols.toIntOrNull() ?: 2
+                        // The user's setting is read as a CARD SIZE, not a fixed
+                        // count: portrait is exactly what they chose, and a wider
+                        // window (landscape, tablet) fits more cards of that same
+                        // size rather than stretching two of them across it.
+                        val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+                        val cols = com.streamflow.data.AdaptiveGrid.columnsFor(
+                            preferred = gridCols.toIntOrNull() ?: 2,
+                            narrowestWidthDp = minOf(cfg.screenWidthDp, cfg.screenHeightDp),
+                            currentWidthDp = cfg.screenWidthDp
+                        )
                         // Videos animate in only ONCE — scrolling back up used to
                         // replay the fade/slide on every card that re-entered view
                         val animatedUrls = remember { mutableSetOf<String>() }
