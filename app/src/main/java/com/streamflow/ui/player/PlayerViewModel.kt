@@ -466,6 +466,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // Reload the same video at a specific resolution (null = Auto, best available).
     fun changeQuality(videoUrl: String, height: Int?) {
         val current = _uiState.value as? PlayerUiState.Ready ?: return
+        // Picking a quality is an explicit instruction, and it outranks any
+        // step-down the app decided on. Clearing it here rather than relying on
+        // the stored preference CHANGING is the fix for the case where it does
+        // not change: someone whose preference was already 1080p, watching a
+        // stream the app had lowered, tapped 1080p, got it, and was then
+        // silently dropped again at the next re-extract because the override
+        // had never been contradicted.
+        com.streamflow.data.AdaptiveQuality.clear()
         val wasAuto = _autoQuality.value
         _autoQuality.value = height == null
         val gen = ++loadGeneration

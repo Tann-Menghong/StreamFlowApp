@@ -1099,13 +1099,14 @@ class PlaybackService : MediaSessionService() {
         // app. Changing the quality setting is an explicit instruction and wins;
         // so does moving to a different network, since the link that justified
         // the override is no longer the link in use.
-        if (stallQualityOverride != null && base != overrideBaseline) {
+        if (com.streamflow.data.AdaptiveQuality.rung != null &&
+            base != com.streamflow.data.AdaptiveQuality.baseline
+        ) {
             com.streamflow.data.PlaybackLog.info(
                 "quality", "preference changed to ${com.streamflow.data.QualityLadder.label(base)}, dropping step-down")
-            stallQualityOverride = null
-            overrideBaseline = null
+            com.streamflow.data.AdaptiveQuality.clear()
         }
-        val effective = stallQualityOverride?.let {
+        val effective = com.streamflow.data.AdaptiveQuality.rung?.let {
             com.streamflow.data.QualityLadder.cap(base, it)
         } ?: base
         val saverOn = try { prefs.batterySaver.first() } catch (_: Exception) { false }
@@ -1131,10 +1132,10 @@ class PlaybackService : MediaSessionService() {
     // position turns stopped video into degraded video.
 
     private val recentStalls = ArrayDeque<Long>()
-    private var stallQualityOverride: String? = null
-    /** The preference the override was measured against, so that the user later
-     *  choosing a quality themselves cancels it. */
-    private var overrideBaseline: String? = null
+    // The step-down the app has imposed now lives in AdaptiveQuality, so the
+    // player screen can SHOW it and an explicit quality pick can CLEAR it.
+    // As two private fields here it was invisible and unreachable, and the UI
+    // consequently reported a quality the service was no longer playing.
     private var downgrading = false
     /** Re-preparing after a step-down buffers by definition; that buffering must
      *  not be counted as evidence for another step-down. */
@@ -1162,10 +1163,9 @@ class PlaybackService : MediaSessionService() {
         comfortableStreak = 0
         stepUpRung = null
         failedRungs.clear()
-        if (stallQualityOverride != null) {
+        if (com.streamflow.data.AdaptiveQuality.rung != null) {
             com.streamflow.data.PlaybackLog.info("quality", "network changed, dropping step-down")
-            stallQualityOverride = null
-            overrideBaseline = null
+            com.streamflow.data.AdaptiveQuality.clear()
         }
     }
 
@@ -1222,7 +1222,7 @@ class PlaybackService : MediaSessionService() {
         val duration = try { player.duration } catch (_: Exception) { 0L }
         val remaining = if (duration > 0L) duration - player.currentPosition else -1L
         if (com.streamflow.data.BufferHealth.readyToStepUp(
-                comfortableStreak, stallQualityOverride != null, remaining)
+                comfortableStreak, com.streamflow.data.AdaptiveQuality.rung != null, remaining)
         ) {
             comfortableStreak = 0
             maybeStepUpQuality()
@@ -1247,7 +1247,7 @@ class PlaybackService : MediaSessionService() {
         if (com.streamflow.data.MediaUrl.classify(mediaId) !=
             com.streamflow.data.MediaKind.YOUTUBE
         ) return
-        val current = stallQualityOverride ?: return
+        val current = com.streamflow.data.AdaptiveQuality.rung ?: return
         val resumeFrom = try { player.currentPosition } catch (_: Exception) { lastGoodPositionMs }
 
         downgrading = true
@@ -1273,10 +1273,9 @@ class PlaybackService : MediaSessionService() {
                 // fully undone; an override equal to the preference would only
                 // survive to confuse the next read.
                 if (next == ceiling) {
-                    stallQualityOverride = null
-                    overrideBaseline = null
+                    com.streamflow.data.AdaptiveQuality.clear()
                 } else {
-                    stallQualityOverride = next
+                    com.streamflow.data.AdaptiveQuality.raise(next)
                 }
                 stepUpRung = next
                 stepUpAt = android.os.SystemClock.elapsedRealtime()
@@ -1376,8 +1375,7 @@ class PlaybackService : MediaSessionService() {
                 // Both together: resumeQuality() drops an override whose
                 // baseline no longer matches, so setting one without the other
                 // would cancel the step-down on the very next read.
-                stallQualityOverride = next
-                overrideBaseline = basePreference()
+                com.streamflow.data.AdaptiveQuality.lower(next, basePreference())
                 // Deliberately NOT recorded in failedRungs. That set exists
                 // to retire a rung the app CHOSE to climb back to and that
                 // then failed; blacklisting the rung a step-down is leaving

@@ -117,6 +117,11 @@ fun PlayerScreen(
     val isInWatchLater by vm.isInWatchLater.collectAsState(initial = false)
     val isSubscribed by vm.isSubscribed.collectAsState()
     val autoQuality by vm.autoQuality.collectAsState()
+    // What the SERVICE has imposed. Without this the button reported the
+    // height this screen extracted, which a step-down behind it made stale --
+    // "Auto (1080p)" over a 480p picture, seconds after a toast saying it had
+    // been lowered to 480p.
+    val lowered by com.streamflow.data.AdaptiveQuality.state.collectAsState()
     // Settings > Playback > Auto-play. The countdown effect below ignored this
     // entirely, so turning the toggle off still auto-played the next video.
     val autoPlayEnabled by vm.autoPlay.collectAsState(initial = true)
@@ -1334,15 +1339,13 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                 Box {
                                     TextButton(onClick = { showFsQualityMenu = true; fsTapTimestamp = System.currentTimeMillis() }) {
                                         Text(
-                                            when {
-                                                autoQuality && fsDetails.currentQuality > 0 -> "Auto (${fsDetails.currentQuality}p)"
-                                                fsDetails.currentQuality > 0 -> "${fsDetails.currentQuality}p"
-                                                else -> "Auto"
-                                            },
+                                            qualityButtonLabel(
+                                                autoQuality, fsDetails.currentQuality, lowered.rung),
                                             fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White
                                         )
                                     }
                                     DropdownMenu(expanded = showFsQualityMenu, onDismissRequest = { showFsQualityMenu = false }) {
+                                        LoweredQualityNotice(lowered.rung)
                                         DropdownMenuItem(
                                             text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
                                             trailingIcon = {
@@ -2183,16 +2186,14 @@ video{width:100%;height:100%;object-fit:contain}</style></head><body>
                                         modifier = Modifier.height(34.dp),
                                         contentPadding = PaddingValues(horizontal = 10.dp)) {
                                         Text(
-                                            when {
-                                                autoQuality && details.currentQuality > 0 -> "Auto (${details.currentQuality}p)"
-                                                details.currentQuality > 0 -> "${details.currentQuality}p"
-                                                else -> "Auto"
-                                            },
+                                            qualityButtonLabel(
+                                                autoQuality, details.currentQuality, lowered.rung),
                                             fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     DropdownMenu(expanded = showQualityMenu, onDismissRequest = { showQualityMenu = false }) {
+                                        LoweredQualityNotice(lowered.rung)
                                         DropdownMenuItem(
                                             text = { Text("Auto", fontWeight = if (autoQuality) FontWeight.Bold else FontWeight.Normal) },
                                             trailingIcon = {
@@ -3108,6 +3109,45 @@ private suspend fun averageThumbColor(context: android.content.Context, url: Str
  * states what happened and gives the one action that helps — a full re-extract,
  * not another prepare() of the URL that already failed.
  */
+
+/**
+ * What the quality button should SAY.
+ *
+ * An app-imposed ceiling wins over the height this screen extracted, because
+ * after an automatic step-down the service re-extracted underneath it and the
+ * screen's own number is stale. Reporting a quality the user is demonstrably
+ * not watching is worse than reporting nothing.
+ */
+private fun qualityButtonLabel(auto: Boolean, currentQuality: Int, loweredTo: String?): String =
+    when {
+        loweredTo != null -> com.streamflow.data.QualityLadder.label(loweredTo)
+        auto && currentQuality > 0 -> "Auto (${currentQuality}p)"
+        currentQuality > 0 -> "${currentQuality}p"
+        else -> "Auto"
+    }
+
+/**
+ * Say why the quality is lower than the user asked for.
+ *
+ * The step-down fires a toast once and is then invisible forever, so a user who
+ * looks at the menu two minutes later has no way to find out why their video is
+ * soft -- or that picking anything here overrides it. One sentence, only while
+ * an override is actually in force.
+ */
+@Composable
+private fun LoweredQualityNotice(loweredTo: String?) {
+    if (loweredTo == null) return
+    Text(
+        "Lowered to ${com.streamflow.data.QualityLadder.label(loweredTo)} " +
+            "for your connection. Pick a quality to override.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .widthIn(max = 240.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    )
+}
+
 @Composable
 private fun BoxScope.PlaybackStoppedOverlay(message: String, onRetry: () -> Unit) {
     Box(
