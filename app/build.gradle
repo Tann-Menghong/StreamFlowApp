@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 163
-        versionName "6.14.0"
+        versionCode 164
+        versionName "6.15.0"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -122,13 +122,17 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.8.2'
     implementation 'androidx.navigation:navigation-compose:2.7.7'
 
-    // ExoPlayer / Media3
-    implementation 'androidx.media3:media3-exoplayer:1.3.1'
-    implementation 'androidx.media3:media3-ui:1.3.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.3.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.3.1'
-    implementation 'androidx.media3:media3-datasource-okhttp:1.3.1'
-    implementation 'androidx.media3:media3-session:1.3.1'
+    // ExoPlayer / Media3 — 1.4.1 is the CEILING for this toolchain, not a
+    // preference: 1.5.x and above require compileSdk 35 (and 1.11 requires 36),
+    // which in turn requires a newer AGP than 8.3.2. Going further is a
+    // toolchain migration, not a dependency bump. Verify playback on a real
+    // device before attempting it.
+    implementation 'androidx.media3:media3-exoplayer:1.4.1'
+    implementation 'androidx.media3:media3-ui:1.4.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.4.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.4.1'
+    implementation 'androidx.media3:media3-datasource-okhttp:1.4.1'
+    implementation 'androidx.media3:media3-session:1.4.1'
 
     // NewPipe Extractor — pinned to a stable release for reproducible builds.
     // v0.26.3 includes the SABR-enforcement workaround + playlist/date extraction fixes

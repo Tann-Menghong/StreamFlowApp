@@ -55,6 +55,22 @@ object PlaybackRecovery {
     const val CODE_IO_CLEARTEXT_NOT_PERMITTED = 2007
     const val CODE_IO_READ_POSITION_OUT_OF_RANGE = 2008
 
+    /**
+     * The OS took our hardware decoder away and gave it to something with a
+     * higher priority -- an incoming video call, the camera, another player.
+     *
+     * media3 1.4 introduced this code; before it, the same event surfaced as a
+     * generic decoder failure. Value confirmed against
+     * PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED in the 1.4.1
+     * artifact rather than assumed, because it is declared here as a plain Int
+     * so these tests can run on the JVM with no device.
+     *
+     * It is the most recoverable failure in this whole file: nothing is wrong
+     * with the video, the network, or the URL. The codec simply has to be
+     * acquired again, which is exactly what prepare() does.
+     */
+    const val CODE_DECODING_RESOURCES_RECLAIMED = 4006
+
     /** No HTTP status was available (not an HTTP failure, or media3 did not say). */
     const val NO_STATUS = 0
 
@@ -66,6 +82,13 @@ object PlaybackRecovery {
      *                   no stream to re-extract and no network to wait for
      */
     fun plan(errorCode: Int, httpStatus: Int = NO_STATUS, isRemote: Boolean = true): RecoveryPlan {
+        // Checked BEFORE the local-media shortcut below. Losing the decoder is a
+        // device-side event with nothing to do with where the media came from,
+        // and a downloaded file is if anything the likeliest thing to still be
+        // playing when a call arrives. Treating it as fatal there would tell
+        // someone their own downloaded video is unplayable on their own phone.
+        if (errorCode == CODE_DECODING_RESOURCES_RECLAIMED) return RecoveryPlan.RETRY
+
         if (!isRemote) return RecoveryPlan.FATAL
 
         // An explicit rejection beats the generic code: media3 reports every bad
