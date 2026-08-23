@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 164
-        versionName "6.15.0"
+        versionCode 165
+        versionName "6.16.0"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -122,17 +122,19 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.8.2'
     implementation 'androidx.navigation:navigation-compose:2.7.7'
 
-    // ExoPlayer / Media3 — 1.4.1 is the CEILING for this toolchain, not a
-    // preference: 1.5.x and above require compileSdk 35 (and 1.11 requires 36),
-    // which in turn requires a newer AGP than 8.3.2. Going further is a
-    // toolchain migration, not a dependency bump. Verify playback on a real
-    // device before attempting it.
-    implementation 'androidx.media3:media3-exoplayer:1.4.1'
-    implementation 'androidx.media3:media3-ui:1.4.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.4.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.4.1'
-    implementation 'androidx.media3:media3-datasource-okhttp:1.4.1'
-    implementation 'androidx.media3:media3-session:1.4.1'
+    // ExoPlayer / Media3 - 1.8.1 is the CEILING, and the reason is DEVICE
+    // SUPPORT, not laziness. Checked empirically, not assumed:
+    //   1.9.0+   require minSdk 23 -- would drop every Android 5.0/5.1 device
+    //   1.10.0+  require compileSdk 36 (this project is 35, AGP 8.6.1)
+    // Raising minSdk is a product decision about who loses the app, so it is
+    // not something to slip into a dependency bump. If it is ever taken, the
+    // manifest merger is what enforces it and will say so plainly.
+    implementation 'androidx.media3:media3-exoplayer:1.8.1'
+    implementation 'androidx.media3:media3-ui:1.8.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.8.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.8.1'
+    implementation 'androidx.media3:media3-datasource-okhttp:1.8.1'
+    implementation 'androidx.media3:media3-session:1.8.1'
 
     // NewPipe Extractor — pinned to a stable release for reproducible builds.
     // v0.26.3 includes the SABR-enforcement workaround + playlist/date extraction fixes

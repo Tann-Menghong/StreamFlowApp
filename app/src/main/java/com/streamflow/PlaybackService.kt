@@ -113,6 +113,24 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        // Keep the media notification while the player sits IDLE.
+        //
+        // media3 1.8 changed the default: controllers no longer get a
+        // notification for an idle player without active preparation or
+        // playback. That is sensible in general and wrong for this app
+        // specifically, because IDLE is exactly where recovery lives. After a
+        // failure, scheduleRecovery() can wait up to 120 s for the network to
+        // come back before it re-prepares -- and under the new default the
+        // notification would vanish for that whole window. Someone listening
+        // with the screen off would watch their controls disappear and conclude
+        // playback had died, at the precise moment the app was working hardest
+        // to bring it back.
+        //
+        // ALWAYS is the pre-1.8 behaviour, chosen deliberately: this upgrade
+        // should change how playback is decoded, not what the user sees while it
+        // recovers.
+        setShowNotificationForIdlePlayer(SHOW_NOTIFICATION_FOR_IDLE_PLAYER_ALWAYS)
+
         // Reuse the app-wide client (same UA headers) so media requests share the
         // warm connection pool instead of opening cold connections
         val httpClient = com.streamflow.data.OkHttpDownloader.instance.client
