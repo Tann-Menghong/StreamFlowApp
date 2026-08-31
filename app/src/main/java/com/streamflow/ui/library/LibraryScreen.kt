@@ -261,7 +261,12 @@ fun LibraryScreen(
                             onOpen = { b -> vm.primeBookmarkPosition(b) { onVideoClick(b.videoUrl) } },
                             onDelete = vm::deleteBookmark
                         )
-                    else -> DownloadList(
+                    else -> {
+                        // Repair rows stranded in DOWNLOADING before drawing the
+                        // list, so a transfer the system has forgotten shows as a
+                        // retryable failure instead of a spinner that never ends.
+                        androidx.compose.runtime.LaunchedEffect(Unit) { vm.reconcileDownloads() }
+                        DownloadList(
                             downloads = downloads,
                             onPlay = { d ->
                                 if (d.status == "DONE" && d.filePath.isNotEmpty()) onVideoClick(d.filePath)
@@ -270,6 +275,7 @@ fun LibraryScreen(
                             onRetry = vm::retryDownload,
                             onRemove = vm::removeDownload
                         )
+                    }
                 }
             }
         }

@@ -379,6 +379,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     val quality              by vm.quality.collectAsState()
     val autoPlay             by vm.autoPlay.collectAsState()
     val dataSaver            by vm.dataSaver.collectAsState()
+    val downloadsWifiOnly    by vm.downloadsWifiOnly.collectAsState()
     val country              by vm.country.collectAsState()
     val accentColor          by vm.accentColor.collectAsState()
     val defaultSpeed         by vm.defaultSpeed.collectAsState()
@@ -869,6 +870,15 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
                             "Prefer lower quality to save mobile data", dataSaver
                         ) { vm.setDataSaver(it) }
+                        SettingsDivider()
+                        // Downloads used to ignore every data preference on this
+                        // screen: setAllowedOverMetered was hard-coded true, so
+                        // tapping download on mobile data started a
+                        // several-hundred-megabyte transfer with no warning.
+                        SettingsSwitchItem(Icons.Rounded.Wifi, "Download on Wi-Fi only",
+                            "Hold downloads until Wi-Fi instead of using mobile data",
+                            downloadsWifiOnly
+                        ) { vm.setDownloadsWifiOnly(it) }
                         SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
                             "Cap quality at 480p, no ambient glow, no prefetching", batterySaver

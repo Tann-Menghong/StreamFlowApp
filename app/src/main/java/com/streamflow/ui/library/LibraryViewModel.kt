@@ -11,6 +11,7 @@ import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -76,6 +77,66 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         db.downloadDao().deleteVariant(d.url, d.isAudio)
     }
 
+    /**
+     * Reconcile stored download rows against the system DownloadManager.
+     *
+     * The completion broadcast is the only thing that moves a row off
+     * DOWNLOADING, and it is not guaranteed to arrive -- the user can clear the
+     * transfer from the system Downloads UI, DownloadManager ages its own
+     * entries out, and a receiver can be missed while the app is dying. When it
+     * does not arrive the row shows "Downloading…" forever, with a progress bar
+     * that never moves and no retry button, because retry is only offered on
+     * FAILED. This is the way out of that state.
+     *
+     * Runs off the main thread and touches only rows whose verdict has actually
+     * changed, so opening the Downloads tab costs one query and usually no
+     * writes at all.
+     */
+    fun reconcileDownloads() = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val rows = db.downloadDao().getAll().first()
+                .filter { it.status == com.streamflow.data.DownloadReconcile.DOWNLOADING }
+            if (rows.isEmpty()) return@launch
+
+            val dm = getApplication<Application>()
+                .getSystemService(android.content.Context.DOWNLOAD_SERVICE)
+                    as android.app.DownloadManager
+
+            // One query for every id, then look each row up. Querying per row
+            // would be N cursors for a list that is usually one or two items and
+            // occasionally twenty.
+            val known = HashMap<Long, Pair<Int, String>>()
+            dm.query(
+                android.app.DownloadManager.Query()
+                    .setFilterById(*rows.map { it.downloadId }.toLongArray())
+            ).use { c ->
+                while (c.moveToNext()) {
+                    val id = c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_ID))
+                    val st = c.getInt(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS))
+                    val uri = try {
+                        c.getString(c.getColumnIndexOrThrow(
+                            android.app.DownloadManager.COLUMN_LOCAL_URI)) ?: ""
+                    } catch (_: Exception) { "" }
+                    known[id] = st to uri
+                }
+            }
+
+            rows.forEach { row ->
+                val entry = known[row.downloadId]
+                val verdict = com.streamflow.data.DownloadReconcile.resolve(row.status, entry?.first)
+                    ?: return@forEach
+                val path = if (verdict == com.streamflow.data.DownloadReconcile.DONE)
+                    entry?.second.orEmpty() else ""
+                db.downloadDao().updateByDownloadId(row.downloadId, verdict, path)
+                com.streamflow.data.PlaybackLog.info(
+                    "download", "reconciled ${row.downloadId} -> $verdict")
+            }
+        } catch (_: Exception) {
+            // Reconciliation is a repair pass, not a feature. If DownloadManager
+            // is unavailable, leaving the rows as they are is the safe outcome.
+        }
+    }
+
     // Failed downloads used to dead-end (delete was the only option) — re-extract
     // a fresh stream URL and re-enqueue with the system DownloadManager
     fun retryDownload(d: DownloadEntity) = viewModelScope.launch {
@@ -86,7 +147,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     "No downloadable stream found", android.widget.Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            val id = com.streamflow.data.DownloadHelper.enqueue(getApplication(), streamUrl, d.title, d.isAudio)
+            val wifiOnly = try {
+                (getApplication() as com.streamflow.StreamFlowApp).prefs.downloadsWifiOnly.first()
+            } catch (_: Exception) { false }
+            val id = com.streamflow.data.DownloadHelper.enqueue(
+                getApplication(), streamUrl, d.title, d.isAudio, wifiOnly)
             db.downloadDao().insert(d.copy(downloadId = id, status = "DOWNLOADING", filePath = ""))
         } catch (_: Exception) {
             android.widget.Toast.makeText(getApplication(),

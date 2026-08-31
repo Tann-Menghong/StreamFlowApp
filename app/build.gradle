@@ -12,8 +12,8 @@ android {
         applicationId "com.streamflow"
         minSdk 21
         targetSdk 34
-        versionCode 168
-        versionName "6.19.0"
+        versionCode 169
+        versionName "6.20.0"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -42,18 +42,52 @@ android {
         buildConfigField "String", "GITHUB_RELEASES_URL", '"https://github.com/Tann-Menghong/StreamFlowApp/releases"'
     }
 
+    // Release signing credentials are read from OUTSIDE this repository.
+    //
+    // They used to be literal strings right here, in a tracked file, in a public
+    // repo. The keystore itself was always gitignored -- so the key was never
+    // actually leaked -- but publishing the passphrase left that one file as the
+    // only thing between the repository and a forged update. That matters more
+    // than usual for this app: it holds REQUEST_INSTALL_PACKAGES and installs
+    // APKs it downloads from GitHub itself.
+    //
+    // The key is deliberately NOT rotated. Android requires an update to carry
+    // the same signing certificate as the installed app, so a new key would
+    // leave every existing install unable to update -- a one-way door. The
+    // correct posture is to guard the .jks absolutely and treat the old
+    // passphrase (still in git history) as spent.
+    //
+    // Put these in ~/.gradle/gradle.properties -- the user-level file, never one
+    // inside the project:
+    //     streamflowStorePassword=...
+    //     streamflowKeyPassword=...
+    // or export STREAMFLOW_STORE_PASSWORD / STREAMFLOW_KEY_PASSWORD.
+    def releaseStorePw = project.findProperty('streamflowStorePassword')
+        ?: System.getenv('STREAMFLOW_STORE_PASSWORD')
+    def releaseKeyPw = project.findProperty('streamflowKeyPassword')
+        ?: System.getenv('STREAMFLOW_KEY_PASSWORD')
+    def releaseKeystore = file('streamflow-release.jks')
+    def canSignRelease = releaseStorePw != null && releaseKeyPw != null && releaseKeystore.exists()
+
     signingConfigs {
         release {
-            storeFile     file('streamflow-release.jks')
-            storePassword 'streamflow2024'
-            keyAlias      'streamflow'
-            keyPassword   'streamflow2024'
+            if (canSignRelease) {
+                storeFile     releaseKeystore
+                storePassword releaseStorePw
+                keyAlias      'streamflow'
+                keyPassword   releaseKeyPw
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig   signingConfigs.release
+            // Falls back to debug signing when no credentials are configured, so
+            // a clean clone -- and CI -- can still build and verify the release
+            // variant (the only one that runs R8) instead of failing on a
+            // missing keystore. A debug-signed APK cannot update a real install,
+            // which is exactly the right failure mode.
+            signingConfig   canSignRelease ? signingConfigs.release : signingConfigs.debug
             minifyEnabled   true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

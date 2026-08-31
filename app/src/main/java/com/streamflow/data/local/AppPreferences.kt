@@ -54,6 +54,12 @@ class AppPreferences(private val context: Context) {
         val QUALITY_CELLULAR_KEY = stringPreferencesKey("quality_cellular")
         // Days to keep watch history; "0" = forever
         val HISTORY_RETENTION_KEY = stringPreferencesKey("history_retention")
+        // Downloads: hold manual downloads until Wi-Fi. The auto-downloader has
+        // always been UNMETERED-constrained; manual downloads honoured nothing
+        // and started a several-hundred-megabyte transfer on mobile data with no
+        // warning. Default OFF so upgrading does not silently change what
+        // happens when an existing user taps download.
+        val DOWNLOADS_WIFI_ONLY_KEY = booleanPreferencesKey("downloads_wifi_only")
         // Notifications
         val NOTIFY_FREQ_KEY        = stringPreferencesKey("notify_freq")        // hours between checks
         val NOTIFY_MAX_KEY         = stringPreferencesKey("notify_max")         // max notifications per check, "0" = unlimited
@@ -141,6 +147,8 @@ class AppPreferences(private val context: Context) {
     val audioOnlyMode: Flow<Boolean> = context.dataStore.data.map { it[AUDIO_ONLY_KEY] ?: false }
     val qualityCellular: Flow<String> = context.dataStore.data.map { it[QUALITY_CELLULAR_KEY] ?: "SAME" }
     val historyRetention: Flow<String> = context.dataStore.data.map { it[HISTORY_RETENTION_KEY] ?: "0" }
+    val downloadsWifiOnly: Flow<Boolean> =
+        context.dataStore.data.map { it[DOWNLOADS_WIFI_ONLY_KEY] ?: false }
     // Notifications
     val notifyFreq         : Flow<String>  = context.dataStore.data.map { it[NOTIFY_FREQ_KEY] ?: "6" }
     val notifyMax          : Flow<String>  = context.dataStore.data.map { it[NOTIFY_MAX_KEY] ?: "5" }
@@ -293,6 +301,8 @@ class AppPreferences(private val context: Context) {
     // Player
     suspend fun setSkipSeconds(v: String) = context.dataStore.edit { it[SKIP_SECONDS_KEY] = v }
     suspend fun setAudioOnlyMode(v: Boolean) = context.dataStore.edit { it[AUDIO_ONLY_KEY] = v }
+    suspend fun setDownloadsWifiOnly(v: Boolean) =
+        context.dataStore.edit { it[DOWNLOADS_WIFI_ONLY_KEY] = v }
     suspend fun setQualityCellular(v: String) = context.dataStore.edit { it[QUALITY_CELLULAR_KEY] = v }
     suspend fun setHistoryRetention(v: String) = context.dataStore.edit { it[HISTORY_RETENTION_KEY] = v }
     // Notifications

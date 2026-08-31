@@ -44,6 +44,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val quality      = prefs.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "AUTO")
     val autoPlay     = prefs.autoPlay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val dataSaver    = prefs.dataSaver.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val downloadsWifiOnly = prefs.downloadsWifiOnly
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val country      = prefs.country.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "US")
     val accentColor  = prefs.accentColor.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "RED")
     val defaultSpeed = prefs.defaultSpeed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "1.0")
@@ -376,6 +378,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setQuality(v: String)        = viewModelScope.launch { prefs.setQuality(v) }
     fun setAutoPlay(v: Boolean)      = viewModelScope.launch { prefs.setAutoPlay(v) }
     fun setDataSaver(v: Boolean)     = viewModelScope.launch { prefs.setDataSaver(v) }
+    fun setDownloadsWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadsWifiOnly(v) }
     fun setCountry(v: String)        = viewModelScope.launch { prefs.setCountry(v) }
     fun setAccentColor(v: String)    = viewModelScope.launch { prefs.setAccentColor(v) }
     fun setDefaultSpeed(v: String)   = viewModelScope.launch { prefs.setDefaultSpeed(v) }

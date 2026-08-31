@@ -1,12 +1,17 @@
 name: Android CI
 
-# Builds the debug APK on Linux runners — no local Windows/Winsock/AF_UNIX issues,
-# and validates that the NewPipe extractor + dependencies resolve and compile.
+# Runs on the branches work actually happens on.
+#
+# This file used to trigger on `master` only. `origin/master` last moved in June
+# 2026 at v2.x, while every release since has shipped from a `fix/**` branch to
+# `main` -- so the workflow had not fired for roughly 140 versionCodes. The unit
+# tests and the checkers below existed that whole time and no automated system
+# had ever run them.
 on:
   push:
-    branches: [ master ]
+    branches: [ main, master, 'fix/**' ]
   pull_request:
-    branches: [ master ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 concurrency:
@@ -33,12 +38,43 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+      # The five bespoke checkers guard classes of bug the compiler cannot see:
+      # a theme wired into four of its five sites compiles perfectly and ships
+      # broken. They are plain node scripts with no build integration, so they
+      # run first -- they are the cheapest signal available.
+      - name: Structural checkers
+        run: |
+          bash tools/a11y-check/run.sh
+          bash tools/adblock-test/run.sh
+          bash tools/backup-check/run.sh
+          bash tools/player-check/run.sh
+          bash tools/theme-check/run.sh
 
-      - name: Upload debug APK
+      - name: Unit tests
+        run: ./gradlew testReleaseUnitTest --stacktrace --no-daemon
+
+      - name: Lint (release)
+        run: ./gradlew lintRelease --stacktrace --no-daemon
+
+      # assembleRelease, not assembleDebug: release is the only variant that
+      # runs R8, and R8 is where the reflection-heavy dependencies (NewPipe,
+      # Rhino, protobuf, MediaPipe JNI) actually get tested. Signing falls back
+      # to the debug config when no credentials are present, so this builds on a
+      # clean clone without the keystore.
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: Upload test report on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: streamflow-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: test-report
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: streamflow-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error

@@ -156,20 +156,36 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     android.widget.Toast.makeText(app, "No downloadable stream found", android.widget.Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                val id = com.streamflow.data.DownloadHelper.enqueue(app, streamUrl, d.title, isAudio)
+                val wifiOnly = try {
+                    (app as com.streamflow.StreamFlowApp).prefs.downloadsWifiOnly.first()
+                } catch (_: Exception) { false }
+                val id = com.streamflow.data.DownloadHelper.enqueue(
+                    app, streamUrl, d.title, isAudio, wifiOnly)
                 // Save captions alongside video downloads (English preferred)
                 if (!isAudio) {
                     val sub = d.subtitles.firstOrNull { it.name.contains("english", ignoreCase = true) }
                         ?: d.subtitles.firstOrNull()
-                    sub?.let { com.streamflow.data.DownloadHelper.enqueueSubtitle(app, it.url, d.title) }
+                    sub?.let {
+                        com.streamflow.data.DownloadHelper.enqueueSubtitle(
+                            app, it.url, d.title, wifiOnly)
+                    }
                 }
                 db.downloadDao().insert(DownloadEntity(
                     url = d.url, title = d.title, thumbnailUrl = d.thumbnailUrl,
                     uploaderName = d.uploaderName, filePath = "", isAudio = isAudio,
                     downloadId = id, status = "DOWNLOADING"
                 ))
+                // Say what actually happens. With wifiOnly on a metered network
+                // DownloadManager holds the transfer, and "Downloading…" over a
+                // progress bar that never moves is the phantom-spinner problem
+                // this release exists to remove.
+                val held = wifiOnly && com.streamflow.data.ConnectivityMonitor.metered.value
                 android.widget.Toast.makeText(app,
-                    if (isAudio) "Downloading audio…" else "Downloading video (${streams.videoHeight}p)…",
+                    when {
+                        held -> "Queued — will download on Wi-Fi"
+                        isAudio -> "Downloading audio…"
+                        else -> "Downloading video (${streams.videoHeight}p)…"
+                    },
                     android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 android.widget.Toast.makeText(app, "Download failed to start", android.widget.Toast.LENGTH_SHORT).show()

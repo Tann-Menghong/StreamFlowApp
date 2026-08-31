@@ -31,7 +31,11 @@ class AutoDownloadWorker(context: Context, params: WorkerParameters) :
             try {
                 val streams = repo.getDownloadStreams(v.url)
                 val streamUrl = streams.videoUrl ?: return@forEach
-                val id = DownloadHelper.enqueue(applicationContext, streamUrl, v.title, isAudio = false)
+                // Already scheduled under an UNMETERED constraint; saying so at
+                // the enqueue too means relaxing that constraint later cannot
+                // silently start pulling video over mobile data.
+                val id = DownloadHelper.enqueue(
+                    applicationContext, streamUrl, v.title, isAudio = false, wifiOnly = true)
                 app.database.downloadDao().insert(DownloadEntity(
                     url = v.url, title = v.title, thumbnailUrl = v.thumbnailUrl,
                     uploaderName = v.uploaderName, filePath = "", isAudio = false,

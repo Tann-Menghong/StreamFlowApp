@@ -17,11 +17,17 @@ object DownloadHelper {
 
     // Enqueue with the system DownloadManager: reliable, resumable, shows its own
     // progress notification. Returns the DownloadManager id.
+    //
+    // [wifiOnly] maps to setAllowedOverMetered(false), which makes DownloadManager
+    // HOLD the transfer until an unmetered network appears rather than failing
+    // it. Callers must read the preference themselves -- this object stays free
+    // of DataStore so it has no suspending entry point.
     fun enqueue(
         context: Context,
         streamUrl: String,
         title: String,
-        isAudio: Boolean
+        isAudio: Boolean,
+        wifiOnly: Boolean = false
     ): Long {
         // ifBlank: a title that is ALL illegal characters sanitized down to
         // nothing and produced a hidden ".mp4" file the user couldn't find
@@ -36,7 +42,7 @@ object DownloadHelper {
             .setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_DOWNLOADS, "StreamFlow/$safeName.$ext"
             )
-            .setAllowedOverMetered(true)
+            .setAllowedOverMetered(!wifiOnly)
             .addRequestHeader(
                 "User-Agent",
                 "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
@@ -47,7 +53,12 @@ object DownloadHelper {
 
     // Companion subtitle file for a video download (same base name, .vtt) —
     // fire-and-forget: no Room row, failures just mean no offline captions
-    fun enqueueSubtitle(context: Context, subtitleUrl: String, title: String) {
+    fun enqueueSubtitle(
+        context: Context,
+        subtitleUrl: String,
+        title: String,
+        wifiOnly: Boolean = false
+    ) {
         try {
             val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80)
                 .trim().ifBlank { "video-${System.currentTimeMillis()}" }
@@ -57,7 +68,7 @@ object DownloadHelper {
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
                 .setDestinationInExternalPublicDir(
                     Environment.DIRECTORY_DOWNLOADS, "StreamFlow/$safeName.vtt")
-                .setAllowedOverMetered(true)
+                .setAllowedOverMetered(!wifiOnly)
             (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager)
                 .enqueue(request)
         } catch (_: Exception) {}
