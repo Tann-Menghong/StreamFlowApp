@@ -29,7 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.streamflow.StreamFlowApp
+import com.streamflow.data.ExtractionError
 import com.streamflow.data.PlaybackQueue
+import com.streamflow.data.SeriesEpisodes
+import com.streamflow.data.classifyExtractionError
 import com.streamflow.data.YouTubeRepository
 import com.streamflow.data.friendlyError
 import com.streamflow.data.model.VideoItem
@@ -196,6 +199,24 @@ fun PlaylistDetailScreen(
 
 // ── Remote (YouTube) playlist ────────────────────────────────────────────────
 
+/**
+ * Play [url] and queue whatever follows it in [episodes].
+ *
+ * Every entry point into a playlist goes through here so none of them can
+ * forget the queue. Tapping a row used to call onVideoClick alone, which played
+ * that one video against whatever queue happened to be left over from before —
+ * so a series stopped at the end of the episode you picked, and "Play all" was
+ * the only way to get continuous playback at all.
+ */
+private fun playFrom(
+    episodes: List<VideoItem>,
+    url: String,
+    onVideoClick: (String) -> Unit,
+) {
+    PlaybackQueue.setAll(SeriesEpisodes.upNextFrom(episodes, url))
+    onVideoClick(url)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RemotePlaylistScreen(
@@ -206,6 +227,18 @@ fun RemotePlaylistScreen(
     val repo = remember { YouTubeRepository() }
     var playlist by remember { mutableStateOf<YouTubeRepository.RemotePlaylist?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Kept alongside the message so the shared ErrorState can offer an action
+    // that can actually work, instead of Retry for every failure.
+    var errorKind by remember { mutableStateOf(ExtractionError.UNKNOWN) }
+
+    // A playlist is a series and its items are episodes, so how far through
+    // each one the user is decides what the Continue button does.
+    val playlistCtx = LocalContext.current
+    val playlistDb = remember { (playlistCtx.applicationContext as StreamFlowApp).database }
+    val watched by playlistDb.historyDao().getAll().collectAsState(initial = emptyList())
+    val progress = remember(watched) {
+        watched.associate { it.url to SeriesEpisodes.fractionOf(it.duration, it.position) }
+    }
     var videos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
     var nextPage by remember { mutableStateOf<Page?>(null) }
     var loadingMore by remember { mutableStateOf(false) }
@@ -221,6 +254,7 @@ fun RemotePlaylistScreen(
             nextPage = p.nextPage
         } catch (e: Exception) {
             error = friendlyError(e)
+            errorKind = classifyExtractionError(e)
         }
     }
 
@@ -267,22 +301,14 @@ fun RemotePlaylistScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
-                error != null -> Column(
-                    Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text("Could not load playlist", style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(Modifier.height(6.dp))
-                    Text(error ?: "", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(14.dp))
-                    Button(onClick = { retryKey++ }) { Text("Retry") }
-                }
-                playlist == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
+                // The shared states, so a playlist that fails to load looks and
+                // behaves like every other failure in the app rather than being
+                // this screen's own private answer to the same question.
+                error != null -> com.streamflow.ui.components.ErrorState(
+                    error = errorKind,
+                    onRetry = { retryKey++ }
+                )
+                playlist == null -> com.streamflow.ui.components.ShimmerList()
                 else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
                     item {
                         Column(Modifier.padding(16.dp)) {
@@ -294,6 +320,35 @@ fun RemotePlaylistScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             if (videos.isNotEmpty()) {
+                                // Continue takes precedence over Play all when
+                                // the series has been started: on a 280-episode
+                                // donghua, "Play all" from episode 1 is almost
+                                // never what the user came back for.
+                                val resume = remember(videos, progress) {
+                                    SeriesEpisodes.resumePoint(videos, progress)
+                                }
+                                if (resume != null) {
+                                    val ep = resume.episode
+                                    val number = SeriesEpisodes.episodeNumber(ep.title, resume.index)
+                                    val left = watched.firstOrNull { it.url == ep.url }
+                                        ?.let { SeriesEpisodes.remainingLabel(it.duration, it.position) }
+                                    Button(
+                                        onClick = { playFrom(videos, ep.url, onVideoClick) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            buildString {
+                                                append(if (resume.isNextUp) "Play episode " else "Continue episode ")
+                                                append(number)
+                                                if (!resume.isNextUp && left != null) append(" · $left")
+                                            },
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(onClick = {
                                         PlaybackQueue.setAll(videos.drop(1))
@@ -317,16 +372,27 @@ fun RemotePlaylistScreen(
                         }
                     }
                     itemsIndexed(videos, key = { _, v -> v.url }) { index, video ->
+                        val watchedFraction = progress[video.url] ?: 0f
                         Row(
                             Modifier.fillMaxWidth()
-                                .clickable { onVideoClick(video.url) }
+                                // The fix that makes this a series rather than a
+                                // list: tapping an episode used to play only
+                                // that episode and leave the queue alone, so
+                                // playback stopped dead at the end of it and
+                                // there was no next episode to go to.
+                                .clickable { playFrom(videos, video.url, onVideoClick) }
                                 .padding(horizontal = 16.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("${index + 1}", fontSize = 11.sp,
+                            // The uploader's own numbering where the title
+                            // states it: a playlist can open with a trailer, or
+                            // start partway into an ongoing series, and then the
+                            // position is not the episode number.
+                            Text("${SeriesEpisodes.episodeNumber(video.title, index)}",
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.width(20.dp))
+                                modifier = Modifier.width(24.dp))
                             Box(Modifier.width(110.dp).height(62.dp).clip(appShape(8.dp))) {
                                 AsyncImage(video.thumbnailUrl, null,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -335,6 +401,20 @@ fun RemotePlaylistScreen(
                                         .background(Color.Black.copy(0.8f), appShape(4.dp))
                                         .padding(horizontal = 4.dp, vertical = 1.dp)) {
                                         Text(formatDuration(video.duration), color = Color.White, fontSize = 9.sp)
+                                    }
+                                }
+                                // How far in you already are, on the thumbnail
+                                // itself — the same cue the rest of the app uses.
+                                if (watchedFraction > SeriesEpisodes.STARTED) {
+                                    Box(
+                                        Modifier.align(Alignment.BottomStart)
+                                            .fillMaxWidth().height(3.dp)
+                                            .background(Color.Black.copy(0.45f))
+                                    ) {
+                                        Box(
+                                            Modifier.fillMaxWidth(watchedFraction).fillMaxHeight()
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
                                     }
                                 }
                             }

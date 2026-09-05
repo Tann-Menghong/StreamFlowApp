@@ -50,6 +50,17 @@ class DonghuaViewModel(app: Application) : AndroidViewModel(app) {
     private val _genre = MutableStateFlow(DonghuaCatalog.genres.first())
     val genre: StateFlow<DonghuaCatalog.Genre> = _genre
 
+    /**
+     * Series, as YouTube playlists.
+     *
+     * A playlist is the closest thing to a series that exists here: its items
+     * are the episodes, already in order, which is what makes an episode list
+     * and a next-episode button possible at all. Loaded separately from the
+     * video rows so a failure here leaves the rest of the tab intact.
+     */
+    private val _series = MutableStateFlow<List<YouTubeRepository.PlaylistItem>>(emptyList())
+    val series: StateFlow<List<YouTubeRepository.PlaylistItem>> = _series
+
     private val history: StateFlow<List<HistoryEntity>> = db.historyDao()
         .getRecentWithProgress(40)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -102,9 +113,16 @@ class DonghuaViewModel(app: Application) : AndroidViewModel(app) {
                     }.associate { (id, job) -> id to job.await() }
                 }
 
+                // Series are a bonus row, never a reason to fail the tab.
+                _series.value = runCatching {
+                    repo.searchPlaylists(DonghuaCatalog.seriesQueryFor(g))
+                        .filter { it.streamCount != 0L }
+                        .take(20)
+                }.getOrDefault(emptyList())
+
                 val sections = DonghuaCatalog.assemble(loaded)
                 _uiState.value =
-                    if (sections.isEmpty()) DonghuaUiState.Empty
+                    if (sections.isEmpty() && _series.value.isEmpty()) DonghuaUiState.Empty
                     else DonghuaUiState.Success(sections)
                 recomputeContinueWatching()
             } catch (e: Exception) {

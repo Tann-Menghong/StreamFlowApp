@@ -1,5 +1,7 @@
 package com.streamflow.ui.donghua
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,11 +48,15 @@ import com.streamflow.ui.components.VideoCard
 fun DonghuaScreen(
     onVideoClick: (String) -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
+    // A series opens the shared playlist screen, which is where the episode
+    // list, the resume point and next-episode playback live.
+    onSeriesClick: ((String) -> Unit)? = null,
     vm: DonghuaViewModel = viewModel(),
 ) {
     val state by vm.uiState.collectAsState()
     val genre by vm.genre.collectAsState()
     val resume by vm.continueWatching.collectAsState()
+    val series by vm.series.collectAsState()
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
@@ -129,6 +136,11 @@ fun DonghuaScreen(
                                 )
                             }
                         }
+                        if (series.isNotEmpty() && onSeriesClick != null) {
+                            item(key = "series") {
+                                SeriesRow(series = series, onSeriesClick = onSeriesClick)
+                            }
+                        }
                         items(s.sections, key = { it.source.id }) { section ->
                             DonghuaRow(
                                 title = section.source.title,
@@ -138,6 +150,72 @@ fun DonghuaScreen(
                                 onChannelClick = onChannelClick
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Series as posters — each one opens an episode list.
+ *
+ * A separate card from VideoCard on purpose: a series has no duration, no view
+ * count and no single thumbnail moment. What matters is the name and how many
+ * episodes are in it, so those are what the card shows.
+ */
+@Composable
+private fun SeriesRow(
+    series: List<com.streamflow.data.YouTubeRepository.PlaylistItem>,
+    onSeriesClick: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(
+            "Series",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp)
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(series, key = { it.url }) { p ->
+                Column(
+                    Modifier
+                        .width(140.dp)
+                        .clip(com.streamflow.ui.theme.appShape(12.dp))
+                        .clickable { onSeriesClick(p.url) }
+                        .padding(bottom = 8.dp)
+                ) {
+                    coil.compose.AsyncImage(
+                        model = p.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(190.dp)
+                            .clip(com.streamflow.ui.theme.appShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.5f))
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        p.name, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        lineHeight = 15.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    // streamCount is -1 when the extractor could not read it;
+                    // showing "-1 episodes" would be worse than showing nothing.
+                    if (p.streamCount > 0) {
+                        Text(
+                            "${p.streamCount} episode${if (p.streamCount == 1L) "" else "s"}",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
                     }
                 }
             }

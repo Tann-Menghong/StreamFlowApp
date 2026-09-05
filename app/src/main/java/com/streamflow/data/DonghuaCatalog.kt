@@ -79,6 +79,17 @@ object DonghuaCatalog {
         else "${source.query} ${genre.term}"
 
     /**
+     * The search that finds SERIES rather than single episodes.
+     *
+     * Separate from the episode queries because the thing being looked for is
+     * different: a playlist collecting a whole show, not one upload. "full
+     * series" and "all episodes" are how uploaders actually name those.
+     */
+    fun seriesQueryFor(genre: Genre): String =
+        if (genre.term.isBlank()) "donghua full series all episodes english sub"
+        else "donghua ${genre.term} full series all episodes english sub"
+
+    /**
      * Turn loaded results into the rows to render.
      *
      * Three rules, all of which the WebView tab had no way to express:
