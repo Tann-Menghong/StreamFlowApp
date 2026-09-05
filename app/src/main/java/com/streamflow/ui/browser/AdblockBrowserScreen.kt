@@ -591,6 +591,9 @@ fun AdblockBrowserScreen(
     // Desktop vs mobile layout for ALL site tabs. Read synchronously so the very
     // first WebView is built with the right UA — see BrowserDisplayMode.
     var desktopMode by remember { mutableStateOf(BrowserDisplayMode.isDesktop(context)) }
+    // The other half of desktop mode, separated so a player that breaks under a
+    // page scale does not force the whole desktop layout off.
+    var pinViewport by remember { mutableStateOf(BrowserDisplayMode.isViewportPinned(context)) }
     var showMenu by remember { mutableStateOf(false) }
     var pageTitle by remember { mutableStateOf(defaultTitle) }
     var customView by remember { mutableStateOf<android.view.View?>(null) }
@@ -717,8 +720,10 @@ fun AdblockBrowserScreen(
                 }
                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                 // Pin the layout width before the page's own stylesheets settle,
-                // so it never flashes the mobile column first.
-                view.evaluateJavascript(BrowserDisplayMode.viewportScript(desktopMode), null)
+                // so it never flashes the mobile column first. Null when width
+                // pinning is off -- the page keeps its own viewport tag.
+                BrowserDisplayMode.viewportScript(desktopMode, pinViewport)
+                    ?.let { view.evaluateJavascript(it, null) }
             }
             // Deliberately the DEPRECATED 4-arg overload, not the API 23
             // WebResourceError one. minSdk here is 21, and this project has
@@ -761,7 +766,8 @@ fun AdblockBrowserScreen(
                 // Re-assert the width: single-page navigations and late scripts
                 // on these sites rewrite the viewport tag after first paint,
                 // which silently dropped the tab back to the mobile layout.
-                view.evaluateJavascript(BrowserDisplayMode.viewportScript(desktopMode), null)
+                BrowserDisplayMode.viewportScript(desktopMode, pinViewport)
+                    ?.let { view.evaluateJavascript(it, null) }
             }
             // Popunder/redirect blocking: streaming sites love navigating the
             // whole page to an ad URL on the first tap — swallow those instead
@@ -1037,6 +1043,30 @@ fun AdblockBrowserScreen(
                                     }
                                 }
                             )
+                            // Right here, because this menu is where someone
+                            // ends up when a video will not play: it is the one
+                            // switch that can fix a page that renders correctly
+                            // with a black rectangle where the video should be.
+                            if (desktopMode) {
+                                DropdownMenuItem(
+                                    text = { Text("Force desktop width") },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Fullscreen, null)
+                                    },
+                                    trailingIcon = {
+                                        Switch(checked = pinViewport, onCheckedChange = null)
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        val next = !pinViewport
+                                        pinViewport = next
+                                        BrowserDisplayMode.setViewportPinned(context, next)
+                                        // The viewport tag is rewritten per page
+                                        // load, so the change needs a reload.
+                                        webViewRef?.reload()
+                                    }
+                                )
+                            }
                         }
                     }
                 },

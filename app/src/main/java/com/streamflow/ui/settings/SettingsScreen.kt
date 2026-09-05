@@ -862,6 +862,27 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             desktopSites = it
                             com.streamflow.data.BrowserDisplayMode.setDesktop(context, it)
                         }
+                        // The second half of desktop mode, on its own switch.
+                        // Swapping the user-agent and pinning the layout width
+                        // are two different interventions that fail differently,
+                        // and welding them together meant a site whose player
+                        // breaks under a page scale could only be fixed by
+                        // giving up the desktop layout altogether.
+                        if (desktopSites) {
+                            SettingsDivider()
+                            var pinWidth by remember {
+                                mutableStateOf(com.streamflow.data.BrowserDisplayMode.isViewportPinned(context))
+                            }
+                            SettingsSwitchItem(
+                                Icons.Rounded.Fullscreen,
+                                "Force desktop width",
+                                "Lays pages out at 1100px and scales them to fit. Turn off if a video plays as a black screen",
+                                pinWidth
+                            ) {
+                                pinWidth = it
+                                com.streamflow.data.BrowserDisplayMode.setViewportPinned(context, it)
+                            }
+                        }
                     }
                     SettingsFooter(
                         "Applies to every website tab at once, so they never disagree. " +

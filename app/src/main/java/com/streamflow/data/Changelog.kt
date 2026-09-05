@@ -9,11 +9,12 @@ package com.streamflow.data
 // which is exactly why tools/version-check now compares this constant against
 // versionName in app/build.gradle and fails the build when they drift.
 object Changelog {
-    const val VERSION_NAME = "6.25.0"
+    const val VERSION_NAME = "6.26.0"
 
     val notes = listOf(
-        "The Donghua tab is back to donghuafun.com 🌐 — same ad-blocking browser as the Drama and MKissa tabs, desktop layout on by default",
-        "Everything the last two updates added to playlists stays: tap an episode and the rest of the series queues behind it, and Continue picks up the episode you left half-watched",
-        "Note that website tabs can't use the rest of the app — downloads, favourites, Watch Later, history and resume position need a video StreamFlow itself is playing, and a web page isn't one"
+        "Fixed: video playing as a black screen on website tabs with desktop mode on 🖥 — desktop mode was doing two things at once, and one of them was breaking the player",
+        "Desktop mode is now two switches. \"Desktop site layout\" still asks the site for its full version; \"Force desktop width\" is the part that scales the page down, and that is the half that can black out a video",
+        "So you can keep the desktop layout and just turn the width forcing off — before, the only fix was giving up desktop mode completely",
+        "Both are in the ⋮ menu inside any website tab, and under Settings › Home › Website tab layout"
     )
 }

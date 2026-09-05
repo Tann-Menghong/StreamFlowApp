@@ -13,6 +13,7 @@
 // ("Downloading AI model…", "Tab limit reached", "StreamFlow crashed last
 // time"), and indexing those would be worse than leaving them out.
 const fs = require('fs');
+const { extractRows, categoryBranches } = require('./rows.js');
 
 const SETTINGS = 'app/src/main/java/com/streamflow/ui/settings/SettingsScreen.kt';
 const INDEX = 'app/src/main/java/com/streamflow/data/SettingsIndex.kt';
@@ -21,28 +22,17 @@ const src = fs.readFileSync(SETTINGS, 'utf8').split('\n');
 const idx = fs.readFileSync(INDEX, 'utf8').split('\n');
 
 // ── what the UI actually renders, per category ──────────────────────────────
-const whenLine = src.findIndex((l) => /when \(category\)/.test(l));
-if (whenLine < 0) {
+const parsed = categoryBranches(src);
+if (!parsed) {
   console.log('FAIL - could not find `when (category)` in SettingsScreen.kt');
   process.exit(2);
 }
-const branches = [];
-let whenEnd = src.length;
-for (let i = whenLine + 1; i < src.length; i++) {
-  if (/^ {16}else ->/.test(src[i])) { whenEnd = i; break; }
-  const m = src[i].match(/^ {16}"([^"]+)" ->/);
-  if (m) branches.push([m[1], i]);
-}
 const rows = new Map(); // category -> Set(label)
-for (let b = 0; b < branches.length; b++) {
-  const [name, start] = branches[b];
-  const stop = b + 1 < branches.length ? branches[b + 1][1] : whenEnd;
-  const set = new Set();
-  for (let i = start; i < stop; i++) {
-    const m = src[i].match(/Settings(?:Item|SwitchItem)\(\s*[^,]+,\s*"([^"]+)"/);
-    if (m) set.add(m[1]);
-  }
-  rows.set(name, set);
+for (const [name, { start, stop }] of parsed.branches) {
+  rows.set(
+    name,
+    new Set(extractRows(src.slice(start, stop), start + 1).map((r) => r.label))
+  );
 }
 
 // ── what the index claims ───────────────────────────────────────────────────
@@ -60,7 +50,8 @@ let fail = 0;
 const byCategory = new Map();
 for (const c of claims) byCategory.set(c.category, (byCategory.get(c.category) || 0) + 1);
 
-console.log(`  ${claims.length} indexed settings across ${byCategory.size} pages\n`);
+console.log(`  ${claims.length} indexed settings across ${byCategory.size} pages`);
+console.log('');
 for (const [cat, n] of [...byCategory].sort()) {
   const total = rows.has(cat) ? rows.get(cat).size : 0;
   console.log(`    ${cat.padEnd(15)} ${String(n).padStart(2)} indexed / ${total} rows on the page`);

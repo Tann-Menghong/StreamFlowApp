@@ -23,6 +23,7 @@
 // page and the two copies will write the same preference and disagree on
 // screen until one of them is noticed. A row label may appear on one page only.
 const fs = require('fs');
+const { extractRows, categoryBranches } = require('./rows.js');
 
 const FILE = 'app/src/main/java/com/streamflow/ui/settings/SettingsScreen.kt';
 const src = fs.readFileSync(FILE, 'utf8').split('\n');
@@ -40,23 +41,18 @@ for (let i = 0; i < src.length; i++) {
   if (s) subtitles.add(s[1]);
 }
 
-// Category branches, read at their own indentation inside `when (category)`.
-// Bounded by that when's `else ->` so a later when at the same depth cannot
-// leak in.
-const whenLine = src.findIndex((l) => /when \(category\)/.test(l));
-if (whenLine < 0) {
+// Category branches, via the shared extractor so this and check-search-index.js
+// cannot disagree about what a row is.
+const parsed = categoryBranches(src);
+if (!parsed) {
   console.log('FAIL - could not find `when (category)`; has SettingsCategoryScreen been restructured?');
   process.exit(2);
 }
-const branches = new Map();
-let whenEnd = src.length;
-for (let i = whenLine + 1; i < src.length; i++) {
-  if (/^ {16}else ->/.test(src[i])) { whenEnd = i; break; }
-  const m = src[i].match(/^ {16}"([^"]+)" ->/);
-  if (m) branches.set(m[1], i);
-}
+const branches = new Map([...parsed.branches].map(([n, r]) => [n, r.start]));
+const whenEnd = parsed.whenEnd;
 
-console.log(`  ${tiles.length} tiles, ${branches.size} category pages\n`);
+console.log(`  ${tiles.length} tiles, ${branches.size} category pages`);
+console.log('');
 console.log('  CATEGORY          TILE  SUBTITLE  PAGE');
 console.log('  ' + '-'.repeat(44));
 for (const t of tiles) {
@@ -76,25 +72,21 @@ for (const [name, line] of branches) {
 }
 
 // ── no control may live on two pages ────────────────────────────────────────
-// Walk each branch's line range and collect the labels it renders.
 const ordered = [...branches.entries()].sort((a, b) => a[1] - b[1]);
 const owner = new Map(); // label -> {category, line}
 console.log('');
 for (let b = 0; b < ordered.length; b++) {
   const [name, start] = ordered[b];
   const end = b + 1 < ordered.length ? ordered[b + 1][1] : whenEnd;
-  for (let i = start; i < end; i++) {
-    const m = src[i].match(/Settings(?:Item|SwitchItem)\(\s*[^,]+,\s*"([^"]+)"/);
-    if (!m) continue;
-    const label = m[1];
+  for (const { label, line } of extractRows(src.slice(start, end), start + 1)) {
     const prev = owner.get(label);
     if (prev && prev.category !== name) {
       problem(
-        `${FILE}:${i + 1}  "${label}" is on both the ${prev.category} page (line ${prev.line}) ` +
+        `${FILE}:${line}  "${label}" is on both the ${prev.category} page (line ${prev.line}) ` +
         `and the ${name} page — one control, two homes`
       );
     } else if (!prev) {
-      owner.set(label, { category: name, line: i + 1 });
+      owner.set(label, { category: name, line });
     }
   }
 }

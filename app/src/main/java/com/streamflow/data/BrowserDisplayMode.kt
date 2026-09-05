@@ -43,6 +43,7 @@ object BrowserDisplayMode {
 
     private const val PREFS = "browser_display"
     private const val KEY_DESKTOP = "desktop"
+    private const val KEY_PIN_VIEWPORT = "pin_viewport"
 
     /** Layout width, in CSS px, that sites are asked to render at. */
     const val DESKTOP_WIDTH_CSS_PX = 1100
@@ -70,6 +71,34 @@ object BrowserDisplayMode {
         prefs(context).edit().putBoolean(KEY_DESKTOP, desktop).apply()
     }
 
+    /**
+     * Whether desktop mode also PINS the layout width, on top of swapping the
+     * user-agent.
+     *
+     * These are two separate interventions that were welded into one switch,
+     * and they fail differently. The user-agent asks the site for its desktop
+     * page. The viewport override then deletes the page's own viewport tag and
+     * forces the engine to lay out at [DESKTOP_WIDTH_CSS_PX], which the
+     * WebView scales down to fit the window.
+     *
+     * That scaling is what makes a desktop page readable on a phone, and it is
+     * also the half most likely to break a `<video>`: a player that measures
+     * the window at init, or a video surface being composited under a page
+     * scale, can end up drawing nothing at all — a page that renders correctly
+     * with a black rectangle where the video should be.
+     *
+     * Separating them means a site whose player dislikes the scaling can still
+     * have the desktop layout, instead of the only remedy being to give up
+     * desktop mode entirely. Defaults to true, which is exactly the behaviour
+     * this setting was carved out of.
+     */
+    fun isViewportPinned(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_PIN_VIEWPORT, true)
+
+    fun setViewportPinned(context: Context, pinned: Boolean) {
+        prefs(context).edit().putBoolean(KEY_PIN_VIEWPORT, pinned).apply()
+    }
+
     fun userAgent(desktop: Boolean): String = if (desktop) DESKTOP_UA else MOBILE_UA
 
     /**
@@ -92,7 +121,12 @@ object BrowserDisplayMode {
      * Returning to mobile mode restores `width=device-width` rather than just
      * dropping the override, because the original tag is gone by then.
      */
-    fun viewportScript(desktop: Boolean): String {
+    fun viewportScript(desktop: Boolean, pinned: Boolean = true): String? {
+        // Desktop layout without width pinning: leave the page's own viewport
+        // tag exactly as the site wrote it. Injecting nothing is the point --
+        // this is the escape hatch for players that break under a page scale,
+        // and rewriting the tag "harmlessly" would defeat it.
+        if (desktop && !pinned) return null
         val content =
             if (desktop) "width=$DESKTOP_WIDTH_CSS_PX"
             else "width=device-width, initial-scale=1"

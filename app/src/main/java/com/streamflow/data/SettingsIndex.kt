@@ -61,6 +61,8 @@ object SettingsIndex {
         Entry("Search tab", "Home", listOf("hide search", "tabs", "bottom bar")),
         Entry("Donghua tab", "Home", listOf("donghua", "chinese anime", "anime", "tabs", "website")),
         Entry("Add website tab", "Home", listOf("custom tab", "website", "browser", "add site")),
+        Entry("Desktop site layout", "Home", listOf("desktop", "mobile site", "user agent", "layout", "browser")),
+        Entry("Force desktop width", "Home", listOf("black screen", "video not playing", "desktop width", "zoom", "scale", "viewport")),
 
         // ── Playback ────────────────────────────────────────────────────────
         Entry("Video quality", "Playback", listOf("quality", "resolution", "1080p", "720p", "hd")),
