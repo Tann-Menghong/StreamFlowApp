@@ -9,12 +9,12 @@ package com.streamflow.data
 // which is exactly why tools/version-check now compares this constant against
 // versionName in app/build.gradle and fails the build when they drift.
 object Changelog {
-    const val VERSION_NAME = "6.22.0"
+    const val VERSION_NAME = "6.23.0"
 
     val notes = listOf(
-        "Errors finally say what actually went wrong 🔍 — \"You're offline\", \"Video unavailable\", \"Members only\" — instead of one generic line with a Retry button that could never have worked",
-        "When YouTube changes something the app can't read, StreamFlow says so and offers to check for an update, rather than asking you to retry a request it already knows will fail",
-        "Settings has a search box 🔎 — type \"dark\", \"pin\", \"wifi\" or \"bass\" and it takes you straight to the right page. Ten pages of settings are pleasant to browse and were awful to look things up in",
-        "Empty screens across Search, Library and the queue now look like each other and tell you how to fill them, instead of one bare line of grey text each"
+        "The Donghua tab plays properly now 🎬 — it was a mini web browser pointed at an outside site, and when that site's player went black there was nothing in StreamFlow that could fix it. It's a real StreamFlow tab now, using the same player as everything else",
+        "So donghua episodes finally support everything the rest of the app does: download, audio-only, favourite, Watch Later, queue, bookmarks, history and background play — none of which could work on a web page",
+        "Continue watching for donghua 📺 — pick a half-finished episode back up, with the progress bar showing where you stopped",
+        "Rows that come back empty are hidden instead of shown as an empty shelf, and the same video no longer appears twice in two different rows"
     )
 }

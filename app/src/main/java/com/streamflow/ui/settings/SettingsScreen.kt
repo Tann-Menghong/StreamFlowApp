@@ -797,7 +797,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         ) { vm.setShowSearchTab(it) }
                         SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.LiveTv, "Donghua tab",
-                            "Chinese anime — donghuafun.com", showDonghua
+                            "Chinese animation, from YouTube", showDonghua
                         ) { vm.setShowDonghua(it) }
                         SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.Theaters, "Drama tab",
@@ -846,8 +846,10 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
 
                     // ── Site tab layout ───────────────────────────────────────
                     // One switch for ALL site tabs. Deliberately not per-tab:
-                    // the point is that Donghua, Drama, MKissa and every custom
-                    // tab look the same as each other, every time.
+                    // the point is that Drama, MKissa and every custom tab look
+                    // the same as each other, every time. Donghua is no longer
+                    // in this list -- it is a YouTube content tab now, not a
+                    // website, so a desktop user-agent means nothing to it.
                     SettingsGroupLabel("Website tab layout")
                     SettingsCard {
                         var desktopSites by remember {
@@ -856,7 +858,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                         SettingsSwitchItem(
                             if (desktopSites) Icons.Rounded.DesktopWindows else Icons.Rounded.PhoneAndroid,
                             "Desktop site layout",
-                            "Donghua, Drama, MKissa and your own tabs all load the full desktop version",
+                            "Drama, MKissa and your own tabs all load the full desktop version",
                             desktopSites
                         ) {
                             desktopSites = it

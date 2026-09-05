@@ -32,7 +32,7 @@ import com.streamflow.data.BrowserDisplayMode
 import com.streamflow.ui.theme.appShape
 import androidx.core.view.WindowInsetsControllerCompat
 
-// ── Ad-blocking (shared by the Donghua, Drama and MKissa tabs) ───────────────
+// ── Ad-blocking (shared by the Drama and MKissa tabs) ────────────────────────
 private val AD_DOMAINS = setOf(
     "doubleclick.net", "googlesyndication.com", "googletagmanager.com",
     "googletagservices.com", "google-analytics.com", "googleadservices.com",
@@ -546,7 +546,8 @@ private val AD_BLOCK_JS = """
 
 /**
  * Ad-blocked in-app browser tab pinned to one streaming site. Used by the
- * Donghua (donghuafun.com), Drama (kisskh.co) and MKissa (mkissa.to) tabs.
+ * Drama (kisskh.co) and MKissa (mkissa.to) tabs. Donghua used to be one of
+ * these and is now a native YouTube content tab -- see ui/donghua.
  * (PDTV got its own native player — see ui/pdtv/PdTvScreen.)
  *
  * Ad defense is layered so nothing legitimate breaks: (1) network blocklist of

@@ -397,7 +397,15 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                 SearchScreen(onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) })
             }
             composable(Screen.Donghua.route) {
-                DonghuaScreen(onFullscreenChange = { isDonghuaFullscreen = it })
+                // A content source now, not a browser tab: it hands a url to the
+                // same player route Home and Search use, so extraction, the
+                // media session, downloads and history all come along for free.
+                DonghuaScreen(
+                    onVideoClick = { navController.navigate(Screen.Player.createRoute(it)) },
+                    onChannelClick = { url ->
+                        if (url.isNotEmpty()) navController.navigate(Screen.Channel.createRoute(url))
+                    }
+                )
             }
             composable(Screen.Drama.route) {
                 com.streamflow.ui.browser.AdblockBrowserScreen(

@@ -10,6 +10,7 @@
 #
 # 1. check-when-branches.js      player screen: is the PlayerView reachable?
 # 2. check-duplicate-branches.js whole codebase: any shadowed `when` branch?
+# 3. check-playback-owners.js    only the files that own playback build a player
 #
 # Usage: bash tools/player-check/run.sh
 set -euo pipefail
@@ -19,3 +20,6 @@ node tools/player-check/check-when-branches.js
 echo
 echo "== codebase: duplicate when-branches =="
 node tools/player-check/check-duplicate-branches.js
+echo
+echo "== codebase: who is allowed to construct a player =="
+node tools/player-check/check-playback-owners.js
