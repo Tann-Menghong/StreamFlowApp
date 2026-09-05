@@ -48,7 +48,9 @@ jobs:
           bash tools/adblock-test/run.sh
           bash tools/backup-check/run.sh
           bash tools/player-check/run.sh
+          bash tools/settings-check/run.sh
           bash tools/theme-check/run.sh
+          bash tools/version-check/run.sh
 
       - name: Unit tests
         run: ./gradlew testReleaseUnitTest --stacktrace --no-daemon

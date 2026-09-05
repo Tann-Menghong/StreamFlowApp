@@ -40,3 +40,8 @@ for (const f of walk('app/src/main/java')) {
   }
 }
 console.log(findings === 0 ? '\nPASS - no duplicate when-branches anywhere' : `\nFAIL - ${findings} duplicate branch(es)`);
+// This printed FAIL and exited 0, so `set -e` in run.sh saw success and CI went
+// green on a real finding -- a checker guarding the bug that blacked out video
+// for three releases, which could not itself fail. Every other checker here
+// exits on its verdict; this one now does too.
+process.exit(findings === 0 ? 0 : 1);

@@ -132,11 +132,37 @@ fun LibraryScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            // Every number the dashboard shows, computed once from one
+            // definition of "week". Keyed on the history list itself, not on
+            // history.size: rewatching a video moves its watchedAt without
+            // changing the count, and the old remember(history.size) went on
+            // serving yesterday's chart until something was added or removed.
+            val snapshot = remember(history) {
+                val midnight = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val fmt = java.text.SimpleDateFormat("EEEEE", java.util.Locale.getDefault())
+                LibrarySnapshot(
+                    stats = com.streamflow.data.LibraryStats.summarize(
+                        history.map {
+                            com.streamflow.data.LibraryStats.Watch(
+                                watchedAt = it.watchedAt,
+                                positionMs = it.position,
+                                uploader = it.uploaderName)
+                        },
+                        dayStartMs = midnight
+                    ),
+                    dayLabels = (com.streamflow.data.LibraryStats.WEEK_DAYS - 1 downTo 0).map { d ->
+                        fmt.format(java.util.Date(midnight - d * com.streamflow.data.LibraryStats.DAY_MS))
+                    }
+                )
+            }
             LibraryDashboard(
+                snapshot           = snapshot,
                 favoritesCount     = favorites.size,
                 downloadsCount     = downloads.size,
-                subscriptionsCount = subscriptions.size,
-                history            = history
+                subscriptionsCount = subscriptions.size
             )
             val tabCounts = listOf(favorites.size, history.size, watchLater.size, subscriptions.size, playlists.size, downloads.size, bookmarksList.size)
             // Pill-style segmented tabs (replaces the flat underline TabRow)
@@ -226,8 +252,7 @@ fun LibraryScreen(
                             emptySubtitle = "Videos you watch will appear here.",
                             emptyIcon = Icons.Rounded.History,
                             progressFractions = progressMap,
-                            remainingSeconds = remainingMap,
-                            header = { HistoryStatsRow(history) }
+                            remainingSeconds = remainingMap
                         )
                     }
                     2 -> VideoListWithSearch(
@@ -510,72 +535,6 @@ private fun DownloadList(
     }
 }
 
-// Watch stats for the History tab: videos today / this week, total watch time
-@Composable
-private fun HistoryStatsRow(history: List<HistoryEntity>) {
-    if (history.isEmpty()) return
-    val dayStart = remember(history.size) {
-        java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-    val weekStart = System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000
-    val today = history.count { it.watchedAt >= dayStart }
-    val week  = history.count { it.watchedAt >= weekStart }
-    val watchMs = history.sumOf { it.position }
-    val watchLabel = run {
-        val totalMin = watchMs / 60000L
-        if (totalMin >= 60) "${totalMin / 60}h ${totalMin % 60}m" else "${totalMin}m"
-    }
-
-    // Top channels — the local history is the only data source, nothing leaves
-    // the phone. Five rather than three now that they render as a ranked list
-    // instead of being squeezed into one horizontally-scrolling line.
-    val topChannels = remember(history.size) {
-        history.groupBy { it.uploaderName }
-            .filterKeys { it.isNotBlank() }
-            .map { (name, vids) -> name to vids.size }
-            .sortedByDescending { it.second }
-            .take(5)
-    }
-
-    // The seven-day chart lives in the Library dashboard above the tabs now, so
-    // this pane deliberately shows only what the dashboard does NOT: today's
-    // count, all-time watch time, and the channel leaderboard. Repeating the
-    // chart a few hundred pixels below itself was pure duplication.
-    com.streamflow.ui.components.DashboardPane(
-        title = "History",
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            com.streamflow.ui.components.DashboardTile("$today", "Today", null, Modifier.weight(1f))
-            com.streamflow.ui.components.DashboardTile("$week", "This week", null, Modifier.weight(1f))
-            com.streamflow.ui.components.DashboardTile(watchLabel, "Watch time", "all time", Modifier.weight(1f))
-        }
-        if (topChannels.isNotEmpty()) {
-            val top = topChannels.first().second.coerceAtLeast(1)
-            Spacer(Modifier.height(10.dp))
-            Text("TOP CHANNELS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.2.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.75f),
-                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
-            topChannels.forEachIndexed { i, (name, count) ->
-                com.streamflow.ui.components.DashboardRankRow(
-                    rank = i + 1,
-                    name = name,
-                    value = "$count",
-                    fraction = count.toFloat() / top
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-        }
-    }
-}
-
 @Composable
 private fun VideoListWithSearch(
     items: List<VideoItem>,
@@ -585,8 +544,7 @@ private fun VideoListWithSearch(
     emptySubtitle: String,
     emptyIcon: ImageVector,
     progressFractions: Map<String, Float> = emptyMap(),
-    remainingSeconds: Map<String, Long> = emptyMap(),
-    header: (@Composable () -> Unit)? = null
+    remainingSeconds: Map<String, Long> = emptyMap()
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var sortBy by remember { mutableStateOf("Date") }
@@ -603,7 +561,6 @@ private fun VideoListWithSearch(
         }
 
     Column(Modifier.fillMaxSize()) {
-        header?.invoke()
         // Search + sort row
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -946,49 +903,43 @@ private fun FavoriteEntity.toVideoItem() = VideoItem(url = url, title = title, t
 private fun HistoryEntity.toVideoItem()  = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 private fun WatchLaterEntity.toVideoItem() = VideoItem(url = url, title = title, thumbnailUrl = thumbnailUrl, uploaderName = uploaderName, viewCount = viewCount, duration = duration)
 
+/** Everything the dashboard draws, computed once per history change. */
+private data class LibrarySnapshot(
+    val stats: com.streamflow.data.LibraryStats.Summary,
+    val dayLabels: List<String>,
+)
+
 /**
- * The Library dashboard: an at-a-glance readout above the tabs.
+ * The Library dashboard — and, deliberately, the only one on this screen.
  *
- * Four metrics plus a seven-day activity chart, collapsible so it never pushes
- * the tab strip off screen on a short phone. Collapsed state is remembered, and
- * defaults to EXPANDED only when there is history worth looking at — a dashboard
- * of zeroes on first launch is just an obstacle between the user and their tabs.
+ * There used to be two. This pane sat above the tab strip, and the History tab
+ * injected a second bordered pane of tiles directly below it, so opening
+ * Library on History (a tab the user can set as their default) showed two
+ * stacked dashboards whose numbers disagreed: "Watched · 7 days" here against
+ * "This week" there, the same idea measured two different ways. Hiding one
+ * would have left the second source of truth in place to drift again, so the
+ * fix is that the second surface no longer exists and what was unique to it —
+ * all-time watch time and the channel leaderboard — moved in here.
  *
- * All of it is built from the shared dashboard primitives, so it matches the
- * Settings dashboard exactly and picks up the TERMINAL treatment for free.
+ * Four metrics, then an expandable detail section carrying the seven-day chart,
+ * the leaderboard and the totals. Collapsible so it never pushes the tab strip
+ * off screen on a short phone; collapsed state is remembered, and it opens
+ * expanded only when there is history worth looking at, because a dashboard of
+ * zeroes on first launch is just an obstacle between the user and their tabs.
+ *
+ * Built from the shared dashboard primitives, so it matches the Settings
+ * dashboard and picks up the TERMINAL treatment for free.
  */
 @Composable
 private fun LibraryDashboard(
+    snapshot: LibrarySnapshot,
     favoritesCount: Int,
     downloadsCount: Int,
     subscriptionsCount: Int,
-    history: List<HistoryEntity>,
 ) {
-    val weekCutoff = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
-    val weekly = history.filter { it.watchedAt >= weekCutoff }
-    val minutes = weekly.sumOf { it.position } / 1000 / 60
-    val timeLabel = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
-
+    val stats = snapshot.stats
     var expanded by androidx.compose.runtime.saveable.rememberSaveable {
-        mutableStateOf(history.isNotEmpty())
-    }
-
-    val dayStart = remember(history.size) {
-        java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-    val dayMs = 24L * 60 * 60 * 1000
-    val dayCounts = remember(history.size, dayStart) {
-        (6 downTo 0).map { d ->
-            val start = dayStart - d * dayMs
-            history.count { it.watchedAt >= start && it.watchedAt < start + dayMs }
-        }
-    }
-    val dayLabels = remember(dayStart) {
-        val fmt = java.text.SimpleDateFormat("EEEEE", java.util.Locale.getDefault())
-        (6 downTo 0).map { d -> fmt.format(java.util.Date(dayStart - d * dayMs)) }
+        mutableStateOf(!stats.isEmpty)
     }
 
     com.streamflow.ui.components.DashboardPane(
@@ -999,9 +950,10 @@ private fun LibraryDashboard(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             com.streamflow.ui.components.DashboardTile(
-                timeLabel, "Watch time", "7 days", Modifier.weight(1f))
+                com.streamflow.data.LibraryStats.formatMinutes(stats.weekMinutes),
+                "Watch time", "7 days", Modifier.weight(1f))
             com.streamflow.ui.components.DashboardTile(
-                "${weekly.size}", "Watched", "7 days", Modifier.weight(1f))
+                "${stats.weekCount}", "Watched", "7 days", Modifier.weight(1f))
             com.streamflow.ui.components.DashboardTile(
                 "$favoritesCount", "Favorites", "saved", Modifier.weight(1f))
             com.streamflow.ui.components.DashboardTile(
@@ -1009,16 +961,41 @@ private fun LibraryDashboard(
         }
         AnimatedVisibility(expanded) {
             Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 4.dp)) {
-                com.streamflow.ui.components.DashboardBarChart(dayCounts, dayLabels)
-                if (subscriptionsCount > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "$subscriptionsCount channel${if (subscriptionsCount == 1) "" else "s"} subscribed",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                com.streamflow.ui.components.DashboardBarChart(
+                    stats.dayCounts, snapshot.dayLabels)
+
+                // The leaderboard the History tab used to carry. Built only from
+                // the local history table — nothing about it leaves the phone.
+                if (stats.topChannels.isNotEmpty()) {
+                    val top = stats.topChannels.first().second.coerceAtLeast(1)
+                    Spacer(Modifier.height(12.dp))
+                    Text("TOP CHANNELS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.2.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.75f),
+                        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+                    stats.topChannels.forEachIndexed { i, (name, count) ->
+                        com.streamflow.ui.components.DashboardRankRow(
+                            rank = i + 1,
+                            name = name,
+                            value = "$count",
+                            fraction = count.toFloat() / top
+                        )
+                    }
                 }
+
+                // All-time totals as a quiet footer line rather than two more
+                // tiles: they are context for the numbers above, not headlines.
+                val allTime = com.streamflow.data.LibraryStats.formatMinutes(stats.totalMinutes)
+                val subsPart = if (subscriptionsCount > 0)
+                    " · $subscriptionsCount channel${if (subscriptionsCount == 1) "" else "s"} subscribed"
+                else ""
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "$allTime watched all time$subsPart",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
         }
         // A quiet full-width affordance rather than an icon button: the whole

@@ -74,10 +74,16 @@ private val settingsSections = listOf(
     SettingsSection("Playback & alerts", listOf(
         SettingsTile("Playback", Icons.Rounded.PlayCircle, Color(0xFF4C8DFF)),
         SettingsTile("Notifications", Icons.Rounded.Notifications, Color(0xFFFF9500)))),
-    SettingsSection("Intelligence & data", listOf(
-        SettingsTile("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)),
+    SettingsSection("Downloads & storage", listOf(
+        SettingsTile("Downloads", Icons.Rounded.DownloadForOffline, Color(0xFF00ACC1)),
         SettingsTile("Storage", Icons.Rounded.Storage, Color(0xFF26A69A)),
         SettingsTile("Backup", Icons.Rounded.Backup, Color(0xFF5C6BC0)))),
+    // Privacy and the on-device model belong together: the reason the AI page
+    // exists in this form -- a model that downloads once and then runs offline
+    // with no key and no server -- is the same reason this app has no account.
+    SettingsSection("Privacy & intelligence", listOf(
+        SettingsTile("Privacy", Icons.Rounded.Shield, Color(0xFF7E57C2)),
+        SettingsTile("AI", Icons.Rounded.AutoAwesome, Color(0xFFEC407A)))),
     SettingsSection("System", listOf(
         SettingsTile("About", Icons.Rounded.Info, Color(0xFFFF7043))))
 )
@@ -112,6 +118,10 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
     val blockedCount by vm.blockedCount.collectAsState()
     val language     by vm.language.collectAsState()
     val update       by vm.update.collectAsState()
+    val wifiOnly     by vm.downloadsWifiOnly.collectAsState()
+    val autoDlWl     by vm.autoDlWatchLater.collectAsState()
+    val appLock      by vm.appLock.collectAsState()
+    val incognito    by vm.incognito.collectAsState()
 
     val themeLabel = com.streamflow.ui.theme.themeLabelFor(theme)
     val notifFreqLabel = when (notifyFreq) { "1" -> "hourly"; "3" -> "every 3h"; "12" -> "every 12h"; "24" -> "daily"; else -> "every 6h" }
@@ -130,6 +140,16 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
         "Notifications" to if (!notifyNewVideos) "Off" else "On • checks $notifFreqLabel",
         "Home" to if (homeLayout == "GRID") "Grid layout" else "List layout",
         "AI" to aiLabel,
+        "Downloads" to buildString {
+            append(if (wifiOnly) "Wi-Fi only" else "Wi-Fi & mobile data")
+            if (autoDlWl) append(" • auto-saving Watch Later")
+        },
+        "Privacy" to when {
+            appLock && incognito -> "App lock on • incognito"
+            appLock -> "App lock on"
+            incognito -> "Incognito on"
+            else -> "Nothing leaves this phone"
+        },
         "Storage" to "$favCount favorites • $histCount history",
         "Backup" to "Export, import & subscriptions",
         "About" to "v${vm.appVersion}"
@@ -732,6 +752,13 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             listOf("Favorites", "History", "Watch Later", "Channels", "Playlists", "Downloads", "Bookmarks")
                                 .getOrElse(libraryTab.toIntOrNull() ?: 0) { "Favorites" }
                         ) { showLibTabDialog = true }
+                        SettingsDivider()
+                        // Moved here from Playback: this picks which country's
+                        // trending list Home shows. It decides what you see, not
+                        // how it plays.
+                        SettingsItem(Icons.Rounded.Language, "Trending country",
+                            countryOptions.firstOrNull { it.first == country }?.second ?: country
+                        ) { showCountryDialog = true }
                     }
                     SettingsFooter("Hidden tabs disappear from the bottom bar instantly — nothing is deleted.")
                 }
@@ -865,37 +892,26 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             "Community titles from DeArrow replace clickbait in the player", deArrow
                         ) { vm.setDeArrow(it) }
                     }
-                    SettingsGroupLabel("Data & privacy")
+                    // What is left here is what actually governs playback: how
+                    // much data and battery a *stream* is allowed to spend.
+                    // Downloads, incognito and the app lock used to sit in this
+                    // group too, which meant the app's only security control was
+                    // filed three levels deep under "Playback" — nobody looking
+                    // for it would ever open this page. They now live on the
+                    // Downloads and Privacy pages instead, once each.
+                    SettingsGroupLabel("Data & battery")
                     SettingsCard {
                         SettingsSwitchItem(Icons.Rounded.DataSaverOn, "Data saver",
                             "Prefer lower quality to save mobile data", dataSaver
                         ) { vm.setDataSaver(it) }
                         SettingsDivider()
-                        // Downloads used to ignore every data preference on this
-                        // screen: setAllowedOverMetered was hard-coded true, so
-                        // tapping download on mobile data started a
-                        // several-hundred-megabyte transfer with no warning.
-                        SettingsSwitchItem(Icons.Rounded.Wifi, "Download on Wi-Fi only",
-                            "Hold downloads until Wi-Fi instead of using mobile data",
-                            downloadsWifiOnly
-                        ) { vm.setDownloadsWifiOnly(it) }
-                        SettingsDivider()
                         SettingsSwitchItem(Icons.Rounded.BatterySaver, "Battery saver",
                             "Cap quality at 480p, no ambient glow, no prefetching", batterySaver
                         ) { vm.setBatterySaver(it) }
-                        SettingsDivider()
-                        SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
-                            "Watch without saving to history", incognito
-                        ) { vm.setIncognito(it) }
-                        SettingsDivider()
-                        SettingsSwitchItem(Icons.Rounded.Lock, "App lock",
-                            "Require fingerprint / PIN to open the app", appLock
-                        ) { vm.setAppLock(it) }
-                        SettingsDivider()
-                        SettingsItem(Icons.Rounded.Language, "Trending country",
-                            countryOptions.firstOrNull { it.first == country }?.second ?: country
-                        ) { showCountryDialog = true }
                     }
+                    SettingsFooter(
+                        "These apply to streaming. Downloads have their own network setting under Settings › Downloads."
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
 
@@ -984,28 +1000,124 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             com.streamflow.data.StorageStats.format(storage.imageCacheBytes) + " — rebuilds as you browse"
                         ) { if (storage.imageCacheBytes > 0) vm.clearImageCache() }
                     }
-                    SettingsGroupLabel("Library data")
+                    // Saved content only. Everything that is a record of what
+                    // was watched -- history, hidden channels, retention --
+                    // moved to Privacy, which is where someone goes looking for
+                    // it, and lives in exactly one place now.
+                    SettingsGroupLabel("Saved content")
                     SettingsCard {
-                    SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
-                        "On Wi-Fi, saves Watch Later videos for offline (3 per check)", autoDlWatchLater
-                    ) { vm.setAutoDlWatchLater(it) }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
-                        "$favCount saved"
-                    ) { if (favCount > 0) showClearFav = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.History, "Clear watch history",
-                        "$histCount entries"
-                    ) { if (histCount > 0) showClearHist = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.VisibilityOff, "Hidden videos & channels",
-                        if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
-                    ) { if (blockedCount > 0) showClearBlocked = true }
-                    SettingsDivider()
-                    SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
-                        when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
-                    ) { showRetentionDialog = true }
+                        SettingsItem(Icons.Rounded.FavoriteBorder, "Clear favorites",
+                            "$favCount saved"
+                        ) { if (favCount > 0) showClearFav = true }
                     }
+                    SettingsFooter(
+                        "Watch history, hidden channels and auto-clearing live under Settings › Privacy. " +
+                        "Downloaded files are managed under Settings › Downloads."
+                    )
+                }
+
+                // ── Downloads ────────────────────────────────────────────────
+                // Download settings were spread across two unrelated pages: the
+                // network rule under Playback and the automatic saver under
+                // Storage, with the size figure on a third. One page now owns
+                // them, and it is the page whose name matches the feature.
+                "Downloads" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    LaunchedEffect(Unit) { vm.refreshStorage() }
+
+                    SettingsGroupLabel("Network")
+                    SettingsCard {
+                        // Downloads used to ignore every data preference in the
+                        // app: setAllowedOverMetered was hard-coded true, so
+                        // tapping download on mobile data started a
+                        // several-hundred-megabyte transfer with no warning.
+                        SettingsSwitchItem(Icons.Rounded.Wifi, "Download on Wi-Fi only",
+                            "Hold downloads until Wi-Fi instead of using mobile data",
+                            downloadsWifiOnly
+                        ) { vm.setDownloadsWifiOnly(it) }
+                    }
+                    SettingsFooter(
+                        if (downloadsWifiOnly)
+                            "Downloads started on mobile data wait in the queue and begin on their own once you are on Wi-Fi."
+                        else
+                            "Downloads will use mobile data. A 1080p video can be several hundred megabytes."
+                    )
+
+                    SettingsGroupLabel("Automatic")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.CloudDownload, "Auto-download Watch Later",
+                            "On Wi-Fi, saves Watch Later videos for offline (3 per check)",
+                            autoDlWatchLater
+                        ) { vm.setAutoDlWatchLater(it) }
+                    }
+
+                    SettingsGroupLabel("Space used")
+                    com.streamflow.ui.components.DashboardPane(
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            com.streamflow.ui.components.DashboardTile(
+                                com.streamflow.data.StorageStats.format(storage.downloadBytes),
+                                "Downloads", if (storageScanning) "measuring…" else "your files",
+                                Modifier.weight(1f))
+                            com.streamflow.ui.components.DashboardTile(
+                                com.streamflow.data.StorageStats.format(storage.mediaCacheBytes),
+                                "Video cache", "temporary", Modifier.weight(1f))
+                        }
+                    }
+                    // Stated plainly because it is a real limit of how YouTube
+                    // serves media, not a missing feature: the signed URL a
+                    // download was started against stops working, so there is
+                    // nothing left to resume against and a fresh URL means a
+                    // fresh transfer. Retry does exactly that.
+                    SettingsFooter(
+                        "A download that fails part-way cannot be resumed — YouTube's stream links expire, " +
+                        "so Retry fetches a new link and starts the file again. Retry lives on the download " +
+                        "itself, in Library › Downloads."
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // ── Privacy & security ───────────────────────────────────────
+                // The app lock was previously the last switch in a group called
+                // "Data & privacy" on the Playback page. Every control that
+                // decides what this app remembers, or who can open it, is here.
+                "Privacy" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SettingsGroupLabel("Access")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.Lock, "App lock",
+                            "Require fingerprint / PIN to open the app", appLock
+                        ) { vm.setAppLock(it) }
+                    }
+
+                    SettingsGroupLabel("What gets recorded")
+                    SettingsCard {
+                        SettingsSwitchItem(Icons.Rounded.VisibilityOff, "Incognito mode",
+                            "Watch without saving to history", incognito
+                        ) { vm.setIncognito(it) }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.AutoDelete, "Auto-clear history",
+                            when (historyRetention) { "30" -> "After 30 days"; "90" -> "After 90 days"; else -> "Never" }
+                        ) { showRetentionDialog = true }
+                    }
+
+                    SettingsGroupLabel("Stored on this phone")
+                    SettingsCard {
+                        SettingsItem(Icons.Rounded.History, "Clear watch history",
+                            "$histCount entries"
+                        ) { if (histCount > 0) showClearHist = true }
+                        SettingsDivider()
+                        SettingsItem(Icons.Rounded.VisibilityOff, "Hidden videos & channels",
+                            if (blockedCount == 0) "Nothing hidden" else "$blockedCount hidden"
+                        ) { if (blockedCount > 0) showClearBlocked = true }
+                    }
+                    SettingsFooter(
+                        "StreamFlow has no account and no sign-in, sends no analytics, and keeps every list on " +
+                        "this device. Clearing history here removes it from the phone — there is no copy anywhere else."
+                    )
+                    Spacer(Modifier.height(8.dp))
                 }
 
                 "Backup" -> SettingsCard(title = category) {
