@@ -9,13 +9,11 @@ package com.streamflow.data
 // which is exactly why tools/version-check now compares this constant against
 // versionName in app/build.gradle and fails the build when they drift.
 object Changelog {
-    const val VERSION_NAME = "6.24.0"
+    const val VERSION_NAME = "6.25.0"
 
     val notes = listOf(
-        "Playlists are series now 📺 — tap any episode and the rest of the show queues up behind it. Before, tapping an episode played that one and stopped dead at the end of it, and \"Play all\" from episode 1 was the only way to get continuous playback",
-        "A Continue button that knows where you are: it opens the furthest episode you left half-watched and says how much of it is left, instead of sending you back to episode 1 of a 280-episode series",
-        "Episode numbers come from the uploader's own titles, so a playlist that opens with a trailer or starts partway into a season is numbered the way the show is",
-        "The Donghua tab has a Series row 🎬 — pick a show, get its full episode list, watch straight through",
-        "Playlists that fail to load now use the app's shared error screen, so they offer an action that can actually work instead of Retry for everything"
+        "The Donghua tab is back to donghuafun.com 🌐 — same ad-blocking browser as the Drama and MKissa tabs, desktop layout on by default",
+        "Everything the last two updates added to playlists stays: tap an episode and the rest of the series queues behind it, and Continue picks up the episode you left half-watched",
+        "Note that website tabs can't use the rest of the app — downloads, favourites, Watch Later, history and resume position need a video StreamFlow itself is playing, and a web page isn't one"
     )
 }

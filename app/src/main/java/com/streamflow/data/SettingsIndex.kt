@@ -59,7 +59,7 @@ object SettingsIndex {
         Entry("Trending country", "Home", listOf("country", "region", "trending", "location")),
         Entry("Bottom bar labels", "Home", listOf("nav labels", "navigation", "bottom bar", "icons only")),
         Entry("Search tab", "Home", listOf("hide search", "tabs", "bottom bar")),
-        Entry("Donghua tab", "Home", listOf("donghua", "chinese anime", "anime", "tabs")),
+        Entry("Donghua tab", "Home", listOf("donghua", "chinese anime", "anime", "tabs", "website")),
         Entry("Add website tab", "Home", listOf("custom tab", "website", "browser", "add site")),
 
         // ── Playback ────────────────────────────────────────────────────────
