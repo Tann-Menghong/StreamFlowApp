@@ -588,9 +588,15 @@ fun AdblockBrowserScreen(
     // showed WebView's built-in white "net::ERR_..." page, which looks like the
     // app broke and offers no way back.
     var loadError by remember { mutableStateOf<String?>(null) }
-    // Desktop vs mobile layout for ALL site tabs. Read synchronously so the very
-    // first WebView is built with the right UA — see BrowserDisplayMode.
-    var desktopMode by remember { mutableStateOf(BrowserDisplayMode.isDesktop(context)) }
+    // Desktop vs mobile layout. The global flag in Settings is the default; a
+    // tab whose mode was flipped from this toolbar remembers its own answer and
+    // stops following it. Read synchronously so the very first WebView is built
+    // with the right UA — see BrowserDisplayMode.
+    var siteMode by remember { mutableStateOf(BrowserDisplayMode.siteMode(context, prefsName)) }
+    // Kept as its own state rather than derived: the WebView callbacks below are
+    // built once and read this on every page load, so it has to be a live
+    // MutableState and not a value snapshotted when the client was created.
+    var desktopMode by remember { mutableStateOf(BrowserDisplayMode.isDesktopFor(context, prefsName)) }
     // The other half of desktop mode, separated so a player that breaks under a
     // page scale does not force the whole desktop layout off.
     var pinViewport by remember { mutableStateOf(BrowserDisplayMode.isViewportPinned(context)) }
@@ -723,8 +729,13 @@ fun AdblockBrowserScreen(
                 // so it never flashes the mobile column first. Decided per URL:
                 // a page with a player is never pinned, because scaling one is
                 // what composites the video as a black rectangle.
-                BrowserDisplayMode.viewportScriptFor(url, desktopMode, pinViewport)
-                    ?.let { view.evaluateJavascript(it, null) }
+                BrowserDisplayMode.viewportScriptFor(
+                    url, desktopMode, pinViewport,
+                    // Read per load rather than held in state, so changing the
+                    // width in Settings applies to an already-open tab on its
+                    // next page instead of only after the tab is reopened.
+                    BrowserDisplayMode.desktopWidth(context)
+                )?.let { view.evaluateJavascript(it, null) }
             }
             // Deliberately the DEPRECATED 4-arg overload, not the API 23
             // WebResourceError one. minSdk here is 21, and this project has
@@ -769,8 +780,13 @@ fun AdblockBrowserScreen(
                 // paint, which silently dropped the tab back to the mobile
                 // layout — or, on a player page, put the pin back and blacked
                 // the video out again after it had started fine.
-                BrowserDisplayMode.viewportScriptFor(url, desktopMode, pinViewport)
-                    ?.let { view.evaluateJavascript(it, null) }
+                BrowserDisplayMode.viewportScriptFor(
+                    url, desktopMode, pinViewport,
+                    // Read per load rather than held in state, so changing the
+                    // width in Settings applies to an already-open tab on its
+                    // next page instead of only after the tab is reopened.
+                    BrowserDisplayMode.desktopWidth(context)
+                )?.let { view.evaluateJavascript(it, null) }
             }
             // Popunder/redirect blocking: streaming sites love navigating the
             // whole page to an ad URL on the first tap — swallow those instead
@@ -1012,10 +1028,11 @@ fun AdblockBrowserScreen(
                                     webViewRef?.loadUrl(homeUrl)
                                 }
                             )
-                            // Flips the mode for EVERY site tab, not just this
-                            // one — see BrowserDisplayMode. Keeping the tabs in
-                            // lockstep is the entire point, so a per-tab
-                            // override is intentionally not offered.
+                            // Flipping it HERE means "this tab", which is the
+                            // only reading that makes sense standing inside one
+                            // tab looking at one site that is laid out wrong.
+                            // The default for every other tab lives in Settings;
+                            // see BrowserDisplayMode for the two levels.
                             DropdownMenuItem(
                                 text = { Text("Desktop site") },
                                 leadingIcon = {
@@ -1035,7 +1052,12 @@ fun AdblockBrowserScreen(
                                     showMenu = false
                                     val next = !desktopMode
                                     desktopMode = next
-                                    BrowserDisplayMode.setDesktop(context, next)
+                                    // Records an EXCEPTION for this tab rather
+                                    // than moving everyone: the other tabs keep
+                                    // following the default they were set to.
+                                    siteMode = if (next) BrowserDisplayMode.SiteMode.DESKTOP
+                                               else BrowserDisplayMode.SiteMode.MOBILE
+                                    BrowserDisplayMode.setSiteMode(context, prefsName, siteMode)
                                     // The user-agent is only consulted when a
                                     // request is made, so the swap needs a
                                     // reload to take effect.
@@ -1046,6 +1068,30 @@ fun AdblockBrowserScreen(
                                     }
                                 }
                             )
+                            // Only once this tab has actually opted out. Without
+                            // a way back, a tab pinned to the wrong mode would
+                            // ignore the Settings default forever with nothing
+                            // on screen explaining why.
+                            if (siteMode != BrowserDisplayMode.SiteMode.DEFAULT) {
+                                DropdownMenuItem(
+                                    text = { Text("Use the default for this site") },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.SettingsBackupRestore, null)
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        siteMode = BrowserDisplayMode.SiteMode.DEFAULT
+                                        BrowserDisplayMode.setSiteMode(context, prefsName, siteMode)
+                                        val next = BrowserDisplayMode.isDesktop(context)
+                                        desktopMode = next
+                                        webViewRef?.let { wv ->
+                                            wv.settings.userAgentString =
+                                                BrowserDisplayMode.userAgent(next)
+                                            wv.reload()
+                                        }
+                                    }
+                                )
+                            }
                             // Right here, because this menu is where someone
                             // ends up when a video will not play: it is the one
                             // switch that can fix a page that renders correctly

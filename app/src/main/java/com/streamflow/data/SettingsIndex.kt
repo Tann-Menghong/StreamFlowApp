@@ -63,6 +63,8 @@ object SettingsIndex {
         Entry("Add website tab", "Home", listOf("custom tab", "website", "browser", "add site")),
         Entry("Desktop site layout", "Home", listOf("desktop", "mobile site", "user agent", "layout", "browser")),
         Entry("Force desktop width", "Home", listOf("black screen", "video not playing", "desktop width", "zoom", "scale", "viewport")),
+        Entry("Desktop layout width", "Home", listOf("1100", "px", "page width", "text size", "smaller", "wider", "zoom")),
+        Entry("Per-tab layout overrides", "Home", listOf("reset", "per site", "per tab", "override", "this tab only", "ignores default")),
 
         // ── Playback ────────────────────────────────────────────────────────
         Entry("Video quality", "Playback", listOf("quality", "resolution", "1080p", "720p", "hd")),

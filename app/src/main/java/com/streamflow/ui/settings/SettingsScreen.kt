@@ -613,6 +613,12 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontDialog     by remember { mutableStateOf(false) }
     var showStartTabDialog by remember { mutableStateOf(false) }
+    var showDesktopWidthDialog by remember { mutableStateOf(false) }
+    // Hoisted out of the card because the picker that changes it lives at the
+    // bottom of this screen, alongside every other dialog.
+    var desktopWidth by remember {
+        mutableStateOf(com.streamflow.data.BrowserDisplayMode.desktopWidth(context))
+    }
     var showWhatsNewDialog by remember { mutableStateOf(false) }
     var showCellularDialog by remember { mutableStateOf(false) }
     var showRetentionDialog by remember { mutableStateOf(false) }
@@ -845,13 +851,17 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                     )
 
                     // ── Site tab layout ───────────────────────────────────────
-                    // One switch for ALL site tabs. Deliberately not per-tab:
-                    // the point is that Donghua, Drama, MKissa and every custom
-                    // tab look the same as each other, every time.
+                    // The DEFAULT for all site tabs. A tab whose mode was
+                    // flipped from its own ⋮ menu keeps that choice and stops
+                    // following this — the count below says how many have, so a
+                    // switch that appears to do nothing is explainable.
                     SettingsGroupLabel("Website tab layout")
                     SettingsCard {
                         var desktopSites by remember {
                             mutableStateOf(com.streamflow.data.BrowserDisplayMode.isDesktop(context))
+                        }
+                        var siteOverrides by remember {
+                            mutableStateOf(com.streamflow.data.BrowserDisplayMode.siteOverrideCount(context))
                         }
                         SettingsSwitchItem(
                             if (desktopSites) Icons.Rounded.DesktopWindows else Icons.Rounded.PhoneAndroid,
@@ -876,18 +886,45 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             SettingsSwitchItem(
                                 Icons.Rounded.Fullscreen,
                                 "Force desktop width",
-                                "Lays browsing pages out at 1100px and scales them to fit. Pages with a video player are never scaled, since that is what showed a black screen",
+                                "Lays browsing pages out at a fixed width and scales them to fit. Pages with a video player are never scaled, since that is what showed a black screen",
                                 pinWidth
                             ) {
                                 pinWidth = it
                                 com.streamflow.data.BrowserDisplayMode.setViewportPinned(context, it)
                             }
+                            // Only meaningful while the width is being forced --
+                            // with pinning off there is no width to choose,
+                            // since the page keeps its own viewport tag.
+                            if (pinWidth) {
+                                SettingsDivider()
+                                SettingsItem(
+                                    Icons.Rounded.AspectRatio,
+                                    "Desktop layout width",
+                                    "$desktopWidth px — narrower fits more readably, wider looks " +
+                                    "more like a real desktop but shrinks further to fit"
+                                ) { showDesktopWidthDialog = true }
+                            }
+                        }
+                        // Nothing to reset until a tab has actually opted out.
+                        if (siteOverrides > 0) {
+                            SettingsDivider()
+                            SettingsItem(
+                                Icons.Rounded.SettingsBackupRestore,
+                                "Per-tab layout overrides",
+                                if (siteOverrides == 1)
+                                    "1 tab is set to its own mode and ignores the default above"
+                                else
+                                    "$siteOverrides tabs are set to their own mode and ignore the default above"
+                            ) {
+                                com.streamflow.data.BrowserDisplayMode.clearSiteModes(context)
+                                siteOverrides = 0
+                            }
                         }
                     }
                     SettingsFooter(
-                        "Applies to every website tab at once, so they never disagree. " +
-                        "Takes effect the next time a tab loads — or switch it from the ⋮ menu inside a tab to reload it now. " +
-                        "Turn it off if a site misbehaves on the desktop layout."
+                        "This is the default every website tab starts from. Changing a tab's mode from its own ⋮ menu " +
+                        "applies to that tab only, and it keeps that choice until you reset it. " +
+                        "Takes effect the next time a tab loads — or switch it from inside a tab to reload it now."
                     )
 
                     SettingsGroupLabel("Start & defaults")
@@ -1550,6 +1587,31 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
             countryOptions.indexOfFirst { it.first == country }.coerceAtLeast(0),
             { vm.setCountry(countryOptions[it].first); showCountryDialog = false },
             { showCountryDialog = false }
+        )
+    }
+    if (showDesktopWidthDialog) {
+        val widths = com.streamflow.data.BrowserDisplayMode.WIDTH_CHOICES
+        PickerDialog(
+            "Desktop layout width",
+            // The number alone means nothing to most people, so each option
+            // says what choosing it actually costs on a phone screen.
+            widths.map { px ->
+                val note = when {
+                    px <= 900 -> "narrowest, easiest to read"
+                    px == com.streamflow.data.BrowserDisplayMode.DEFAULT_DESKTOP_WIDTH_CSS_PX ->
+                        "default"
+                    px >= 1440 -> "widest, smallest text"
+                    else -> "more on screen"
+                }
+                "$px px — $note"
+            },
+            widths.indexOf(desktopWidth).coerceAtLeast(0),
+            {
+                desktopWidth = widths[it]
+                com.streamflow.data.BrowserDisplayMode.setDesktopWidth(context, desktopWidth)
+                showDesktopWidthDialog = false
+            },
+            { showDesktopWidthDialog = false }
         )
     }
     if (showEqDialog) {

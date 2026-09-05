@@ -9,12 +9,13 @@ package com.streamflow.data
 // which is exactly why tools/version-check now compares this constant against
 // versionName in app/build.gradle and fails the build when they drift.
 object Changelog {
-    const val VERSION_NAME = "6.27.0"
+    const val VERSION_NAME = "6.28.0"
 
     val notes = listOf(
-        "Fixed for real this time: video on website tabs no longer plays as a black screen with desktop mode on 🖥 — and you no longer have to turn any setting off to get it",
-        "v6.26.0 split desktop mode in two but left you to find the right switch. This release measures which half was at fault instead of guessing: the site sends the identical page to a phone and a PC, so the desktop layout came entirely from the width override — and scaling a 1100px page into a phone window is what was blacking out the player",
-        "So the width is now decided per page: browsing pages keep the wide desktop grid, and the page you actually watch on is never scaled",
-        "\"Force desktop width\" stays in the ⋮ menu and Settings › Home for anything the automatic rule misses"
+        "Each website tab can now have its own layout 🖥 — flip \"Desktop site\" from a tab's ⋮ menu and it applies to that tab only, so Donghua can be desktop while Drama stays mobile",
+        "Settings › Home is now the default every tab starts from, and it tells you how many tabs have chosen their own mode — a switch that looks like it does nothing is no longer a mystery",
+        "\"Use the default for this site\" in a tab's ⋮ menu puts it back under that default, and Settings can reset every tab at once",
+        "New: Desktop layout width — 900, 1000, 1100, 1280 or 1440px. Narrower is easier to read, wider looks more like a real desktop but shrinks further to fit",
+        "Watch pages are still never scaled at any width, so last release's black-screen fix stays fixed"
     )
 }
