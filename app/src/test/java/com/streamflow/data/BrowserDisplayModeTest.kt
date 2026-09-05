@@ -88,4 +88,111 @@ class BrowserDisplayModeTest {
         assertEquals(BrowserDisplayMode.DESKTOP_UA, BrowserDisplayMode.userAgent(true))
         assertEquals(BrowserDisplayMode.MOBILE_UA, BrowserDisplayMode.userAgent(false))
     }
+
+    // ── which pages carry a player ──────────────────────────────────────────
+    //
+    // Measured, not guessed: donghuafun returns byte-identical HTML for both
+    // user-agents and ships width=device-width on every page, so the desktop
+    // layout is produced solely by the width pin -- and the pin is therefore
+    // also the only thing that could have blacked out the video.
+
+    @Test fun `real watch URLs are recognised`() {
+        val watching = listOf(
+            "https://donghuafun.com/index.php/vod/play/id/1/sid/1/nid/1.html",
+            "https://kisskh.co/Drama/Some-Title/Episode-1?id=1234&ep=5678",
+            "https://example.com/anime/title/ep-12",
+            "https://example.com/watch/9981",
+            "https://example.com/embed/abc123",
+        )
+        for (u in watching) {
+            assertTrue("should be a player page: $u", BrowserDisplayMode.isPlayerPage(u))
+        }
+    }
+
+    // Every one of these is a browsing page that must keep the desktop grid.
+    // "/user/plays.html" and "/episodes" are the two that a loose substring
+    // match gets wrong, which is why the patterns require a separator or a
+    // following digit.
+    @Test fun `browsing URLs keep the desktop layout`() {
+        val browsing = listOf(
+            "https://donghuafun.com/",
+            "https://donghuafun.com/index.php/vod/detail/id/1.html",
+            "https://donghuafun.com/index.php/art/index.html",
+            "https://donghuafun.com/index.php/user/plays.html",
+            "https://donghuafun.com/index.php/label/weekday.html",
+            "https://example.com/anime/title/episodes",
+        )
+        for (u in browsing) {
+            assertTrue("should NOT be a player page: $u", !BrowserDisplayMode.isPlayerPage(u))
+        }
+    }
+
+    // The host is dropped before matching, so a site whose DOMAIN says "watch"
+    // does not put its entire catalogue into mobile layout.
+    @Test fun `the host is not matched`() {
+        assertTrue(!BrowserDisplayMode.isPlayerPage("https://watchanime.com/"))
+        assertTrue(!BrowserDisplayMode.isPlayerPage("https://episode4.example.com/browse"))
+    }
+
+    // ── the per-page decision ───────────────────────────────────────────────
+
+    @Test fun `a player page is never pinned, even with pinning on`() {
+        val js = BrowserDisplayMode.viewportScriptFor(
+            "https://donghuafun.com/index.php/vod/play/id/1/sid/1/nid/1.html",
+            desktop = true, pinned = true
+        )
+        assertNotNull(js)
+        assertTrue(
+            "must not pin the desktop width on a watch page",
+            !js!!.contains("width=${BrowserDisplayMode.DESKTOP_WIDTH_CSS_PX}")
+        )
+        assertTrue(js.contains("width=device-width"))
+    }
+
+    // A site that already asked for device width keeps its own tag, so
+    // viewport-fit=cover (display-cutout handling) is not thrown away.
+    @Test fun `a correct viewport tag is left alone on a player page`() {
+        val js = BrowserDisplayMode.viewportScriptFor(
+            "https://donghuafun.com/index.php/vod/play/id/1/sid/1/nid/1.html",
+            desktop = true, pinned = true
+        )!!
+        assertTrue(js.contains("device-width"))
+        assertTrue("must bail out before rewriting", js.contains("return"))
+        assertTrue(js.indexOf("indexOf('device-width')") < js.indexOf("appendChild"))
+    }
+
+    @Test fun `browsing pages still get the desktop width`() {
+        val js = BrowserDisplayMode.viewportScriptFor(
+            "https://donghuafun.com/index.php/vod/detail/id/1.html",
+            desktop = true, pinned = true
+        )
+        assertNotNull(js)
+        assertTrue(js!!.contains("width=${BrowserDisplayMode.DESKTOP_WIDTH_CSS_PX}"))
+    }
+
+    // The manual switch still wins everywhere it applied before.
+    @Test fun `pinning off still injects nothing while browsing`() {
+        assertNull(
+            BrowserDisplayMode.viewportScriptFor(
+                "https://donghuafun.com/index.php/vod/detail/id/1.html",
+                desktop = true, pinned = false
+            )
+        )
+    }
+
+    @Test fun `mobile mode is unchanged on every kind of page`() {
+        for (u in listOf("https://donghuafun.com/", "https://donghuafun.com/vod/play/id/1.html")) {
+            val js = BrowserDisplayMode.viewportScriptFor(u, desktop = false, pinned = true)
+            assertNotNull(js)
+            assertTrue(js!!.contains("width=device-width"))
+        }
+    }
+
+    @Test fun `the player-page script cannot throw out of itself`() {
+        val js = BrowserDisplayMode.viewportScriptFor(
+            "https://example.com/watch/1", desktop = true, pinned = true
+        )!!
+        assertTrue(js.contains("try{"))
+        assertTrue(js.contains("catch(e)"))
+    }
 }

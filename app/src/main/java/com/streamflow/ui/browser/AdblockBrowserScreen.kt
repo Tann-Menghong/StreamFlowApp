@@ -720,9 +720,10 @@ fun AdblockBrowserScreen(
                 }
                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
                 // Pin the layout width before the page's own stylesheets settle,
-                // so it never flashes the mobile column first. Null when width
-                // pinning is off -- the page keeps its own viewport tag.
-                BrowserDisplayMode.viewportScript(desktopMode, pinViewport)
+                // so it never flashes the mobile column first. Decided per URL:
+                // a page with a player is never pinned, because scaling one is
+                // what composites the video as a black rectangle.
+                BrowserDisplayMode.viewportScriptFor(url, desktopMode, pinViewport)
                     ?.let { view.evaluateJavascript(it, null) }
             }
             // Deliberately the DEPRECATED 4-arg overload, not the API 23
@@ -763,10 +764,12 @@ fun AdblockBrowserScreen(
                     }
                 }
                 view.evaluateJavascript("javascript:(function(){$AD_BLOCK_JS})()", null)
-                // Re-assert the width: single-page navigations and late scripts
-                // on these sites rewrite the viewport tag after first paint,
-                // which silently dropped the tab back to the mobile layout.
-                BrowserDisplayMode.viewportScript(desktopMode, pinViewport)
+                // Re-assert the decision: single-page navigations and late
+                // scripts on these sites rewrite the viewport tag after first
+                // paint, which silently dropped the tab back to the mobile
+                // layout — or, on a player page, put the pin back and blacked
+                // the video out again after it had started fine.
+                BrowserDisplayMode.viewportScriptFor(url, desktopMode, pinViewport)
                     ?.let { view.evaluateJavascript(it, null) }
             }
             // Popunder/redirect blocking: streaming sites love navigating the

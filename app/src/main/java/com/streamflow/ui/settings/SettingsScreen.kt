@@ -876,7 +876,7 @@ fun SettingsCategoryScreen(category: String, onBack: () -> Unit, vm: SettingsVie
                             SettingsSwitchItem(
                                 Icons.Rounded.Fullscreen,
                                 "Force desktop width",
-                                "Lays pages out at 1100px and scales them to fit. Turn off if a video plays as a black screen",
+                                "Lays browsing pages out at 1100px and scales them to fit. Pages with a video player are never scaled, since that is what showed a black screen",
                                 pinWidth
                             ) {
                                 pinWidth = it

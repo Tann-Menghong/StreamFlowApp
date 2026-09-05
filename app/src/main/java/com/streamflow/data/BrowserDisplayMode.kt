@@ -102,6 +102,92 @@ object BrowserDisplayMode {
     fun userAgent(desktop: Boolean): String = if (desktop) DESKTOP_UA else MOBILE_UA
 
     /**
+     * Pages that are showing a video, where the layout width must never be
+     * pinned no matter what the setting says.
+     *
+     * v6.26.0 split the width pin out of desktop mode on the theory that the
+     * pin, not the user-agent, was blacking out video. That theory is now
+     * measured rather than assumed. Fetching the same donghuafun episode page
+     * under both user-agents returns byte-identical HTML apart from a 9-char
+     * Cloudflare request id; there is no `userAgent` or mobile-detection
+     * branch in the served markup or in the site's player.js; and every page —
+     * home, series, episode — ships `width=device-width`. So the user-agent
+     * changes nothing at all on these sites, and the desktop layout users see
+     * is produced *entirely* by [viewportScript] rewriting that tag.
+     *
+     * Which makes the two facts fit together exactly: the only thing desktop
+     * mode really does is pin the width, and pinning 1100px into a ~400px
+     * window means the engine composites the whole page — the video layer
+     * included — at roughly a third scale. That is the black rectangle.
+     *
+     * The pin is what makes a browsing grid readable and it is what breaks a
+     * player, so it is applied per page rather than per app: pinned while
+     * browsing, never on the page with the video. Matching is on the path and
+     * query only — the host is dropped, so a site with "watch" in its domain
+     * does not put every one of its pages in mobile layout.
+     */
+    private val PLAYER_PATH = Regex(
+        // /index.php/vod/play/id/1/... but NOT /user/plays.html
+        """/play(?:[/.?]|$)""" +
+        """|/watch""" +
+        """|/embed/""" +
+        // Episode-1, /ep-12, /episode/3 — the trailing digit keeps an
+        // "/episodes" index page, which is browsing, out of this.
+        """|(?:^|[/\-_])ep(?:isode)?[-_/]?\d"""
+    )
+
+    fun isPlayerPage(url: String): Boolean {
+        val afterScheme = url.substringAfter("://", url)
+        val slash = afterScheme.indexOf('/')
+        if (slash < 0) return false
+        return PLAYER_PATH.containsMatchIn(afterScheme.substring(slash).lowercase())
+    }
+
+    /**
+     * The viewport script to run for one specific page.
+     *
+     * This is the entry point [AdblockBrowserScreen] calls; [viewportScript] is
+     * the mode-level primitive underneath it.
+     */
+    fun viewportScriptFor(url: String, desktop: Boolean, pinned: Boolean): String? = when {
+        !desktop -> viewportScript(desktop = false, pinned = pinned)
+        isPlayerPage(url) -> UNPIN_ON_PLAYER_JS
+        pinned -> viewportScript(desktop = true, pinned = true)
+        else -> null
+    }
+
+    /**
+     * Guarantees scale 1 on a page with a player, without trampling a viewport
+     * tag the site already got right.
+     *
+     * Most of these pages ship `width=device-width, initial-scale=1,
+     * viewport-fit=cover`, and blindly replacing that would drop the
+     * `viewport-fit` the site uses to lay out under a display cutout — trading
+     * a black video for a notch bug. So the tag is only rewritten when it is
+     * missing or does not ask for device width, which is also the case that
+     * would otherwise leave WebView on its 980px default and scale the page
+     * anyway.
+     */
+    private val UNPIN_ON_PLAYER_JS = """
+        (function(){
+          try{
+            var tags = document.querySelectorAll('meta[name="viewport"]');
+            for(var i=0;i<tags.length;i++){
+              var c = tags[i].getAttribute('content') || '';
+              if(c.indexOf('device-width') !== -1) return;
+            }
+            var head = document.head || document.getElementsByTagName('head')[0];
+            if(!head) return;
+            for(var j=0;j<tags.length;j++) tags[j].parentNode.removeChild(tags[j]);
+            var m = document.createElement('meta');
+            m.setAttribute('name','viewport');
+            m.setAttribute('content','width=device-width, initial-scale=1');
+            head.appendChild(m);
+          }catch(e){}
+        })();
+    """.trimIndent()
+
+    /**
      * Forces the page to lay out at a fixed desktop width instead of obeying its
      * own `width=device-width` viewport tag.
      *
