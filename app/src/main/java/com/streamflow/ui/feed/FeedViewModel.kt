@@ -20,7 +20,10 @@ sealed class FeedUiState {
     object Loading : FeedUiState()
     object NoSubscriptions : FeedUiState()
     data class Success(val videos: List<VideoItem>) : FeedUiState()
-    data class Error(val message: String) : FeedUiState()
+    data class Error(
+        val message: String,
+        val kind: com.streamflow.data.ExtractionError = com.streamflow.data.ExtractionError.UNKNOWN,
+    ) : FeedUiState()
 }
 
 class FeedViewModel(app: Application) : AndroidViewModel(app) {
@@ -106,7 +109,7 @@ class FeedViewModel(app: Application) : AndroidViewModel(app) {
                 loaded = true
             } catch (e: Exception) {
                 if (gen != feedGeneration) return@launch
-                _uiState.value = FeedUiState.Error(friendlyError(e))
+                _uiState.value = FeedUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
             }
         }
     }

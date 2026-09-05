@@ -96,16 +96,16 @@ fun FeedScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
                         textAlign = TextAlign.Center)
                 }
-                is FeedUiState.Error -> Column(
-                    Modifier.align(Alignment.Center).padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(s.message, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { vm.load(force = true) }) { Text("Retry") }
-                }
+                is FeedUiState.Error -> com.streamflow.ui.components.ErrorState(
+                    error = s.kind,
+                    onRetry = { vm.load(force = true) },
+                    // Feed is the one screen that sometimes knows more than the
+                    // classification does -- "none of your channels returned
+                    // anything" is more use than "network error".
+                    message = s.message.takeIf {
+                        s.kind == com.streamflow.data.ExtractionError.UNKNOWN
+                    }
+                )
                 is FeedUiState.Success -> LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {

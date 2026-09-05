@@ -19,7 +19,10 @@ sealed class SearchUiState {
         val isLoadingMore: Boolean = false,
         val hasMore: Boolean = false
     ) : SearchUiState()
-    data class Error(val message: String) : SearchUiState()
+    data class Error(
+        val message: String,
+        val kind: com.streamflow.data.ExtractionError = com.streamflow.data.ExtractionError.UNKNOWN,
+    ) : SearchUiState()
 }
 
 // Client-side result filters (YouTube's search API doesn't expose these via
@@ -82,7 +85,7 @@ class SearchViewModel : ViewModel() {
                 _uiState.value = SearchUiState.Success(query, result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
                 if (gen != searchGeneration) return@launch
-                _uiState.value = SearchUiState.Error(friendlyError(e))
+                _uiState.value = SearchUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
             }
         }
     }

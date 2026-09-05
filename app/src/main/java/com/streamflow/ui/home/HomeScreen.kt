@@ -85,6 +85,10 @@ fun HomeScreen(
     onChannelClick: ((String) -> Unit)? = null,
     onPlaylistClick: ((String) -> Unit)? = null,
     onShortsClick: (() -> Unit)? = null,
+    // Where "Check for update" goes when the extractor can no longer read
+    // YouTube. Nullable because a host that cannot reach Settings should show
+    // no button rather than one that does nothing.
+    onOpenSettings: (() -> Unit)? = null,
     vm: HomeViewModel = viewModel()
 ) {
     val state            by vm.uiState.collectAsState()
@@ -631,24 +635,18 @@ fun HomeScreen(
                 when (s) {
                     is HomeUiState.Loading -> ShimmerList()
 
-                    is HomeUiState.Error -> Column(
-                        Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("Could not load", style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground)
-                        Spacer(Modifier.height(6.dp))
-                        Text(s.message, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 32.dp))
-                        Spacer(Modifier.height(20.dp))
-                        FilledTonalButton(onClick = {
+                    // Title, glyph and button all come from the classification
+                    // now. "Could not load" + Retry was shown for every failure,
+                    // including a broken extractor, where retrying cannot work.
+                    is HomeUiState.Error -> com.streamflow.ui.components.ErrorState(
+                        error = s.kind,
+                        onRetry = {
                             if (activeSearch.isNotEmpty()) vm.search(activeSearch)
                             else if (selectedCategory == "All") vm.loadTrending()
                             else vm.selectCategory(selectedCategory)
-                        }) { Text("Retry") }
-                    }
+                        },
+                        onCheckForUpdate = onOpenSettings
+                    )
 
                     is HomeUiState.Success -> {
                         // The user's setting is read as a CARD SIZE, not a fixed

@@ -9,12 +9,12 @@ package com.streamflow.data
 // which is exactly why tools/version-check now compares this constant against
 // versionName in app/build.gradle and fails the build when they drift.
 object Changelog {
-    const val VERSION_NAME = "6.21.0"
+    const val VERSION_NAME = "6.22.0"
 
     val notes = listOf(
-        "Library had two dashboards 📊 — one above the tabs and a second one the History tab added underneath it. They measured 'this week' differently, so the two numbers on screen disagreed. There is one dashboard now, and the top-channel list and all-time watch time moved into it",
-        "Your Library stats also stopped going stale: rewatching a video updates the chart straight away instead of waiting for something to be added or removed",
-        "App lock was buried under Settings › Playback 🔒 — it now has its own Privacy page, together with incognito mode, auto-clear history and everything else that decides what the app remembers",
-        "Download settings were split across two unrelated pages. Settings › Downloads now owns the Wi-Fi-only switch, the automatic Watch Later saver and how much space your downloads take"
+        "Errors finally say what actually went wrong 🔍 — \"You're offline\", \"Video unavailable\", \"Members only\" — instead of one generic line with a Retry button that could never have worked",
+        "When YouTube changes something the app can't read, StreamFlow says so and offers to check for an update, rather than asking you to retry a request it already knows will fail",
+        "Settings has a search box 🔎 — type \"dark\", \"pin\", \"wifi\" or \"bass\" and it takes you straight to the right page. Ten pages of settings are pleasant to browse and were awful to look things up in",
+        "Empty screens across Search, Library and the queue now look like each other and tell you how to fill them, instead of one bare line of grey text each"
     )
 }

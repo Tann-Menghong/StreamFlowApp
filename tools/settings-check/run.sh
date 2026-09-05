@@ -17,6 +17,13 @@
 #                               category pages, which is how the app lock ended
 #                               up filed under Playback.
 #
+# 3. check-search-index.js      Settings search navigates from a hand-written
+#                               index. Nothing in Kotlin ties it to the real UI,
+#                               so a renamed or moved row would send the user to
+#                               a page that does not contain what they searched
+#                               for. Every entry is verified against the rows
+#                               that page actually renders.
+#
 # Usage: bash tools/settings-check/run.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -25,3 +32,6 @@ node tools/settings-check/check-single-dashboard.js
 echo
 echo "== settings: category reachability & row ownership =="
 node tools/settings-check/check-categories.js
+echo
+echo "== settings: search index points at settings that exist =="
+node tools/settings-check/check-search-index.js

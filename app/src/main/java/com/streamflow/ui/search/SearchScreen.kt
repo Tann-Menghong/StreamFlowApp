@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FilterAltOff
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
@@ -287,13 +288,13 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                     }
                 }
                 is SearchUiState.Loading -> ShimmerList()
-                is SearchUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(s.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(12.dp))
-                        Button(onClick = { vm.retry() }) { Text("Retry") }
-                    }
-                }
+                // Was a bare sentence and a Retry button with no heading and no
+                // icon -- a different answer to the same question Home was
+                // already answering differently.
+                is SearchUiState.Error -> com.streamflow.ui.components.ErrorState(
+                    error = s.kind,
+                    onRetry = { vm.retry() }
+                )
                 is SearchUiState.Success -> {
                     // Results animate in only once — scrolling back up used to
                     // replay the fade on every card that re-entered view
@@ -339,11 +340,19 @@ fun SearchScreen(onVideoClick: (String) -> Unit, vm: SearchViewModel = viewModel
                         }
                     }
                     if (shown.isEmpty() && s.videos.isNotEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No results match these filters",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        // A filter dead-end that could not be undone from where
+                        // it was shown: the chips are above the fold and this
+                        // sat in the middle of an otherwise empty screen.
+                        com.streamflow.ui.components.EmptyState(
+                            icon = Icons.Rounded.FilterAltOff,
+                            title = "No results match these filters",
+                            subtitle = "${s.videos.size} result${if (s.videos.size == 1) "" else "s"} were hidden by the length and date filters.",
+                            actionLabel = "Clear filters",
+                            onAction = {
+                                vm.durationFilter.value = DurationFilter.ANY
+                                vm.dateFilter.value = DateFilter.ANY
+                            }
+                        )
                     } else LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)

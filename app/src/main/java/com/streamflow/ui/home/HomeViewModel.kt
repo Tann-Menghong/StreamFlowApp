@@ -22,7 +22,13 @@ sealed class HomeUiState {
         val isLoadingMore: Boolean = false,
         val hasMore: Boolean = false
     ) : HomeUiState()
-    data class Error(val message: String) : HomeUiState()
+    // Carries WHY, not just what to print: the UI picks its recovery action
+    // from the classification, so a broken extractor no longer offers a
+    // Retry button that ErrorUtils already knows cannot succeed.
+    data class Error(
+        val message: String,
+        val kind: com.streamflow.data.ExtractionError = com.streamflow.data.ExtractionError.UNKNOWN,
+    ) : HomeUiState()
 }
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -372,7 +378,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 // A stale failure must not replace a newer feed with an error page
                 if (gen != feedGeneration) return@launch
                 // Offline / failed refresh: the cached feed is better than an error page
-                if (!showingCachedFeed) _uiState.value = HomeUiState.Error(friendlyError(e))
+                if (!showingCachedFeed) _uiState.value = HomeUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
             }
         }
     }
@@ -405,7 +411,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
                 if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
-                _uiState.value = HomeUiState.Error(friendlyError(e))
+                _uiState.value = HomeUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
             }
         }
     }
@@ -433,7 +439,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
                 } catch (e: Exception) {
                     if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
-                    _uiState.value = HomeUiState.Error(friendlyError(e))
+                    _uiState.value = HomeUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
                 }
             }
         }
@@ -455,7 +461,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = HomeUiState.Success(result.videos, hasMore = result.nextPage != null)
             } catch (e: Exception) {
                 if (gen != feedGeneration) return@launch // stale failure — don't clobber the newer feed
-                _uiState.value = HomeUiState.Error(friendlyError(e))
+                _uiState.value = HomeUiState.Error(friendlyError(e), com.streamflow.data.classifyExtractionError(e))
             }
         }
     }

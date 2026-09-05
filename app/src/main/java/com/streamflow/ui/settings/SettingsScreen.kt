@@ -122,6 +122,11 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
     val autoDlWl     by vm.autoDlWatchLater.collectAsState()
     val appLock      by vm.appLock.collectAsState()
     val incognito    by vm.incognito.collectAsState()
+    // rememberSaveable: opening a result and pressing back should return to the
+    // search that found it, not to a box that has cleared itself.
+    var settingsQuery by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf("")
+    }
 
     val themeLabel = com.streamflow.ui.theme.themeLabelFor(theme)
     val notifFreqLabel = when (notifyFreq) { "1" -> "hourly"; "3" -> "every 3h"; "12" -> "every 12h"; "24" -> "daily"; else -> "every 6h" }
@@ -265,10 +270,107 @@ fun SettingsScreen(onCategoryClick: (String) -> Unit, vm: SettingsViewModel = vi
                 }
             }
 
+            // ── Search ───────────────────────────────────────────────
+            // Ten pages and ~80 controls: categorising them well made them
+            // easier to browse and harder to look up. Knowing "Data saver"
+            // exists tells you nothing about whether it is filed under
+            // Playback, Downloads or Privacy. Results replace the category
+            // list rather than pushing it down, so the screen answers one
+            // question at a time. The index is verified against the real rows
+            // by tools/settings-check/check-search-index.js.
+            Spacer(Modifier.height(14.dp))
+            val results = remember(settingsQuery) {
+                com.streamflow.data.SettingsIndex.search(settingsQuery)
+            }
+            Surface(
+                shape = appShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.outline.copy(0.6f)),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Search, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp))
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = settingsQuery,
+                        onValueChange = { settingsQuery = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(
+                            MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.weight(1f)
+                            .padding(horizontal = 10.dp, vertical = 14.dp),
+                        decorationBox = { inner ->
+                            if (settingsQuery.isEmpty()) {
+                                Text("Search settings",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                            }
+                            inner()
+                        }
+                    )
+                    if (settingsQuery.isNotEmpty()) {
+                        IconButton(onClick = { settingsQuery = "" },
+                            modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Rounded.Close, "Clear search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+
+            if (settingsQuery.isNotBlank()) {
+                if (results.isEmpty()) {
+                    Text(
+                        "Nothing in Settings matches that.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)
+                    )
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        shape = appShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(0.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.outline.copy(0.6f))
+                    ) {
+                        results.forEachIndexed { i, r ->
+                            // The page name is the subtitle: a result is only
+                            // useful if it says where it is taking you.
+                            SettingsSearchRow(
+                                title = r.entry.title,
+                                category = r.entry.category,
+                                onClick = { onCategoryClick(r.entry.category) }
+                            )
+                            if (i < results.lastIndex) {
+                                Divider(
+                                    modifier = Modifier.padding(start = 20.dp),
+                                    thickness = 0.7.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(0.35f)
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+
             // ── Dashboard: every category grouped into labelled sections, each a
             // single rounded card of full-width rows. Tapping a row opens that
-            // category's own page.
-            settingsSections.forEach { section ->
+            // category's own page. Hidden while searching: two lists of settings
+            // on one screen is the Library's old problem in a new place.
+            if (settingsQuery.isBlank()) settingsSections.forEach { section ->
                 // Muted uppercase section label
                 Text(
                     section.header.uppercase(),
@@ -382,6 +484,31 @@ private fun SettingsDashboardRow(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        Icon(Icons.Rounded.ChevronRight, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
+            modifier = Modifier.size(20.dp))
+    }
+}
+
+// One search hit: the setting's own name, and the page it will open.
+@Composable
+private fun SettingsSearchRow(title: String, category: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(category, fontSize = 12.sp, maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.Rounded.ChevronRight, null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),

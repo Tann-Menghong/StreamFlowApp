@@ -374,7 +374,10 @@ fun NavGraph(startUrl: String? = null, startDest: String? = null, intentNonce: I
                     onPlaylistClick = { url ->
                         if (url.isNotEmpty()) navController.navigate(Screen.YtPlaylist.createRoute(url))
                     },
-                    onShortsClick = { navController.navigate(Screen.Shorts.route) }
+                    onShortsClick = { navController.navigate(Screen.Shorts.route) },
+                    onOpenSettings = {
+                        navController.navigate(Screen.SettingsCategory.createRoute("About"))
+                    }
                 )
             }
             composable(Screen.Shorts.route) {

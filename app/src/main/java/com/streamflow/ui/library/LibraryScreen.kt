@@ -37,6 +37,7 @@ import com.streamflow.data.local.entity.HistoryEntity
 import com.streamflow.data.local.entity.SubscriptionEntity
 import com.streamflow.data.local.entity.WatchLaterEntity
 import com.streamflow.data.model.VideoItem
+import com.streamflow.ui.components.EmptyState
 import com.streamflow.ui.components.VideoCard
 import com.streamflow.ui.components.formatDuration
 import kotlinx.coroutines.flow.first
@@ -682,24 +683,6 @@ private fun VideoListWithSearch(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(40.dp)) {
-            Icon(icon, null,
-                tint     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.25f),
-                modifier = Modifier.size(64.dp))
-            Spacer(Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(0.55f))
-            Spacer(Modifier.height(6.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.45f),
-                textAlign = TextAlign.Center)
         }
     }
 }
